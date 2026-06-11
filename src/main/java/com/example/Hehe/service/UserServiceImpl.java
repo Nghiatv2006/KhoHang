@@ -1,5 +1,6 @@
 package com.example.Hehe.service;
 
+import com.example.Hehe.dto.ChangePasswordRequest;
 import com.example.Hehe.dto.UserResponse;
 import com.example.Hehe.dto.UserSaveRequest;
 import com.example.Hehe.model.Branch;
@@ -251,6 +252,35 @@ public class UserServiceImpl implements UserService {
         return convertToResponse(updatedUser);
     }
 
+    @Override
+    public void changePassword(ChangePasswordRequest request, User currentUser) {
+        // Validate dữ liệu đầu vào
+        if (request.getCurrentPassword() == null || request.getCurrentPassword().trim().isEmpty()) {
+            throw new RuntimeException("Vui lòng nhập mật khẩu hiện tại.");
+        }
+        if (request.getNewPassword() == null || request.getNewPassword().trim().isEmpty()) {
+            throw new RuntimeException("Vui lòng nhập mật khẩu mới.");
+        }
+        if (request.getNewPassword().length() < 8) {
+            throw new RuntimeException("Mật khẩu mới phải có ít nhất 8 ký tự.");
+        }
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new RuntimeException("Mật khẩu xác nhận không khớp với mật khẩu mới.");
+        }
+
+        // Load user mới nhất từ DB
+        User user = userRepository.findById(currentUser.getId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản."));
+
+        // Kiểm tra mật khẩu hiện tại
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new RuntimeException("Mật khẩu hiện tại không chính xác.");
+        }
+
+        // Hash và lưu mật khẩu mới
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+    }
     private UserResponse convertToResponse(User user) {
         Integer branchId = user.getBranch() != null ? user.getBranch().getId() : null;
         String branchName = user.getBranch() != null ? user.getBranch().getName() : null;

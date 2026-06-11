@@ -1,5 +1,6 @@
 package com.example.Hehe.controller;
 
+import com.example.Hehe.dto.ChangePasswordRequest;
 import com.example.Hehe.dto.UserResponse;
 import com.example.Hehe.dto.UserSaveRequest;
 import com.example.Hehe.model.User;
@@ -80,6 +81,17 @@ public class UserController {
         try {
             UserResponse response = userService.toggleUserStatus(id, currentUser);
             return ResponseEntity.ok(response);
+        } catch (RuntimeException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+    }
+    @PutMapping("/me/change-password")
+    public ResponseEntity<?> changePassword(
+            @RequestBody ChangePasswordRequest request,
+            @AuthenticationPrincipal User currentUser) {
+        try {
+            userService.changePassword(request, currentUser);
+            return ResponseEntity.ok(Map.of("message", "Đổi mật khẩu thành công."));
         } catch (RuntimeException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }

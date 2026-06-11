@@ -1,5 +1,6 @@
 package com.example.Hehe.service;
 
+import com.example.Hehe.dto.ChangePasswordRequest;
 import com.example.Hehe.dto.UserResponse;
 import com.example.Hehe.dto.UserSaveRequest;
 import com.example.Hehe.model.User;
@@ -15,4 +16,6 @@ public interface UserService {
     void deleteUser(Integer id, User currentUser);
     
     UserResponse toggleUserStatus(Integer id, User currentUser);
+
+    void changePassword(ChangePasswordRequest request, User currentUser);
 }

@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html class="light" lang="vi">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Quản lý Chi nhánh - WMS Hệ Thống</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+    <div id="app" class="min-h-screen flex" v-cloak>
+
+        <!-- Access Denied for non-ADMIN -->
+        <div v-if="currentUser && currentUser.role !== 'ADMIN'" class="fixed inset-0 z-50 bg-slate-900 text-white flex flex-col items-center justify-center p-6 text-center">
+            <span class="material-symbols-outlined text-[64px] text-red-500 mb-4">gpp_maybe</span>
+            <h1 class="text-2xl font-bold">Không có quyền truy cập</h1>
+            <p class="text-slate-400 mt-2 max-w-md">Chức năng quản lý chi nhánh chỉ dành cho tài khoản quản trị viên (ADMIN). Vui lòng liên hệ quản trị viên.</p>
+            <a href="/index.html" class="mt-6 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all inline-block">
+                Quay về Trang chính
+            </a>
+        </div>
+
+        <!-- Sidebar Navigation -->
+        <aside v-if="currentUser && currentUser.role === 'ADMIN'" class="fixed left-0 top-0 h-screen flex flex-col w-[240px] z-40 bg-white border-r border-slate-200">
+            <div class="p-6 flex items-center gap-3">
+                <div class="w-10 h-10 bg-[#00355f] rounded-xl flex items-center justify-center text-white">
+                    <span class="material-symbols-outlined">warehouse</span>
+                </div>
+                <div>
+                    <h1 class="font-bold text-[#00355f]">Quản lý Kho</h1>
+                    <p class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Hệ thống WMS</p>
+                </div>
+            </div>
+            <nav class="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
+                <!-- Active: Chi nhánh -->
+                <a href="/branches.html" class="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-[#0f4c81]/10 text-[#0f4c81] font-semibold text-sm transition-all no-underline">
+                    <span class="material-symbols-outlined">storefront</span>
+                    <span>Chi nhánh</span>
+                </a>
+                <a href="#" class="flex items-center gap-3 px-4 py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 text-slate-600 font-medium text-sm transition-all no-underline">
+                    <span class="material-symbols-outlined">inventory_2</span>
+                    <span>Sản phẩm</span>
+                </a>
+                <a href="/index.html" class="flex items-center gap-3 px-4 py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 text-slate-600 font-medium text-sm transition-all no-underline">
+                    <span class="material-symbols-outlined">badge</span>
+                    <span>Nhân viên</span>
+                </a>
+                <a href="#" class="flex items-center gap-3 px-4 py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 text-slate-600 font-medium text-sm transition-all no-underline">
+                    <span class="material-symbols-outlined">warehouse</span>
+                    <span>Kho hàng</span>
+                </a>
+                <a href="#" class="flex items-center gap-3 px-4 py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 text-slate-600 font-medium text-sm transition-all no-underline">
+                    <span class="material-symbols-outlined">local_shipping</span>
+                    <span>Vận đơn</span>
+                </a>
+                <div class="pt-6 mt-6 border-t border-slate-100">
+                    <a href="#" class="flex items-center gap-3 px-4 py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 text-slate-600 font-medium text-sm transition-all no-underline">
+                        <span class="material-symbols-outlined">manage_accounts</span>
+                        <span>Vai trò</span>
+                    </a>
+                </div>
+            </nav>
+            <div class="p-4 border-t border-slate-100 space-y-1">
+                <a href="/account.html" class="flex items-center gap-3 px-4 py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 text-slate-600 font-medium text-sm transition-all no-underline">
+                    <span class="material-symbols-outlined">settings</span><span>Cài đặt</span>
+                </a>
+                <div @click="logout" class="flex items-center gap-3 px-4 py-2.5 rounded-xl cursor-pointer hover:bg-red-50 text-red-600 font-medium text-sm transition-all">
+                    <span class="material-symbols-outlined">logout</span><span>Đăng xuất</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main v-if="currentUser && currentUser.role === 'ADMIN'" class="ml-[240px] flex-1 flex flex-col min-h-screen">
+
+            <!-- Top Header -->
+            <header class="h-16 flex justify-between items-center w-full px-8 bg-white border-b border-slate-200 sticky top-0 z-30">
+                <div class="text-sm font-semibold text-[#00355f]">
+                    <span class="text-slate-400 font-normal">Quản trị /</span> Chi nhánh
+                </div>
+                <div class="flex items-center gap-2 cursor-pointer">
+                    <div class="w-8 h-8 rounded-full bg-[#00355f] text-white flex items-center justify-center font-bold text-sm">
+                        {{ currentUser.fullName ? currentUser.fullName.substring(0, 2).toUpperCase() : 'AD' }}
+                    </div>
+                    <div class="text-left hidden md:block">
+                        <p class="font-semibold text-sm leading-tight">{{ currentUser.fullName }}</p>
+                        <p class="text-xs text-slate-400">{{ currentUser.role }}</p>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Body -->
+            <div class="p-8 space-y-6 max-w-[1440px] w-full mx-auto">
+
+                <!-- Page Header & Actions -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-[#00355f] tracking-tight">Quản lý Chi nhánh</h2>
+                        <p class="text-sm text-slate-500">Quản lý danh sách và ngưỡng cảnh báo tồn kho các chi nhánh trên toàn hệ thống.</p>
+                    </div>
+                    <button @click="openAddModal" class="flex items-center gap-2 px-5 py-2.5 bg-[#00355f] hover:bg-[#0f4c81] text-white font-semibold rounded-xl active:scale-[0.98] transition-all shadow-sm">
+                        <span class="material-symbols-outlined text-[20px]">add_business</span>
+                        <span>Thêm chi nhánh</span>
+                    </button>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Tổng chi nhánh</p>
+                            <p class="text-3xl font-bold text-[#00355f] mt-1">{{ branches.length }}</p>
+                            <p class="text-xs text-slate-400 mt-1">Trên toàn hệ thống</p>
+                        </div>
+                        <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+                            <span class="material-symbols-outlined text-[28px]">domain</span>
+                        </div>
+                    </div>
+                    <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Ngưỡng TB tồn kho</p>
+                            <p class="text-3xl font-bold text-[#00355f] mt-1">{{ avgThreshold }}</p>
+                            <p class="text-xs text-slate-400 mt-1">Trung bình tất cả chi nhánh</p>
+                        </div>
+                        <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center">
+                            <span class="material-symbols-outlined text-[28px]">inventory</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Branch Table -->
+                <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                    <!-- Search -->
+                    <div class="p-6 border-b border-slate-200 flex flex-col sm:flex-row gap-4 justify-between items-center bg-slate-50/50">
+                        <div class="relative w-full sm:w-96">
+                            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                            <input v-model="searchQuery" @input="debouncedFetch" class="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-[#0f4c81] focus:ring-2 focus:ring-blue-900/10 text-sm" placeholder="Tìm theo tên hoặc địa chỉ chi nhánh..." type="text"/>
+                        </div>
+                        <button @click="searchQuery=''; fetchBranches()" class="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-[#00355f] border border-slate-200 hover:border-slate-300 rounded-xl transition-all">
+                            Xóa bộ lọc
+                        </button>
+                    </div>
+
+                    <!-- Table -->
+                    <div class="overflow-x-auto relative">
+                        <div v-if="loading" class="absolute inset-0 bg-white/70 flex items-center justify-center z-10 py-12">
+                            <span class="w-8 h-8 border-4 border-slate-200 border-t-[#00355f] rounded-full animate-spin"></span>
+                        </div>
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-slate-50/70 text-slate-500 font-semibold text-xs border-b border-slate-200 uppercase tracking-wider">
+                                <tr>
+                                    <th class="px-6 py-4">ID</th>
+                                    <th class="px-6 py-4">Tên chi nhánh</th>
+                                    <th class="px-6 py-4">Địa chỉ</th>
+                                    <th class="px-6 py-4 text-center">Ngưỡng tồn kho tối thiểu</th>
+                                    <th class="px-6 py-4 text-right">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-sm">
+                                <tr v-for="branch in branches" :key="branch.id" class="hover:bg-blue-50/40 transition-colors">
+                                    <td class="px-6 py-4 text-slate-400 font-mono text-xs font-semibold">#{{ branch.id }}</td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-9 h-9 rounded-xl bg-[#0f4c81]/10 text-[#0f4c81] flex items-center justify-center">
+                                                <span class="material-symbols-outlined text-[20px]">storefront</span>
+                                            </div>
+                                            <span class="font-semibold text-slate-900">{{ branch.name }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 text-slate-500 max-w-xs truncate">{{ branch.address }}</td>
+                                    <td class="px-6 py-4 text-center">
+                                        <span class="inline-flex items-center gap-1 px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold">
+                                            <span class="material-symbols-outlined text-[16px]">warning</span>
+                                            ≤ {{ branch.lowStockThreshold }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-right" @click.stop>
+                                        <div class="flex items-center justify-end gap-2">
+                                            <button @click="openEditModal(branch)" class="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all" title="Sửa chi nhánh">
+                                                <span class="material-symbols-outlined text-[20px]">edit</span>
+                                            </button>
+                                            <button @click="openDeleteConfirm(branch)" class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Xóa chi nhánh">
+                                                <span class="material-symbols-outlined text-[20px]">delete</span>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr v-if="!loading && branches.length === 0">
+                                    <td colspan="5" class="px-6 py-12 text-center text-slate-400 font-medium">
+                                        Không tìm thấy chi nhánh nào.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="px-6 py-4 border-t border-slate-200 bg-slate-50 text-xs text-slate-500 font-medium">
+                        Hiển thị {{ branches.length }} chi nhánh
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add/Edit Modal -->
+            <div v-if="showFormModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60">
+                <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200">
+                    <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-[#00355f] text-white">
+                        <h3 class="font-bold text-lg flex items-center gap-2">
+                            <span class="material-symbols-outlined">{{ isEditMode ? 'edit_square' : 'add_business' }}</span>
+                            <span>{{ isEditMode ? 'Cập nhật Chi nhánh' : 'Thêm Chi nhánh mới' }}</span>
+                        </h3>
+                        <button @click="showFormModal=false" class="text-white/80 hover:text-white">
+                            <span class="material-symbols-outlined text-[24px]">close</span>
+                        </button>
+                    </div>
+                    <form @submit.prevent="saveBranch" class="p-6 space-y-4">
+                        <div v-if="modalError" class="bg-red-50 border border-red-200 text-red-600 px-4 py-2.5 rounded-xl text-xs flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[18px]">error</span>
+                            <span>{{ modalError }}</span>
+                        </div>
+                        <!-- Name -->
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Tên chi nhánh *</label>
+                            <input type="text" v-model="formBranch.name" required class="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-[#0f4c81] text-sm" placeholder="Ví dụ: Chi nhánh Cần Thơ"/>
+                        </div>
+                        <!-- Address -->
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Địa chỉ đầy đủ *</label>
+                            <textarea v-model="formBranch.address" required rows="2" class="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-[#0f4c81] text-sm resize-none" placeholder="Ví dụ: 99 Đường 3/2, Ninh Kiều, Cần Thơ"></textarea>
+                        </div>
+                        <!-- Low Stock Threshold -->
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Ngưỡng cảnh báo tồn kho tối thiểu</label>
+                            <div class="flex items-center gap-3">
+                                <input type="number" v-model.number="formBranch.lowStockThreshold" min="0" class="w-32 px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-[#0f4c81] text-sm text-center font-bold"/>
+                                <p class="text-xs text-slate-400">Sản phẩm có số lượng tồn kho ≤ giá trị này sẽ được đánh dấu cảnh báo.</p>
+                            </div>
+                        </div>
+                        <!-- Actions -->
+                        <div class="pt-4 flex justify-end gap-3 border-t border-slate-100">
+                            <button type="button" @click="showFormModal=false" class="px-5 py-2 text-sm font-semibold text-slate-500 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all">Hủy bỏ</button>
+                            <button type="submit" :disabled="modalLoading" class="px-5 py-2 bg-[#00355f] hover:bg-[#0f4c81] text-white font-semibold text-sm rounded-xl active:scale-[0.98] transition-all disabled:opacity-50 flex items-center gap-1.5">
+                                <span v-if="modalLoading" class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                                <span>{{ isEditMode ? 'Lưu cập nhật' : 'Tạo mới' }}</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Delete Confirmation Modal -->
+            <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60">
+                <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden border border-slate-200">
+                    <div class="p-6 text-center space-y-4">
+                        <div class="w-14 h-14 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto">
+                            <span class="material-symbols-outlined text-[32px]">warning</span>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-lg text-slate-900">Xác nhận xóa chi nhánh?</h3>
+                            <p class="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                                Bạn có chắc chắn muốn xóa <span class="font-semibold text-slate-800">"{{ deletingBranchName }}"</span>? Thao tác này sẽ thất bại nếu chi nhánh đã có nhân viên, tồn kho hoặc dữ liệu giao dịch liên kết.
+                            </p>
+                        </div>
+                        <div v-if="deleteError" class="bg-red-50 border border-red-200 text-red-600 px-4 py-2.5 rounded-xl text-xs flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[18px]">error</span>
+                            <span>{{ deleteError }}</span>
+                        </div>
+                        <div class="flex justify-center gap-3 pt-2">
+                            <button @click="showDeleteModal=false; deleteError=''" class="px-4 py-2 border border-slate-200 rounded-xl text-slate-500 font-semibold text-xs hover:bg-slate-50 transition-all">Hủy bỏ</button>
+                            <button @click="deleteBranch" :disabled="modalLoading" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold text-xs rounded-xl transition-all disabled:opacity-50 flex items-center gap-1.5">
+                                <span v-if="modalLoading" class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                                <span>Xác nhận xóa</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script>
+        const { createApp, ref, computed, onMounted, nextTick } = Vue;
+
+        // ===== VUE APP =====
+        createApp({
+            setup() {
+                const currentUser = ref(null);
+                const branches = ref([]);
+                const loading = ref(false);
+                const searchQuery = ref('');
+                let debounceTimeout = null;
+
+                // Modal state
+                const showFormModal = ref(false);
+                const isEditMode = ref(false);
+                const modalLoading = ref(false);
+                const modalError = ref('');
+                const formBranch = ref({ id: null, name: '', address: '', lowStockThreshold: 5 });
+
+                const showDeleteModal = ref(false);
+                const deletingBranchId = ref(null);
+                const deletingBranchName = ref('');
+                const deleteError = ref('');
+
+                // Computed stats
+                const avgThreshold = computed(() => {
+                    if (branches.value.length === 0) return 0;
+                    const sum = branches.value.reduce((s, b) => s + (b.lowStockThreshold || 0), 0);
+                    return Math.round(sum / branches.value.length);
+                });
+
+                // Auth check
+                onMounted(() => {
+                    const savedUser = localStorage.getItem('wms_user');
+                    if (!savedUser) { window.location.href = '/login.html'; return; }
+                    currentUser.value = JSON.parse(savedUser);
+                    if (currentUser.value.role !== 'ADMIN') return;
+
+                    fetchBranches();
+                });
+
+                const checkStatus = (response) => {
+                    if (response.status === 401) {
+                        localStorage.removeItem('wms_user');
+                        window.location.href = '/login.html';
+                        throw new Error('Phiên đăng nhập hết hạn.');
+                    }
+                    return response;
+                };
+
+                // ===== FETCH =====
+                async function fetchBranches() {
+                    loading.value = true;
+                    try {
+                        let url = '/api/branches';
+                        if (searchQuery.value.trim()) {
+                            url += `?keyword=${encodeURIComponent(searchQuery.value.trim())}`;
+                        }
+                        const resp = await fetch(url);
+                        checkStatus(resp);
+                        if (resp.ok) {
+                            branches.value = await resp.json();
+                        }
+                    } catch (e) {
+                        console.error(e);
+                    } finally {
+                        loading.value = false;
+                    }
+                }
+
+                function debouncedFetch() {
+                    clearTimeout(debounceTimeout);
+                    debounceTimeout = setTimeout(() => fetchBranches(), 400);
+                }
+
+                // ===== MODAL =====
+                function openAddModal() {
+                    isEditMode.value = false;
+                    modalError.value = '';
+                    formBranch.value = { id: null, name: '', address: '', lowStockThreshold: 5 };
+                    showFormModal.value = true;
+                }
+                function openEditModal(branch) {
+                    isEditMode.value = true;
+                    modalError.value = '';
+                    formBranch.value = {
+                        id: branch.id,
+                        name: branch.name,
+                        address: branch.address,
+                        lowStockThreshold: branch.lowStockThreshold
+                    };
+                    showFormModal.value = true;
+                }
+
+                async function saveBranch() {
+                    modalLoading.value = true;
+                    modalError.value = '';
+                    try {
+                        const isEdit = isEditMode.value;
+                        const url = isEdit ? `/api/branches/${formBranch.value.id}` : '/api/branches';
+                        const method = isEdit ? 'PUT' : 'POST';
+                        const resp = await fetch(url, {
+                            method,
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                name: formBranch.value.name,
+                                address: formBranch.value.address,
+                                lowStockThreshold: formBranch.value.lowStockThreshold
+                            })
+                        });
+                        checkStatus(resp);
+                        const data = await resp.json();
+                        if (!resp.ok) throw new Error(data.message || 'Lỗi lưu thông tin chi nhánh.');
+                        showFormModal.value = false;
+                        fetchBranches();
+                    } catch (e) {
+                        modalError.value = e.message;
+                    } finally {
+                        modalLoading.value = false;
+                    }
+                }
+
+                // ===== DELETE =====
+                function openDeleteConfirm(branch) {
+                    deletingBranchId.value = branch.id;
+                    deletingBranchName.value = branch.name;
+                    deleteError.value = '';
+                    showDeleteModal.value = true;
+                }
+                async function deleteBranch() {
+                    modalLoading.value = true;
+                    deleteError.value = '';
+                    try {
+                        const resp = await fetch(`/api/branches/${deletingBranchId.value}`, { method: 'DELETE' });
+                        checkStatus(resp);
+                        const data = await resp.json();
+                        if (!resp.ok) throw new Error(data.message || 'Không thể xóa chi nhánh.');
+                        showDeleteModal.value = false;
+                        fetchBranches();
+                    } catch (e) {
+                        deleteError.value = e.message;
+                    } finally {
+                        modalLoading.value = false;
+                    }
+                }
+
+                // ===== LOGOUT =====
+                function logout() {
+                    localStorage.removeItem('wms_user');
+                    fetch('/api/auth/logout', { method: 'POST' }).finally(() => {
+                        window.location.href = '/login.html';
+                    });
+                }
+
+                return {
+                    currentUser, branches, loading, searchQuery,
+                    avgThreshold,
+                    showFormModal, isEditMode, modalLoading, modalError, formBranch,
+                    showDeleteModal, deletingBranchName, deleteError,
+                    fetchBranches, debouncedFetch,
+                    openAddModal, openEditModal, saveBranch,
+                    openDeleteConfirm, deleteBranch,
+                    logout
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
