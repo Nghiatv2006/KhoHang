@@ -147,9 +147,10 @@ graph TD
     *   So sánh số lượng tồn hiện tại với số lượng cần xuất. Nếu tồn kho không đủ, chặn giao dịch và ném lỗi `Không đủ tồn kho`.
     *   Trừ số lượng tồn kho tương ứng. Nếu tồn kho sau khi trừ bằng `0`, bản ghi lô tồn kho vẫn được giữ lại với số lượng là `0` để lưu vết lịch sử lô (hoặc có thể xóa tùy theo cấu hình hệ thống).
     *   Cập nhật thời gian `last_updated = CURRENT_TIMESTAMP`.
-*   **TRANSFER (Điều chuyển chi nhánh):**
-    *   Thực hiện đồng thời: Trừ số lượng tồn kho tại chi nhánh xuất (`source_branch_id`) và Cộng số lượng tồn kho tại chi nhánh nhận (`dest_branch_id`).
-    *   Nếu chi nhánh xuất không đủ số lượng tồn của bất kỳ lô nào trong phiếu, toàn bộ quá trình điều chuyển sẽ bị hủy bỏ (Rollback transaction).
+*   **TRANSFER (Điều chuyển chi nhánh 2 bước):**
+    *   **Bước 1 (Xuất điều chuyển):** Khi phiếu xuất đi được phê duyệt, hệ thống trừ số lượng tồn kho tại chi nhánh nguồn (`source_branch_id`), đồng thời lưu trạng thái `payment_status` là `'IN_TRANSIT'` (Đang đi đường). Hàng hóa tạm thời bị trừ khỏi kho nguồn nhưng chưa được cộng vào kho đích.
+    *   **Bước 2 (Xác nhận nhập):** Khi hàng hóa thực tế tới chi nhánh đích, nhân viên tại chi nhánh đích thực hiện đếm thực tế và bấm Xác nhận nhận hàng. Hệ thống cộng số lượng nhận thực tế vào tồn kho của chi nhánh đích (`dest_branch_id`), đồng thời chuyển trạng thái `payment_status` của phiếu thành `'RECEIVED'` (Đã nhận hàng) để hoàn tất phiếu.
+    *   **Xử lý hao hụt vận chuyển:** Nếu số lượng nhận thực tế ít hơn số lượng xuất đi, hệ thống tự động ghi nhận lượng hao hụt và sinh một phiếu cân bằng giảm (`ADJUST_OUT` ở trạng thái `COMPLETED`) tại chi nhánh nguồn tương ứng với số lượng chênh lệch hao hụt để đảm bảo tính nhất quán của số liệu sổ sách.
 
 ---
 
@@ -166,12 +167,29 @@ Kiểm kê kho là nghiệp vụ định kỳ của chi nhánh để đối chi�
 
 ---
 
-## 9. NGHIỆP VỤ ĐIỀU CHUYỂN NHÂN SỰ CHUYÊN BIỆT (STAFF TRANSFER)
-Nhằm quản lý biến động nhân sự giữa các kho hàng vật lý:
-*   **Tạo đề xuất:** Khi một chi nhánh thiếu nhân sự hoặc nhân viên xin chuyển công tác, `MANAGER` của chi nhánh hiện tại (hoặc quản lý chi nhánh tiếp nhận) tạo một yêu cầu điều chuyển (`branch_transfer_requests`) chứa thông tin nhân viên, chi nhánh đi (`from_branch`), chi nhánh đến đề xuất (`to_branch`) ở trạng thái `PENDING`.
-*   **Duyệt đề xuất:** Chỉ có `ADMIN` hệ thống mới nhìn thấy danh sách yêu cầu này và thực hiện phê duyệt:
-    *   Nếu chọn **APPROVED (Duyệt):** Hệ thống tự động cập nhật trường `branch_id` của nhân viên đó trong bảng `users` sang chi nhánh mới (`to_branch_id`), cập nhật ngày duyệt và người duyệt. Từ thời điểm này, nhân viên đó chỉ có quyền đăng nhập và làm việc trên dữ liệu của chi nhánh mới.
-    *   Nếu chọn **REJECTED (Từ chối):** Yêu cầu chuyển sang trạng thái hủy, nhân viên vẫn ở lại chi nhánh cũ.
+## 9. NGHIỆP VỤ ĐIỀU CHUYỂN NHÂN SỰ 3 BƯỚC (3-STEP STAFF TRANSFER)
+Nhằm quản lý biến động nhân sự giữa các kho hàng vật lý và đảm bảo sự đồng thuận từ các bên:
+*   **Bước 1: Đề xuất & Xác nhận từ Nhân viên:** 
+    *   Yêu cầu điều động có thể do `MANAGER` tạo, nhưng hệ thống sẽ yêu cầu tài khoản của `STAFF` đó phải thực hiện **Xác nhận đồng ý** trên giao diện Web của mình. 
+    *   Nếu nhân viên tự làm đơn xin chuyển, đơn cũng sẽ được tạo và ghi nhận trạng thái khởi đầu là `STAFF_CONFIRMED` (đã có sự xác nhận từ nhân viên).
+*   **Bước 2: Manager thông qua:**
+    *   Quản lý (`MANAGER`) của chi nhánh hiện tại tiến hành phê duyệt để xác nhận việc bàn giao công việc hoàn tất. 
+    *   Trạng thái chuyển sang `MANAGER_APPROVED`.
+*   **Bước 3: Admin phê duyệt quyết định:**
+    *   Chỉ có `ADMIN` hệ thống mới có quyền đưa ra quyết định phê duyệt cuối cùng (`APPROVED`) hoặc từ chối (`REJECTED`).
+    *   Nếu chọn **APPROVED (Duyệt):** Hệ thống tự động cập nhật trường `branch_id` của nhân viên đó trong bảng `users` sang chi nhánh mới (`to_branch_id`), cập nhật ngày duyệt và người duyệt. Từ thời điểm này, nhân viên đó chỉ có quyền đăng nhập và thao tác dữ liệu của chi nhánh mới.
+    *   Nếu chọn **REJECTED (Từ chối):** Đơn chuyển sang trạng thái hủy, nhân viên tiếp tục làm việc tại chi nhánh cũ.
+
+---
+
+## 10. NGHIỆP VỤ SAO LƯU & PHỤC HỒI TRÊN WEB (WEB-BASED BACKUP & RESTORE)
+Để phục vụ công tác quản trị và lưu trữ dữ liệu an toàn trực tiếp từ trình duyệt mà không cần sử dụng công cụ quản trị CSDL chuyên dụng:
+*   **Sao lưu dữ liệu (Backup):**
+    *   `ADMIN` kích hoạt chức năng sao lưu trên giao diện quản trị Web.
+    *   Hệ thống backend truy vấn dữ liệu từ các bảng PostgreSQL, serialize thành file dạng JSON hoặc SQL và tự động kích hoạt tiến trình tải xuống thông qua trình duyệt để lưu trên máy tính cá nhân.
+*   **Phục hồi dữ liệu (Restore):**
+    *   `ADMIN` tải lên file sao lưu (.json hoặc .sql) từ máy tính thông qua form nhập file trên giao diện Web.
+    *   Backend nhận file, phân tích dữ liệu và tự động nạp đè vào PostgreSQL dưới một transaction bảo mật.
 
 ---
 
