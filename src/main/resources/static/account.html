@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html class="light" lang="vi">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Cài đặt bảo mật - WMS Hệ Thống</title>
+    <meta name="description" content="Quản lý tài khoản cá nhân và đổi mật khẩu bảo mật trong hệ thống quản lý kho hàng WMS."/>
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        [v-cloak] { display: none !important; }
+
+        /* Toast notification animation */
+        .toast-enter { animation: toastSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .toast-exit { animation: toastSlideOut 0.3s ease-in forwards; }
+        @keyframes toastSlideIn {
+            from { transform: translateX(120%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes toastSlideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(120%); opacity: 0; }
+        }
+
+        /* Password strength bar animation */
+        .strength-bar { transition: width 0.4s ease, background-color 0.4s ease; }
+
+        /* Subtle pulse for active status dot */
+        @keyframes statusPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .status-pulse { animation: statusPulse 2s ease-in-out infinite; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+    <div id="app" class="min-h-screen flex" v-cloak>
+
+        <!-- Sidebar Navigation -->
+        <aside class="fixed left-0 top-0 h-screen flex flex-col w-[240px] z-40 bg-white border-r border-slate-200">
+            <div class="p-6 flex items-center gap-3">
+                <div class="w-10 h-10 bg-[#00355f] rounded-xl flex items-center justify-center text-white">
+                    <span class="material-symbols-outlined">warehouse</span>
+                </div>
+                <div>
+                    <h1 class="font-bold text-[#00355f]">Quản lý Kho</h1>
+                    <p class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Hệ thống WMS</p>
+                </div>
+            </div>
+            <nav class="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
+                <a href="/branches.html" class="flex items-center gap-3 px-4 py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 text-slate-600 font-medium text-sm transition-all no-underline">
+                    <span class="material-symbols-outlined">storefront</span>
+                    <span>Chi nhánh</span>
+                </a>
+                <a href="#" class="flex items-center gap-3 px-4 py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 text-slate-600 font-medium text-sm transition-all no-underline">
+                    <span class="material-symbols-outlined">inventory_2</span>
+                    <span>Sản phẩm</span>
+                </a>
+                <a href="/index.html" class="flex items-center gap-3 px-4 py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 text-slate-600 font-medium text-sm transition-all no-underline">
+                    <span class="material-symbols-outlined">badge</span>
+                    <span>Nhân viên</span>
+                </a>
+                <a href="#" class="flex items-center gap-3 px-4 py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 text-slate-600 font-medium text-sm transition-all no-underline">
+                    <span class="material-symbols-outlined">warehouse</span>
+                    <span>Kho hàng</span>
+                </a>
+                <a href="#" class="flex items-center gap-3 px-4 py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 text-slate-600 font-medium text-sm transition-all no-underline">
+                    <span class="material-symbols-outlined">local_shipping</span>
+                    <span>Vận đơn</span>
+                </a>
+                <div class="pt-6 mt-6 border-t border-slate-100">
+                    <a href="#" class="flex items-center gap-3 px-4 py-2.5 rounded-xl cursor-pointer hover:bg-slate-50 text-slate-600 font-medium text-sm transition-all no-underline">
+                        <span class="material-symbols-outlined">manage_accounts</span>
+                        <span>Vai trò</span>
+                    </a>
+                </div>
+            </nav>
+            <div class="p-4 border-t border-slate-100 space-y-1">
+                <a href="/account.html" class="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-[#0f4c81]/10 text-[#0f4c81] font-semibold text-sm transition-all no-underline">
+                    <span class="material-symbols-outlined">settings</span>
+                    <span>Cài đặt</span>
+                </a>
+                <div @click="logout" class="flex items-center gap-3 px-4 py-2.5 rounded-xl cursor-pointer hover:bg-red-50 text-red-600 font-medium text-sm transition-all">
+                    <span class="material-symbols-outlined">logout</span><span>Đăng xuất</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="ml-[240px] flex-1 flex flex-col min-h-screen">
+
+            <!-- Top Header -->
+            <header class="h-16 flex justify-between items-center w-full px-8 bg-white border-b border-slate-200 sticky top-0 z-30">
+                <div class="text-sm font-semibold text-[#00355f]">
+                    <span class="text-slate-400 font-normal">Cài đặt /</span> Bảo mật tài khoản
+                </div>
+                <div class="flex items-center gap-2 cursor-pointer">
+                    <div class="w-8 h-8 rounded-full bg-[#00355f] text-white flex items-center justify-center font-bold text-sm">
+                        {{ currentUser ? currentUser.fullName.substring(0, 2).toUpperCase() : 'U' }}
+                    </div>
+                    <div class="text-left hidden md:block">
+                        <p class="font-semibold text-sm leading-tight">{{ currentUser ? currentUser.fullName : '' }}</p>
+                        <p class="text-xs text-slate-400">{{ currentUser ? currentUser.role : '' }}</p>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content Canvas -->
+            <div class="p-8 max-w-5xl mx-auto w-full">
+
+                <!-- Profile Header Section -->
+                <section id="profile-header" class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div class="flex items-center gap-5">
+                        <div class="relative">
+                            <div class="w-20 h-20 rounded-full bg-gradient-to-br from-[#00355f] to-[#0f4c81] flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-blue-900/20 border-4 border-white">
+                                {{ currentUser ? currentUser.fullName.substring(0, 2).toUpperCase() : 'U' }}
+                            </div>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-slate-900">{{ currentUser ? currentUser.fullName : '' }}</h2>
+                            <div class="flex items-center gap-3 mt-1.5 flex-wrap">
+                                <span class="px-3 py-1 bg-[#0f4c81]/10 text-[#0f4c81] rounded-full text-xs font-semibold">{{ roleLabel }}</span>
+                                <span class="flex items-center gap-1 text-xs text-slate-500">
+                                    <span class="material-symbols-outlined text-[14px]">person</span>
+                                    {{ currentUser ? currentUser.username : '' }}
+                                </span>
+                                <span v-if="currentUser && currentUser.branchName" class="flex items-center gap-1 text-xs text-slate-500">
+                                    <span class="material-symbols-outlined text-[14px]">storefront</span>
+                                    {{ currentUser.branchName }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="hidden md:flex gap-6 text-right">
+                        <div class="px-4">
+                            <p class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Trạng thái</p>
+                            <div class="flex items-center gap-1.5 text-green-600 font-semibold text-sm mt-0.5">
+                                <span class="w-2 h-2 rounded-full bg-green-500 status-pulse"></span>
+                                Đang hoạt động
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Main Security Form Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                    <!-- Change Password Form (2/3) -->
+                    <div class="lg:col-span-2">
+                        <section id="change-password-form" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div class="px-6 py-4 border-b border-slate-200 flex items-center gap-3 bg-slate-50/50">
+                                <span class="material-symbols-outlined text-[#0f4c81]">lock_reset</span>
+                                <h3 class="text-lg font-bold text-slate-900">Thay đổi mật khẩu</h3>
+                            </div>
+                            <form @submit.prevent="handleChangePassword" class="p-6 space-y-5">
+
+                                <!-- Error alert -->
+                                <div v-if="formError" class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm flex items-start gap-2.5">
+                                    <span class="material-symbols-outlined text-[18px] shrink-0 mt-0.5">error</span>
+                                    <span>{{ formError }}</span>
+                                </div>
+
+                                <!-- Current Password -->
+                                <div>
+                                    <label for="current_password" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Mật khẩu hiện tại</label>
+                                    <div class="relative">
+                                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">lock</span>
+                                        <input
+                                            :type="showCurrentPassword ? 'text' : 'password'"
+                                            id="current_password"
+                                            v-model="currentPassword"
+                                            class="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0f4c81] focus:ring-2 focus:ring-blue-900/10 transition-all"
+                                            placeholder="••••••••"
+                                            required
+                                        />
+                                        <button type="button" @click="showCurrentPassword = !showCurrentPassword" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#00355f] focus:outline-none">
+                                            <span class="material-symbols-outlined text-[20px]">{{ showCurrentPassword ? 'visibility_off' : 'visibility' }}</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="h-px bg-slate-100"></div>
+
+                                <!-- New Password -->
+                                <div>
+                                    <label for="new_password" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Mật khẩu mới</label>
+                                    <div class="relative">
+                                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">key</span>
+                                        <input
+                                            :type="showNewPassword ? 'text' : 'password'"
+                                            id="new_password"
+                                            v-model="newPassword"
+                                            class="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0f4c81] focus:ring-2 focus:ring-blue-900/10 transition-all"
+                                            placeholder="Nhập mật khẩu mới"
+                                            required
+                                        />
+                                        <button type="button" @click="showNewPassword = !showNewPassword" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#00355f] focus:outline-none">
+                                            <span class="material-symbols-outlined text-[20px]">{{ showNewPassword ? 'visibility_off' : 'visibility' }}</span>
+                                        </button>
+                                    </div>
+                                    <!-- Password Strength Bar -->
+                                    <div v-if="newPassword" class="mt-2">
+                                        <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                            <div class="strength-bar h-full rounded-full" :style="{ width: strengthPercent + '%', backgroundColor: strengthColor }"></div>
+                                        </div>
+                                        <p class="text-[11px] mt-1 font-medium" :style="{ color: strengthColor }">{{ strengthLabel }}</p>
+                                    </div>
+                                </div>
+
+                                <!-- Confirm Password -->
+                                <div>
+                                    <label for="confirm_password" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Xác nhận mật khẩu mới</label>
+                                    <div class="relative">
+                                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">check_circle</span>
+                                        <input
+                                            :type="showConfirmPassword ? 'text' : 'password'"
+                                            id="confirm_password"
+                                            v-model="confirmPassword"
+                                            class="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0f4c81] focus:ring-2 focus:ring-blue-900/10 transition-all"
+                                            :class="{ 'border-red-300 focus:border-red-400 focus:ring-red-100': confirmPassword && confirmPassword !== newPassword, 'border-green-300 focus:border-green-400 focus:ring-green-100': confirmPassword && confirmPassword === newPassword }"
+                                            placeholder="Nhập lại mật khẩu mới"
+                                            required
+                                        />
+                                        <button type="button" @click="showConfirmPassword = !showConfirmPassword" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#00355f] focus:outline-none">
+                                            <span class="material-symbols-outlined text-[20px]">{{ showConfirmPassword ? 'visibility_off' : 'visibility' }}</span>
+                                        </button>
+                                    </div>
+                                    <p v-if="confirmPassword && confirmPassword !== newPassword" class="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                        <span class="material-symbols-outlined text-[14px]">error</span>
+                                        Mật khẩu xác nhận không khớp
+                                    </p>
+                                </div>
+
+                                <!-- Actions -->
+                                <div class="pt-4 flex justify-end gap-3 border-t border-slate-100">
+                                    <button type="button" @click="resetForm" class="px-5 py-2.5 text-sm font-semibold text-slate-500 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all">Hủy bỏ</button>
+                                    <button
+                                        type="submit"
+                                        :disabled="loading || !canSubmit"
+                                        class="px-6 py-2.5 bg-[#00355f] hover:bg-[#0f4c81] text-white font-semibold text-sm rounded-xl active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md shadow-blue-900/10"
+                                    >
+                                        <span v-if="loading" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                                        <span>{{ loading ? 'Đang lưu...' : 'Lưu thay đổi' }}</span>
+                                    </button>
+                                </div>
+                            </form>
+                        </section>
+                    </div>
+
+                    <!-- Security Checklist & Info Sidebar (1/3) -->
+                    <div class="space-y-6">
+                        <!-- Password Requirements Checklist -->
+                        <section id="security-checklist" class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                            <h3 class="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                <span class="material-symbols-outlined text-[#0f4c81]">verified_user</span>
+                                Yêu cầu bảo mật
+                            </h3>
+                            <p class="text-xs text-slate-500 mb-4 leading-relaxed">Để bảo vệ tài khoản tốt nhất, mật khẩu của bạn nên đáp ứng các tiêu chuẩn sau:</p>
+                            <ul class="space-y-3">
+                                <li class="flex items-center gap-3 transition-all duration-300" :class="checks.minLength ? 'opacity-100' : 'opacity-60'">
+                                    <span class="material-symbols-outlined text-[20px] transition-colors duration-300" :class="checks.minLength ? 'text-green-500' : 'text-slate-300'">
+                                        {{ checks.minLength ? 'check_circle' : 'radio_button_unchecked' }}
+                                    </span>
+                                    <span class="text-sm" :class="checks.minLength ? 'text-slate-800 font-medium' : 'text-slate-500'">Ít nhất 8 ký tự</span>
+                                </li>
+                                <li class="flex items-center gap-3 transition-all duration-300" :class="checks.hasUpperLower ? 'opacity-100' : 'opacity-60'">
+                                    <span class="material-symbols-outlined text-[20px] transition-colors duration-300" :class="checks.hasUpperLower ? 'text-green-500' : 'text-slate-300'">
+                                        {{ checks.hasUpperLower ? 'check_circle' : 'radio_button_unchecked' }}
+                                    </span>
+                                    <span class="text-sm" :class="checks.hasUpperLower ? 'text-slate-800 font-medium' : 'text-slate-500'">Bao gồm chữ cái hoa &amp; thường</span>
+                                </li>
+                                <li class="flex items-center gap-3 transition-all duration-300" :class="checks.hasDigit ? 'opacity-100' : 'opacity-60'">
+                                    <span class="material-symbols-outlined text-[20px] transition-colors duration-300" :class="checks.hasDigit ? 'text-green-500' : 'text-slate-300'">
+                                        {{ checks.hasDigit ? 'check_circle' : 'radio_button_unchecked' }}
+                                    </span>
+                                    <span class="text-sm" :class="checks.hasDigit ? 'text-slate-800 font-medium' : 'text-slate-500'">Bao gồm ít nhất một chữ số</span>
+                                </li>
+                                <li class="flex items-center gap-3 transition-all duration-300" :class="checks.hasSpecial ? 'opacity-100' : 'opacity-60'">
+                                    <span class="material-symbols-outlined text-[20px] transition-colors duration-300" :class="checks.hasSpecial ? 'text-green-500' : 'text-slate-300'">
+                                        {{ checks.hasSpecial ? 'check_circle' : 'radio_button_unchecked' }}
+                                    </span>
+                                    <span class="text-sm" :class="checks.hasSpecial ? 'text-slate-800 font-medium' : 'text-slate-500'">Bao gồm ký tự đặc biệt (!@#...)</span>
+                                </li>
+                            </ul>
+                        </section>
+
+                        <!-- Security Tips -->
+                        <section id="security-tips" class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-5 border border-blue-100">
+                            <div class="flex gap-3">
+                                <span class="material-symbols-outlined text-[#0f4c81] shrink-0 mt-0.5">tips_and_updates</span>
+                                <div>
+                                    <h4 class="font-bold text-[#00355f] text-sm mb-1.5">Mẹo bảo mật</h4>
+                                    <p class="text-xs text-[#0f4c81]/80 leading-relaxed">Sử dụng mật khẩu dài và duy nhất cho mỗi tài khoản trực tuyến của bạn. Tránh sử dụng thông tin cá nhân dễ đoán như ngày sinh, tên hoặc số điện thoại.</p>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Toast Notification -->
+        <div class="fixed top-6 right-6 z-[100] space-y-3">
+            <div
+                v-for="toast in toasts"
+                :key="toast.id"
+                class="flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl border min-w-[320px] max-w-md"
+                :class="{
+                    'bg-green-50 border-green-200 text-green-800 toast-enter': toast.type === 'success' && !toast.exiting,
+                    'bg-red-50 border-red-200 text-red-800 toast-enter': toast.type === 'error' && !toast.exiting,
+                    'toast-exit': toast.exiting
+                }"
+            >
+                <span class="material-symbols-outlined text-[22px] shrink-0" :class="toast.type === 'success' ? 'text-green-500' : 'text-red-500'">
+                    {{ toast.type === 'success' ? 'check_circle' : 'error' }}
+                </span>
+                <p class="text-sm font-medium flex-1">{{ toast.message }}</p>
+                <button @click="removeToast(toast.id)" class="text-slate-400 hover:text-slate-600 shrink-0">
+                    <span class="material-symbols-outlined text-[18px]">close</span>
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Vue 3 Setup -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script>
+        const { createApp, ref, computed, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                // ===== AUTH STATE =====
+                const currentUser = ref(null);
+
+                onMounted(() => {
+                    const savedUser = localStorage.getItem('wms_user');
+                    if (!savedUser) { window.location.href = '/login.html'; return; }
+                    currentUser.value = JSON.parse(savedUser);
+                });
+
+                const roleLabel = computed(() => {
+                    if (!currentUser.value) return '';
+                    const map = { 'ADMIN': 'Quản trị viên', 'MANAGER': 'Quản lý', 'STAFF': 'Nhân viên' };
+                    return map[currentUser.value.role] || currentUser.value.role;
+                });
+
+                // ===== AUTH HELPERS =====
+                const checkStatus = (response) => {
+                    if (response.status === 401) {
+                        localStorage.removeItem('wms_user');
+                        window.location.href = '/login.html';
+                        throw new Error('Phiên đăng nhập hết hạn.');
+                    }
+                    return response;
+                };
+
+                // ===== FORM STATE =====
+                const currentPassword = ref('');
+                const newPassword = ref('');
+                const confirmPassword = ref('');
+                const showCurrentPassword = ref(false);
+                const showNewPassword = ref(false);
+                const showConfirmPassword = ref(false);
+                const loading = ref(false);
+                const formError = ref('');
+
+                // ===== PASSWORD CHECKS (realtime) =====
+                const checks = computed(() => {
+                    const pw = newPassword.value;
+                    return {
+                        minLength: pw.length >= 8,
+                        hasUpperLower: /[a-z]/.test(pw) && /[A-Z]/.test(pw),
+                        hasDigit: /\d/.test(pw),
+                        hasSpecial: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(pw)
+                    };
+                });
+
+                // ===== PASSWORD STRENGTH =====
+                const strengthScore = computed(() => {
+                    let score = 0;
+                    if (checks.value.minLength) score++;
+                    if (checks.value.hasUpperLower) score++;
+                    if (checks.value.hasDigit) score++;
+                    if (checks.value.hasSpecial) score++;
+                    return score;
+                });
+
+                const strengthPercent = computed(() => (strengthScore.value / 4) * 100);
+
+                const strengthColor = computed(() => {
+                    const colors = ['#ef4444', '#f59e0b', '#f59e0b', '#10b981', '#10b981'];
+                    return colors[strengthScore.value];
+                });
+
+                const strengthLabel = computed(() => {
+                    const labels = ['Rất yếu', 'Yếu', 'Trung bình', 'Mạnh', 'Rất mạnh'];
+                    return labels[strengthScore.value];
+                });
+
+                // ===== CAN SUBMIT =====
+                const canSubmit = computed(() => {
+                    return currentPassword.value.length > 0
+                        && newPassword.value.length >= 8
+                        && confirmPassword.value === newPassword.value;
+                });
+
+                // ===== FORM ACTIONS =====
+                function resetForm() {
+                    currentPassword.value = '';
+                    newPassword.value = '';
+                    confirmPassword.value = '';
+                    showCurrentPassword.value = false;
+                    showNewPassword.value = false;
+                    showConfirmPassword.value = false;
+                    formError.value = '';
+                }
+
+                async function handleChangePassword() {
+                    if (!canSubmit.value) return;
+
+                    loading.value = true;
+                    formError.value = '';
+
+                    try {
+                        const resp = await fetch('/api/users/me/change-password', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                currentPassword: currentPassword.value,
+                                newPassword: newPassword.value,
+                                confirmPassword: confirmPassword.value
+                            })
+                        });
+                        checkStatus(resp);
+                        const data = await resp.json();
+
+                        if (!resp.ok) {
+                            throw new Error(data.message || 'Có lỗi xảy ra khi đổi mật khẩu.');
+                        }
+
+                        addToast('success', data.message || 'Đổi mật khẩu thành công!');
+                        resetForm();
+                    } catch (err) {
+                        formError.value = err.message;
+                        addToast('error', err.message);
+                    } finally {
+                        loading.value = false;
+                    }
+                }
+
+                // ===== TOAST SYSTEM =====
+                const toasts = ref([]);
+                let toastCounter = 0;
+
+                function addToast(type, message) {
+                    const id = ++toastCounter;
+                    toasts.value.push({ id, type, message, exiting: false });
+                    // Auto remove after 4s
+                    setTimeout(() => removeToast(id), 4000);
+                }
+
+                function removeToast(id) {
+                    const toast = toasts.value.find(t => t.id === id);
+                    if (toast && !toast.exiting) {
+                        toast.exiting = true;
+                        setTimeout(() => {
+                            toasts.value = toasts.value.filter(t => t.id !== id);
+                        }, 300);
+                    }
+                }
+
+                // ===== LOGOUT =====
+                function logout() {
+                    localStorage.removeItem('wms_user');
+                    fetch('/api/auth/logout', { method: 'POST' }).finally(() => {
+                        window.location.href = '/login.html';
+                    });
+                }
+
+                return {
+                    currentUser, roleLabel,
+                    currentPassword, newPassword, confirmPassword,
+                    showCurrentPassword, showNewPassword, showConfirmPassword,
+                    loading, formError,
+                    checks, strengthPercent, strengthColor, strengthLabel,
+                    canSubmit,
+                    resetForm, handleChangePassword,
+                    toasts, removeToast,
+                    logout
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
