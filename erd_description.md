@@ -52,7 +52,7 @@ Dưới đây là danh sách thuộc tính của từng thực thể được v�
 ### 2.4. Phân hệ Kiểm kê & Điều chuyển nhân sự (Cam)
 *   **`Stocktakes` (Kiểm kê):** `id` (Khóa chính - gạch chân), `check date` (Ngày kiểm kê), `status` (Trạng thái).
 *   **`Stocktake Details` (Chi tiết kiểm kê):** `id` (Khóa chính - gạch chân), `actual quantity` (Số lượng thực tế), `note` (Ghi chú).
-*   **`Branch Transfer Requests` (Yêu cầu chuyển chi nhánh):** `id` (Khóa chính - gạch chân), `code` (Mã yêu cầu), `request date` (Ngày yêu cầu), `status` (Trạng thái), `from branch` (Chi nhánh nguồn hiện tại), `from branch actual quantity` (Số lượng thực tế tại chi nhánh nguồn).
+*   **`Branch Transfer Requests` (Yêu cầu chuyển chi nhánh):** `id` (Khóa chính - gạch chân), `code` (Mã yêu cầu), `request date` (Ngày yêu cầu), `status` (Trạng thái), `from branch` (Chi nhánh nguồn hiện tại), `from branch actual quantity` (Số lượng thực tế tại chi nhánh nguồn). *Lưu ý: Trong CSDL thực tế, thực thể này quản lý điều chuyển công tác nhân viên và được chuẩn hóa thành các trường `staff_id`, `from_branch_id`, `to_branch_id`, `created_by`, `approved_by` để đảm bảo tính toàn vẹn dữ liệu.*
 
 ### 2.5. Phân hệ Nhật ký hệ thống (Tím)
 *   **`Audit Logs` (Nhật ký):** `id` (Khóa chính - gạch chân), `action` (Hành động), `time` (Thời gian ghi log), `details` (Thông tin chi tiết).
@@ -95,7 +95,7 @@ Các hình thoi màu trắng thể hiện sự liên kết nghiệp vụ giữa 
     *   *Ý nghĩa:* Đợt kiểm kê được thực hiện trực tiếp tại một chi nhánh kho nhất định.
 *   **Hình thoi `transfers` (Yêu cầu điều chuyển - Chi tiết kiểm kê):**
     *   *Kết nối:* `Branch Transfer Requests` (N) <---> `Stocktake Details` (1).
-    *   *Ý nghĩa:* Yêu cầu điều chuyển liên kết trực tiếp với chi tiết đợt kiểm kê để cập nhật, đối soát lượng tồn thực tế phục vụ quá trình luân chuyển hàng hóa/nhân sự liên quan.
+    *   *Ý nghĩa:* Mối quan hệ logic nghiệp vụ: khi nhân viên được điều chuyển sang chi nhánh mới, chi nhánh làm việc của họ thay đổi, quyết định kho hàng mà nhân viên đó sẽ thực hiện kiểm kê thực tế. (Mối quan hệ này không nối trực tiếp bằng khóa ngoại ở mức database mà đi gián tiếp qua thực thể `Users`).
 
 ---
 
@@ -141,4 +141,4 @@ Bảng đối chiếu cách sơ đồ khái niệm ERD được hiện thực h�
 | **`performs at`** | `Branches` <---> `Stocktakes` | Bảng `stocktakes` chứa khóa ngoại `branch_id` trỏ tới bảng `branches`. |
 | **`creates`** (Kiểm kê) | `Users` <---> `Stocktakes` | Bảng `stocktakes` chứa khóa ngoại `created_by` trỏ tới bảng `users`. |
 | **`requests`** | `Users` <---> `Branch Transfer Requests` | Bảng `branch_transfer_requests` chứa khóa ngoại `staff_id` hoặc `created_by` trỏ tới `users`. |
-| **`transfers`** | `BTR` <---> `Stocktake Details` | Liên kết gián tiếp để đối soát lượng tồn được điều chuyển sau khi kiểm kho. |
+| **`transfers`** | `BTR` <---> `Stocktake Details` | Mối quan hệ logic nghiệp vụ. Trong CSDL thực tế, liên kết này được thực hiện gián tiếp thông qua việc cập nhật `branch_id` của nhân viên trong bảng `users` (BTR -> Users -> Stocktakes -> Stocktake Details), không có khóa ngoại nối trực tiếp giữa hai bảng này. |
