@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import Card from "../components/card.vue";
 import Chart from "../components/chart.vue";
+import { useRouter } from "vue-router";
 const kpi = [
     {
         title: "Tổng sản phẩm nhập",
@@ -63,30 +64,37 @@ const collapse = ref(false);
 const toggleSidebar = () => {
     collapse.value = !collapse.value;
 }
+
+const router = useRouter();
+
+const logout = () => {
+    router.push("/login");
+};
 </script>
 
 <template>
     <div class="d-flex vh-100">
-        <div class="sidebar bg-light" :class="{ collapsed: collapse }">
+        <div class="sidebar" :class="{ collapsed: collapse }"
+            style="background: linear-gradient(180deg,#0353c5 0%,#3657d4 45%,#6b5ce7 100%);">
 
             <!-- Sidebar Header -->
             <div class="sidebar-header">
                 <div class="logo-section">
                     <span class="sidebar-text" v-show="!collapse">
-                        <button class="btn btn-sm btn-rounded btn-dark">
-                            <i class="bi bi-box-seam-fill"></i>
+                        <button class="btn btn-info btn-rounded border-dark" disabled>
+                            <i class="bi bi-box-seam-fill" style="color: white;"></i>
                         </button>
                     </span>
 
 
 
-                    <div class="logo-text" v-show="!collapse">
+                    <div class="logo-text" v-show="!collapse" style="color: bisque;">
                         <div class="fw-bold">Quản lý kho</div>
-                        <small class="text-muted">HỆ THỐNG WMS</small>
+                        <small class="text-white-50">HỆ THỐNG WMS</small>
                     </div>
                 </div>
                 <div class="d-flex justify-content-end p-2">
-                    <button class="btn btn-sm btn-outline-secondary toggle-btn" @click="toggleSidebar">
+                    <button class="btn btn-sm btn-outline-info toggle-btn" @click="toggleSidebar">
                         <i class="bi bi-layout-sidebar"></i>
                     </button>
                 </div>
@@ -112,7 +120,7 @@ const toggleSidebar = () => {
                     <span class="sidebar-text">Cài đặt</span>
                 </div>
 
-                <div class="sidebar-item text-danger">
+                <div class="sidebar-item text-danger"  @click="logout">
                     <i class="bi bi-box-arrow-right"></i>
                     <span class="sidebar-text">Đăng xuất</span>
                 </div>
@@ -176,8 +184,8 @@ const toggleSidebar = () => {
                                         <span>Bia 333 lon 330ml</span>
                                         <span class="badge bg-primary">70</span>
                                     </li>
-                                    
-                                     <li class="list-group-item d-flex justify-content-between">
+
+                                    <li class="list-group-item d-flex justify-content-between">
                                         <span>Laptop MacBook Air M3 2024</span>
                                         <span class="badge bg-primary">35</span>
                                     </li>
@@ -203,6 +211,24 @@ const toggleSidebar = () => {
 </template>
 
 <style scoped>
+.sidebar a {
+    color: rgba(255, 255, 255, 0.85);
+    transition: all 0.25s ease;
+}
+
+.sidebar a:hover {
+    color: #6ee7ff;
+    transform: translateX(4px);
+}
+
+.sidebar i {
+    transition: color 0.25s ease;
+}
+
+.sidebar a:hover i {
+    color: #6ee7ff;
+}
+
 .sidebar {
     width: 250px;
     transition: width 0.3s ease;
@@ -249,10 +275,13 @@ const toggleSidebar = () => {
     cursor: pointer;
 
     transition: background-color .2s;
+    color: rgba(255,255,255,0.9);
+    transition: all .25s ease;
 }
 
 .sidebar-item:hover {
     background: #eef3fb;
+    color: #3c3ff8;
 }
 
 .sidebar-item i {

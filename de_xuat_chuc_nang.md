@@ -1,270 +1,110 @@
-# Đề Xuất Chức Năng Nâng Cao — Hệ Thống Quản Lý Kho Nhiều Chi Nhánh
+# ĐỀ XUẤT CHỨC NĂNG NÂNG CAO — HỆ THỐNG QUẢN LÝ KHO NHIỀU CHI NHÁNH
 
-> Phạm vi: Đồ án ~2 tháng. Các chức năng dưới đây được chọn lọc để **nâng cao rõ rệt giá trị hệ thống** nhưng vẫn **khớp với kiến trúc hiện tại** (JavaFX desktop + Spring Boot + Spring Data JPA + PostgreSQL), không đập đi xây lại.
-
----
-
-## 0. Cơ bản phải có
-
-- Đăng nhập, phân quyền ADMIN / MANAGER / STAFF
-- Quản lý sản phẩm, danh mục
-- Tồn kho theo lô (branch + product + NSX + HSD)
-- Phiếu kho: Nhập / Xuất / Điều chuyển / Cân bằng tăng-giảm
-- Lịch sử giao dịch, quản lý người dùng, quản lý chi nhánh
-- Cảnh báo tồn kho thấp theo ngưỡng
-
-Các đề xuất dưới đây xây trực tiếp trên nền này.
+> **Phạm vi:** Đồ án ~2 tháng. Các chức năng dưới đây được lựa chọn kỹ lưỡng để nâng cao giá trị nghiệp vụ và tính học thuật của hệ thống, nhưng vẫn đảm bảo tính khả thi và tương thích hoàn toàn với kiến trúc công nghệ hiện tại (Spring Boot Backend + JavaFX Desktop Client / Vue.js Web Client + PostgreSQL).
 
 ---
 
-## NHÓM 1 — Báo cáo & Phân tích (BI)
+## 1. DANH SÁCH CHỨC NĂNG CƠ BẢN (NỀN TẢNG CÓ SẴN)
 
-### 1.1. Dashboard Tổng quan có biểu đồ
-- Thẻ số liệu nhanh: tổng giá trị tồn kho, số phiếu trong tháng, số mặt hàng dưới ngưỡng, số lô sắp hết hạn.
-- Biểu đồ (JavaFX `BarChart` / `PieChart` / `LineChart`):
-  - Cơ cấu tồn kho theo danh mục (Pie).
-  - Giá trị tồn theo từng chi nhánh (Bar).
-  - Xu hướng Nhập vs Xuất theo 12 tháng (Line).
-- Lọc theo chi nhánh / khoảng thời gian.
-
-### 1.2. Báo cáo Tồn kho & Định giá - tính sau
-- Báo cáo tồn kho tại một thời điểm (tổng số lượng × đơn giá = giá trị tồn).
-- Tính **giá vốn xuất kho** theo phương pháp FIFO hoặc Bình quân gia quyền.
-- Báo cáo Nhập–Xuất–Tồn (mẫu kế toán kho chuẩn): tồn đầu kỳ, nhập trong kỳ, xuất trong kỳ, tồn cuối kỳ.
-
-### 1.3. Xuất báo cáo ra file
-- Xuất CSV (thuần Java) cho mọi bảng.
-- Xuất Excel (Apache POI) có định dạng, tiêu đề, tổng cộng.
-- Xuất / In phiếu kho ra PDF (iText hoặc JasperReports) — dùng khi giao nhận hàng.
+Trước khi đi vào các tính năng nâng cao, hệ thống đảm bảo vận hành ổn định các nghiệp vụ cốt lõi sau:
+*   **Xác thực & Phân quyền:** Đăng nhập hệ thống, phân quyền người dùng theo 3 vai trò: `ADMIN` (Quản trị viên), `MANAGER` (Quản lý chi nhánh), và `STAFF` (Nhân viên kho).
+*   **Quản lý Danh mục:** CRUD Chi nhánh (`branches`), Danh mục (`categories`), và Sản phẩm (`products`).
+*   **Quản lý Tồn kho theo Lô:** Quản lý số lượng tồn vật lý của từng sản phẩm tại từng chi nhánh dựa trên tổ hợp Lô sản xuất gồm Ngày sản xuất (NSX) và Hạn sử dụng (HSD).
+*   **Giao dịch Kho (Phiếu kho):** Lập phiếu Nhập kho (`IMPORT`), Xuất kho (`EXPORT`), Điều chuyển nội bộ (`TRANSFER`), Cân bằng tăng (`ADJUST_IN`), và Cân bằng giảm (`ADJUST_OUT`).
+*   **Cảnh báo Tồn kho thấp:** Tự động phát hiện và cảnh báo các mặt hàng có số lượng tồn kho chạm hoặc dưới ngưỡng tối thiểu (`low_stock_threshold`) được thiết lập riêng cho từng chi nhánh.
 
 ---
 
-## NHÓM 2 — Nghiệp vụ kho nâng cao
+## 2. ĐỀ XUẤT CÁC TÍNH NĂNG NÂNG CAO & CHUYÊN SÂU
 
-### 2.1. Quy trình duyệt phiếu (Approval Workflow)
-> Tận dụng cột `status` (DRAFT / COMPLETED / CANCELLED) đã có sẵn trong schema nhưng chưa khai thác.
-- STAFF lập phiếu ở trạng thái **DRAFT** (chưa trừ kho).
-- MANAGER / ADMIN xem và **Duyệt** → mới thực sự cập nhật tồn kho (COMPLETED), hoặc **Từ chối** (CANCELLED).
-- Phiếu DRAFT có thể sửa/xóa; phiếu COMPLETED thì khóa.
+Dưới đây là các tính năng được bổ sung để nâng tầm đồ án, giải quyết trực tiếp các bài toán nghiệp vụ thực tế trong quản lý chuỗi cung ứng.
 
-### 2.2. Quản lý Nhà cung cấp & Khách hàng ( cân nhắc khách hàng )
-- Thêm 2 thực thể `Supplier` và `Customer`.
-- Phiếu nhập gắn nhà cung cấp, phiếu xuất gắn khách hàng.
-- Lịch sử giao dịch theo từng đối tác, công nợ cơ bản.
+### 2.1. Quy trình phê duyệt Phiếu kho (Approval Workflow)
+*   **Mục tiêu:** Kiểm soát chặt chẽ hàng hóa ra vào kho, ngăn chặn nhân viên tự ý thay đổi số liệu tồn kho vật lý.
+*   **Nghiệp vụ chi tiết:**
+    *   **Bước 1 (Lập phiếu):** `STAFF` tạo phiếu xuất/nhập/điều chuyển. Phiếu lưu ở trạng thái **`DRAFT` (Phiếu nháp)**. Ở trạng thái này, số lượng tồn kho thực tế chưa bị thay đổi. Phiếu nháp có thể tự do chỉnh sửa hoặc xóa.
+    *   **Bước 2 (Kiểm duyệt):** `MANAGER` hoặc `ADMIN` nhận được thông báo có phiếu chờ duyệt. Tiến hành đối soát thông tin.
+    *   **Bước 3 (Phê duyệt):** 
+        *   Nếu **Đồng ý (Duyệt)**: Trạng thái phiếu chuyển thành **`COMPLETED`**. Lúc này hệ thống mới chính thức thực hiện cộng/trừ số lượng tồn kho tương ứng và khóa vĩnh viễn phiếu kho (không cho phép chỉnh sửa/xóa).
+        *   Nếu **Từ chối**: Trạng thái phiếu chuyển thành **`CANCELLED`**. Phiếu bị hủy bỏ và lưu trữ ở dạng lịch sử để đối soát sau này.
 
-### 2.3. Cảnh báo & Quản lý Hạn sử dụng (FEFO)
-- Danh sách lô hàng **sắp hết hạn** (HSD trong vòng N ngày) — bảng riêng + tô màu.
-- Khi xuất hàng có HSD: tự gợi ý **xuất lô hết hạn sớm nhất trước** (First-Expired-First-Out).
-- Cảnh báo hàng **đã hết hạn** còn tồn trong kho.
+### 2.2. Quy trình điều chuyển nhân sự 3 bước (3-Step Branch Transfer Requests)
+*   **Mục tiêu:** Quản lý việc luân chuyển nhân sự giữa các kho, loại bỏ rủi ro tranh chấp hoặc nhân viên phản đối quyết định điều động.
+*   **Nghiệp vụ chi tiết:**
+    *   **Bước 1 (Đề xuất / Xác nhận từ Nhân viên):** Nhân viên (`STAFF`) tự lập đơn xin chuyển chi nhánh hoặc nếu `MANAGER` lập đơn điều động thì hệ thống yêu cầu tài khoản của `STAFF` đó phải bấm **Xác nhận đồng ý** trên giao diện của mình. Trạng thái đơn lúc này là `STAFF_CONFIRMED`.
+    *   **Bước 2 (Manager thông qua):** Quản lý chi nhánh hiện tại của nhân viên duyệt đơn nội bộ để xác nhận bàn giao công việc. Đơn chuyển trạng thái sang `MANAGER_APPROVED`.
+    *   **Bước 3 (Admin phê duyệt quyết định):** `ADMIN` xem xét tình hình nhân sự toàn chuỗi, thực hiện phê duyệt cuối cùng (`APPROVED`). 
+        *   Ngay khi được duyệt, hệ thống tự động chạy Transaction để **cập nhật lại cột `branch_id` của tài khoản `Users` đó sang chi nhánh mới**. Nhân viên chính thức thuộc quyền quản lý và chỉ thao tác được dữ liệu tại chi nhánh mới từ lần đăng nhập sau.
 
-### 2.4. Kiểm kê kho (Stocktake) 
-- Tạo phiên kiểm kê: hệ thống liệt kê tồn theo sổ sách, người dùng nhập số đếm thực tế.
-- Tự tính chênh lệch, sinh phiếu cân bằng (ADJUST_IN/OUT) tương ứng.
-- Lưu biên bản kiểm kê ( chưa có trong project , hiện tại có mỗi ghi chú ).
+### 2.3. Điều chuyển hàng hóa 2 bước (Two-Step Inventory Transfer)
+*   **Mục tiêu:** Quản lý chính xác hàng hóa đang đi đường (In-Transit) giữa các chi nhánh, tránh việc hàng hóa "biến mất" ở kho này và lập tức "xuất hiện" ở kho kia khi chưa vận chuyển tới nơi.
+*   **Nghiệp vụ chi tiết:**
+    *   **Bước 1 (Xuất điều chuyển):** Chi nhánh nguồn xuất hàng đi $\rightarrow$ Số lượng tồn kho tại chi nhánh nguồn lập tức bị trừ, hàng được ghi nhận vào trạng thái **`IN_TRANSIT` (Đang đi đường)**.
+    *   **Bước 2 (Xác nhận nhập điều chuyển):** Khi hàng hóa vật lý tới chi nhánh đích, nhân viên tại chi nhánh đích thực hiện kiểm đếm và bấm **Xác nhận nhận hàng**. Lúc này hàng mới chính thức cộng vào tồn kho của chi nhánh đích và hoàn tất phiếu (`COMPLETED`).
+    *   **Xử lý hao hụt vận chuyển:** Nếu số lượng nhận thực tế ít hơn số lượng xuất đi $\rightarrow$ Hệ thống tự động ghi nhận lượng hao hụt vận chuyển vào chi tiết phiếu và sinh một phiếu điều chỉnh giảm (`ADJUST_OUT`) tương ứng để đảm bảo tính nhất quán của số liệu sổ sách.
 
-### 2.5. Đề xuất nhập hàng tự động (Reorder)
-- Khi tồn ≤ ngưỡng, hệ thống tổng hợp danh sách hàng cần nhập theo chi nhánh.
-- Gợi ý số lượng đặt dựa trên tốc độ bán trung bình (từ lịch sử xuất).
 
----
+### 2.4. Quản lý công nợ đối tác & Thanh toán (Partner Debt & Payment Management)
+*   **Mục tiêu:** Quản lý dòng tiền mua bán hàng và kiểm soát dư nợ của Khách hàng/Nhà cung cấp.
+*   **Nghiệp vụ chi tiết:**
+    *   **Tự động ghi nhận nợ:**
+        *   Khi duyệt phiếu nhập kho (`IMPORT` + trạng thái `COMPLETED` + thanh toán `UNPAID`) $\rightarrow$ Công nợ của Nhà cung cấp (`suppliers.debt`) tự động **tăng lên** (doanh nghiệp tăng khoản nợ phải trả).
+        *   Khi duyệt phiếu xuất kho (`EXPORT` + trạng thái `COMPLETED` + thanh toán `UNPAID`) $\rightarrow$ Công nợ của Khách hàng (`customers.debt`) tự động **tăng lên** (doanh nghiệp tăng khoản phải thu).
+    *   **Thanh toán công nợ:**
+        *   Cung cấp màn hình quản lý hóa đơn/phiếu kho chưa thanh toán (`UNPAID`). 
+        *   Khi người dùng thực hiện thanh toán (trả tiền cho NCC hoặc thu tiền khách hàng) $\rightarrow$ Chuyển trạng thái phiếu từ `UNPAID` sang `PAID`, đồng thời **giảm trừ công nợ** tương ứng của Khách hàng hoặc Nhà cung cấp trong CSDL.
 
-## NHÓM 3 — Vận hành, Bảo mật & Trải nghiệm
-
-### 3.1. Nhật ký hoạt động (Audit Log)
-- Ghi lại mọi thao tác quan trọng: ai, làm gì, lúc nào, trên bản ghi nào.
-- Bảng `audit_logs`, màn hình tra cứu cho ADMIN.
-- Phục vụ truy vết và đúng tinh thần "Worklog".
-
-### 3.2. Quản lý tài khoản cá nhân
-- Tự đổi mật khẩu.
-- Quên mật khẩu → ADMIN cấp lại.
-- Quy tắc mật khẩu mạnh.
-
-### 3.3. Đa ngôn ngữ (i18n)
-- Việt / Anh qua `ResourceBundle`, chuyển ngôn ngữ ngay trong app.
-
-### 3.4. Quét mã vạch / QR ( ưu tiên thấp )
-- Dùng webcam (thư viện ZXing) quét mã sản phẩm để chọn nhanh khi lập phiếu, thay vì gõ tay.
-- Sinh mã QR cho mỗi sản phẩm để in nhãn.
-
-### 3.5. Sao lưu & Phục hồi dữ liệu
-- Chức năng backup database ra file (pg_dump) và phục hồi, lên lịch định kỳ.
+### 2.5. Bảo mật phân quyền dữ liệu theo chi nhánh (Data Isolation)
+*   **Mục tiêu:** Bảo mật dữ liệu kinh doanh nội bộ giữa các chi nhánh khác nhau.
+*   **Nghiệp vụ chi tiết:**
+    *   Tài khoản `MANAGER` và `STAFF` khi đăng nhập hệ thống sẽ **bị giới hạn quyền truy cập**: chỉ được phép xem báo cáo doanh thu, lịch sử phiếu kho, tồn kho thực tế và thông tin đối tác trực thuộc đúng chi nhánh làm việc của mình (`branch_id`). Các truy vấn SQL dưới Spring Boot sẽ tự động chèn thêm điều kiện `WHERE branch_id = :userBranchId`.
+    *   Tài khoản `ADMIN` có quyền xem toàn cục, lọc và so sánh số liệu giữa tất cả các chi nhánh.
 
 ---
 
-## NHÓM 4 — Kỹ thuật & Chất lượng (điểm cộng học thuật)
+## 3. BÁO CÁO PHÂN TÍCH (BI) & XUẤT NHẬP DỮ LIỆU FILE
 
-### 4.1. Kiểm thử tự động
-- Unit Test (JUnit + Mockito) cho tầng Service, đặc biệt `ReceiptService` (logic trừ/cộng kho, rollback).
-- Test các ràng buộc nghiệp vụ: không xuất quá tồn, điều chuyển 2 chiều đúng số lượng.
+### 3.1. Dashboard phân tích thông minh
+*   Biểu đồ JavaFX trực quan hóa:
+    *   Cơ cấu giá trị tồn kho theo từng danh mục sản phẩm (Biểu đồ tròn - PieChart).
+    *   Tổng giá trị hàng tồn tại mỗi chi nhánh (Biểu đồ cột - BarChart).
+    *   So sánh xu hướng Nhập vs Xuất hàng tháng để kiểm soát luồng hàng (Biểu đồ đường - LineChart).
+*   Thẻ thống kê nhanh: Lô hàng sắp hết hạn, sản phẩm dưới ngưỡng cảnh báo, tổng giá trị tồn kho toàn chuỗi.
+*   **Báo cáo hàng chậm tiêu thụ (Deadstock):** Liệt kê các lô hàng tồn kho đã nằm im quá 60 ngày không phát sinh giao dịch xuất bán để quản lý nhanh chóng đưa ra giải pháp xả hàng.
 
-### 4.2. Tài liệu hóa
-- Sơ đồ Use Case, ERD, Activity Diagram (Sequence cho luồng lập phiếu).
-- README + hướng dẫn cài đặt + tài khoản mẫu (đã có).
-
----
-
-## Lộ trình đề xuất theo tuần (8 tuần)
-
-| Tuần | Nội dung |
-|------|----------|
-| 1 | Hoàn thiện CRUD còn thiếu + Unit Test nền tảng |
-| 2 | Quy trình duyệt phiếu (DRAFT → COMPLETED/CANCELLED) |
-| 3 | Nhà cung cấp / Khách hàng + gắn vào phiếu |
-| 4 | Quản lý HSD nâng cao (FEFO) + cảnh báo hết hạn |
-| 5 | Kiểm kê kho + đề xuất nhập hàng tự động |
-| 6 | Dashboard biểu đồ + báo cáo Nhập-Xuất-Tồn |
-| 7 | Xuất Excel/PDF + Audit Log + đổi mật khẩu |
-| 8 | Quét mã vạch (nếu kịp) + kiểm thử tổng thể + viết báo cáo |
+### 3.2. Sao lưu và Phục hồi dữ liệu trực tiếp trên giao diện Web (Web-Based Backup & Restore)
+*   **Chức năng Sao lưu (Export Data):**
+    *   Cho phép người dùng có vai trò `ADMIN` thực hiện sao lưu trực tiếp trên giao diện Web bằng cách bấm nút **"Sao lưu dữ liệu"**. 
+    *   Spring Boot backend sẽ truy vấn toàn bộ dữ liệu trong các bảng CSDL, đóng gói thông tin thành một file định dạng chuẩn (JSON hoặc file SQL) và gửi về trình duyệt dưới dạng file tải xuống để lưu trực tiếp trên máy tính cá nhân của người dùng.
+*   **Chức năng Phục hồi (Import Data):**
+    *   Cho phép `ADMIN` khôi phục dữ liệu bằng cách tải file đã sao lưu trước đó từ máy tính cá nhân lên thông qua giao diện Web (sử dụng Form Upload File).
+    *   Backend sẽ đọc file dữ liệu này và tự động phục hồi/ghi đè vào cơ sở dữ liệu PostgreSQL. Thao tác hoàn toàn diễn ra trên giao diện Web, không cần dùng công cụ bên ngoài.
+*   **Nhập dữ liệu hàng loạt từ file Excel (Bulk Import Excel):**
+    *   Cho phép Admin/Manager tải lên file Excel mẫu (.xlsx) chứa danh sách sản phẩm mới hoặc nhà cung cấp mới. Hệ thống sử dụng thư viện **Apache POI** để phân tích file và thêm hàng loạt bản ghi vào database trong một transaction, giúp tiết kiệm thời gian nhập tay trên UI.
+*   **Xuất báo cáo định dạng chuyên nghiệp:**
+    *   Xuất báo cáo Nhập - Xuất - Tồn và Danh sách hàng tồn kho ra file Excel (.xlsx) được định dạng bảng biểu, màu sắc, font chữ chuyên nghiệp.
+    *   Xuất/In hóa đơn phiếu kho ra file **PDF** để ký nhận bàn giao hàng hóa vật lý.
 
 ---
 
-## Top ưu tiên nếu phải chọn
+## 4. KẾ HOẠCH TRIỂN KHAI THEO TUẦN (MỨC ĐỘ DỄ ĐẾN KHÓ)
 
-1. **Quy trình duyệt phiếu** — tận dụng schema có sẵn, thể hiện tư duy nghiệp vụ rõ nhất.
-2. **Dashboard biểu đồ + Báo cáo Nhập-Xuất-Tồn + Xuất file** — nổi bật khi demo, đúng yêu cầu báo cáo.
-3. **Quản lý HSD nâng cao (FEFO) + Kiểm kê** — khai thác đúng thiết kế tồn kho theo lô.
-4. **Nhà cung cấp / Khách hàng** — mở rộng nghiệp vụ thực tế.
-5. **Audit Log + Đổi mật khẩu** — hoàn thiện tính chuyên nghiệp.
+Kế hoạch 8 tuần được phân chia để đảm bảo các chức năng được xây dựng tuần tự, giảm thiểu rủi ro xung đột code và dễ kiểm thử.
 
----
-
-## PHỤ LỤC — Kiến trúc Triển khai: Tách Backend REST API
-
-> Phương án triển khai khuyến nghị khi đóng gói thành `.exe` và cần nhiều máy/chi nhánh ở xa nhau cùng dùng chung dữ liệu một cách an toàn.
-
-### Mô hình
-
-```
-[App JavaFX .exe]  --HTTP/HTTPS-->  [Spring Boot REST API]  --JDBC-->  [PostgreSQL]
-   (client, nhiều máy)                  (server, 1 nơi)                  (1 nơi)
-```
-
-- App desktop **không** truy vấn SQL trực tiếp nữa, mà gọi **API qua HTTP**.
-- Toàn bộ logic nghiệp vụ và kết nối DB nằm tập trung ở server.
-- Dữ liệu vẫn là một kho trung tâm duy nhất → mọi máy luôn nhất quán tức thời (không cần "đồng bộ").
-
-### Vì sao chọn cách này
-
-- **An toàn:** Client không cầm mật khẩu DB, DB không phơi ra Internet. Client chỉ biết địa chỉ API.
-- **Tập trung nghiệp vụ:** Validate, trừ/cộng kho, kiểm soát quyền đều ở server → khó gian lận, dễ bảo trì.
-- **Mở rộng:** Sau này thêm web/mobile chỉ việc gọi cùng bộ API.
-- **Bảo mật nâng cao:** Dễ gắn xác thực bằng token (JWT), ghi log, giới hạn truy cập theo vai trò ở tầng API.
-
-### Các bước chuyển đổi (từ kiến trúc hiện tại)
-
-1. **Thêm Spring Web** vào server: `spring-boot-starter-web`.
-2. **Viết REST Controller** bọc các Service đã có:
-   - `POST /api/auth/login` → trả về token + thông tin user.
-   - `GET /api/products`, `POST /api/products`, ... (CRUD sản phẩm).
-   - `GET /api/inventories?branchId=...` (tồn kho).
-   - `POST /api/receipts` (lập phiếu — gọi `ReceiptService.createReceipt`).
-   - `GET /api/receipts`, `GET /api/branches`, `GET /api/users`, ...
-3. **Bảo mật API:** thêm Spring Security + JWT; mỗi request đính kèm token ở header `Authorization`.
-4. **Sửa client JavaFX:** thay các lời gọi Service trực tiếp bằng gọi HTTP (dùng `java.net.http.HttpClient` hoặc thư viện như Retrofit/OkHttp), parse JSON (Jackson).
-5. **Tài liệu hóa API:** thêm Swagger UI (springdoc-openapi) để test và mô tả API — đúng công cụ syllabus gợi ý (Postman/Swagger).
-
-### Đóng gói & cấu hình
-
-- **Server:** đóng gói JAR, chạy trên 1 máy/VPS/cloud; là nơi duy nhất giữ mật khẩu DB.
-- **Client (.exe):** dùng `jpackage` (JDK 17) tạo `.exe`/`.msi` kèm JRE; chỉ cần cấu hình **địa chỉ API server** (đọc từ file config ngoài, không hardcode).
-- Nên bật **HTTPS** cho API khi chạy thật để mã hóa dữ liệu truyền đi.
-
-### So với 2 cách đơn giản hơn
-
-| Tiêu chí | Cách 1: DB chung LAN | Cách 2: DB cloud | Cách 3: REST API |
-|----------|:---:|:---:|:---:|
-| Công sức | Thấp | Thấp | Cao |
-| Phạm vi | Chỉ LAN | Toàn Internet | Toàn Internet |
-| An toàn | Thấp | Thấp–TB | Cao |
-| Client cầm mật khẩu DB | Có | Có | Không |
-| Điểm cộng kiến trúc | Ít | Ít | Nhiều |
-
-→ **Khuyến nghị:** Dùng Cách 2 để demo nhanh; nâng lên **Cách 3** nếu muốn đúng chuẩn production và ăn điểm kiến trúc cho đồ án.
-
----
-
-## PHỤ LỤC — So sánh chi tiết: Cách 2 (DB Cloud) vs Cách 3 (REST API)
-
-### Bản chất
-
-**Cách 2 — DB Cloud (client nối thẳng DB)**
-```
-[App .exe] ──JDBC qua Internet──> [PostgreSQL trên cloud]
-```
-App JavaFX cầm tài khoản DB và bắn SQL thẳng tới database trên cloud.
-
-**Cách 3 — REST API (có server trung gian)**
-```
-[App .exe] ──HTTP──> [Spring Boot API] ──JDBC──> [PostgreSQL]
-```
-App gọi API qua HTTP; server là nơi duy nhất nối DB và xử lý nghiệp vụ.
-
-### Bảng so sánh
-
-| Tiêu chí | Cách 2 (DB Cloud) | Cách 3 (REST API) |
-|---|---|---|
-| Công sức | Rất thấp — đổi 1 dòng `DB_URL` | Cao — viết Controller, đổi client sang gọi HTTP, thêm JWT |
-| Thời gian | Vài phút | 1–2 tuần |
-| Client cầm mật khẩu DB | Có (rủi ro) | Không |
-| DB phơi ra Internet | Có (rủi ro) | Không — chỉ API lộ ra |
-| An toàn dữ liệu | Thấp–Trung bình | Cao |
-| Logic nghiệp vụ | Nằm ở client | Tập trung ở server |
-| Kiểm soát quyền | Client tự check (dễ lách) | Server ép buộc (chặt) |
-| Mở rộng web/mobile | Không tiện | Sẵn sàng, dùng chung API |
-| Điểm cộng kiến trúc | Ít | Nhiều |
-| Rủi ro phát sinh bug | Thấp | Cao (serialize JSON, lazy-load, token) |
-
-### Cốt lõi để quyết định
-
-- Về mục tiêu "nhiều máy dùng chung dữ liệu": **cả 2 đạt như nhau**, dữ liệu tập trung 1 chỗ, mọi máy thấy cùng số liệu tức thì.
-- Khác biệt thật nằm ở **bảo mật và kiến trúc**:
-  - Cách 2 có lỗ hổng: mỗi `.exe` chứa mật khẩu DB và DB mở cổng ra Internet → lộ là chiếm toàn bộ database.
-  - Cách 3 bịt lỗ hổng đó: client chỉ biết địa chỉ API, thao tác qua token, server kiểm soát hết.
-
-### Khuyến nghị
-- Ưu tiên hoàn thành nhanh + nhiều tính năng nghiệp vụ → **Cách 2** (nêu rõ hạn chế bảo mật trong báo cáo).
-- Muốn ăn điểm kiến trúc + còn thời gian + dự định làm web/mobile → **Cách 3**.
-- App desktop nội bộ thuần túy: Cách 2 là đủ. Cách 3 chỉ thực sự đáng khi có kế hoạch mở rộng nền tảng.
-
----
-
-## PHỤ LỤC — Lộ trình triển khai tính năng (sắp xếp từ DỄ đến KHÓ)
-
-> Thứ tự gợi ý làm tuần tự. Mỗi mức nên hoàn thành và kiểm thử xong trước khi sang mức sau.
-
-### MỨC 1 — Dễ (hoàn thiện nền tảng, ít rủi ro)
-1. **Đổi mật khẩu cá nhân** — chỉ thêm form + 1 method ở `UserService`. Làm quen luồng mà không đụng nghiệp vụ phức tạp.
-2. **Xuất CSV** — xuất bảng tồn kho / lịch sử ra file. Thuần Java, không cần thư viện.
-3. **Cảnh báo & danh sách hàng sắp/đã hết hạn** — chỉ là query lọc theo HSD trên dữ liệu sẵn có + tô màu.
-4. **Unit Test cho Service** — đặc biệt `ReceiptService`. Vừa dễ vừa là yêu cầu bắt buộc của syllabus.
-
-→ *Mục tiêu: làm chủ codebase, củng cố phần đã có, lấy điểm chắc chắn.*
-
-### MỨC 2 — Trung bình (thêm nghiệp vụ, dùng schema sẵn có)
-5. **Quy trình duyệt phiếu (DRAFT → COMPLETED/CANCELLED)** — tận dụng cột `status` đã có. Sửa `ReceiptService` để DRAFT chưa trừ kho, thêm nút Duyệt/Từ chối.
-6. **Kiểm kê kho (Stocktake)** — liệt kê tồn sổ sách, nhập đếm thực tế, tự sinh phiếu cân bằng.
-7. **Dashboard biểu đồ** — `BarChart`/`PieChart`/`LineChart` từ dữ liệu tồn kho và lịch sử.
-8. **Báo cáo Nhập–Xuất–Tồn + xuất Excel (Apache POI)** — báo cáo kế toán kho chuẩn.
-
-→ *Mục tiêu: tăng giá trị nghiệp vụ và tính trực quan khi demo.*
-
-### MỨC 3 — Khó (mở rộng mô hình dữ liệu & thuật toán)
-9. **Quản lý Nhà cung cấp & Khách hàng** — thêm 2 entity mới, gắn vào phiếu, sửa schema + nhiều màn hình.
-10. **Định giá xuất kho FIFO / Bình quân gia quyền** — logic tính giá vốn, cần xử lý theo lô cẩn thận.
-11. **Xuất / In phiếu ra PDF (JasperReports/iText)** — thiết kế mẫu in, tích hợp thư viện.
-12. **Audit Log** — chặn ngang các thao tác để ghi log (AOP hoặc thủ công), thêm màn hình tra cứu.
-
-→ *Mục tiêu: chiều sâu nghiệp vụ và kỹ thuật.*
-
-### MỨC 4 — Rất khó (thay đổi kiến trúc / phần cứng)
-13. **Quét mã vạch / QR bằng webcam (ZXing)** — tích hợp camera với JavaFX, xử lý luồng ảnh.
-14. **Đa ngôn ngữ (i18n)** — refactor toàn bộ chuỗi text ra `ResourceBundle`.
-15. **Tách Backend REST API (Cách 3)** — viết tầng API + JWT, đổi toàn bộ client sang gọi HTTP. **Làm cuối cùng** vì ảnh hưởng toàn hệ thống.
-
-→ *Mục tiêu: nâng tầm kiến trúc — chỉ làm khi các mức dưới đã ổn định.*
-
-### Nguyên tắc thứ tự
-- Làm **MỨC 1 trước** để vững nền và lấy điểm chắc.
-- **Tách REST API (#15) để sau cùng**: nếu làm sớm rồi mới thêm tính năng, mỗi tính năng mới đều phải code 2 lần (cả API lẫn client). Làm xong nghiệp vụ rồi mới tách sẽ gọn hơn nhiều.
-- Sau mỗi mức nên commit + kiểm thử trước khi đi tiếp.
+*   **Tuần 1-2 (Mức Dễ - Hoàn thiện nền tảng):**
+    *   Thiết lập phân quyền bảo mật dữ liệu theo chi nhánh (`Data Isolation`).
+    *   Viết chức năng đổi mật khẩu cá nhân, quản lý tài khoản người dùng.
+    *   Viết Unit Test (JUnit + Mockito) kiểm thử các service cơ bản.
+*   **Tuần 3-4 (Mức Trung bình - Quy trình nghiệp vụ kho):**
+    *   Hiện thực hóa Quy trình duyệt phiếu kho 2 bước (DRAFT $\rightarrow$ COMPLETED/CANCELLED).
+    *   Phát triển quy trình kiểm kê kho (Stocktake), tính toán chênh lệch và tự động sinh phiếu điều chỉnh.
+    *   Quản lý hạn sử dụng theo lô và logic gợi ý xuất hàng hết hạn trước (FEFO).
+*   **Tuần 5-6 (Mức Khó - Đối tác, Công nợ & Nhân sự):**
+    *   Tích hợp Nhà cung cấp & Khách hàng. Xây dựng logic tự động tính công nợ (`debt`) và thanh toán phiếu kho.
+    *   Phát triển quy trình 3 bước phê duyệt điều chuyển nhân sự (`Branch Transfer Requests`).
+    *   Phát triển quy trình điều chuyển kho 2 bước (`IN_TRANSIT` $\rightarrow$ Nhận hàng $\rightarrow$ Xử lý hao hụt).
+*   **Tuần 7-8 (Mức Rất khó - Phân tích, Backup & REST API):**
+    *   Thiết kế Dashboard biểu đồ, Báo cáo hàng chậm tiêu thụ (Deadstock).
+    *   Tích hợp tính năng Sao lưu & Phục hồi dữ liệu dạng file (.json / .sql) trực tiếp qua giao diện Web.
+    *   Tích hợp thư viện Apache POI để Bulk Import/Export Excel.
+    *   *Mở rộng (nếu còn thời gian):* Tách backend REST API cấp phát token bảo mật bằng JWT.

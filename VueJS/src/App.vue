@@ -1,11 +1,11 @@
 <script setup>
-import homeframe from './pages/homepage.vue'
+import { RouterView } from 'vue-router';
 </script>
 
 <template>
   <div class="container">
-    <homeframe/>
-  </div>
+    <router-view/>
+</div>
 </template>
 
 <style scoped></style>

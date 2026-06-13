@@ -177,12 +177,12 @@ TRANSFER:
 ### 7.4. Khóa / Mở khóa
 - Toggle status ACTIVE ↔ LOCKED.
 - Không tự khóa chính mình.
-- User bị khóa → bị đá ra khỏi hệ thống ở thao tác tiếp theo (checkCurrentUserActive).
+- User bị khóa → bị đá ra khỏi hệ thống ở thao tác tiếp theo hoặc ngay lập tức (checkCurrentUserActive).
 
 ### 7.5. Xóa user
 - Confirm dialog trước.
 - Không tự xóa chính mình.
-- Thất bại nếu user đã có phiếu giao dịch (FK reference → exception).
+- Thất bại nếu user đã có phiếu giao dịch (FK reference → exception). Khuyến nghị khoá tài khoản hơn
 
 ### 7.6. Bộ lọc
 - Tìm kiếm: theo username hoặc fullName.

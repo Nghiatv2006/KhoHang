@@ -105,7 +105,7 @@ Quản lý tồn kho thực tế của từng sản phẩm tại từng chi nhá
 | `product_id` | INT | NOT NULL, FOREIGN KEY | Sản phẩm |
 | `mfg_date` | DATE | NOT NULL, DEFAULT '1970-01-01' | Ngày sản xuất của lô hàng |
 | `exp_date` | DATE | NOT NULL, DEFAULT '1970-01-01' | Hạn sử dụng của lô hàng |
-| `quantity` | INT | NOT NULL, DEFAULT 0, CHECK (qty >= 0) | Số lượng tồn kho hiện tại (Không được âm) |
+| `quantity` | INT | NOT NULL, DEFAULT 0, CHECK (quantity >= 0) | Số lượng tồn kho hiện tại (Không được âm) |
 | `last_updated` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Thời gian cập nhật số lượng cuối cùng |
 
 *   *Ràng buộc đặc biệt:* `UNIQUE (branch_id, product_id, mfg_date, exp_date)` (Một sản phẩm tại một chi nhánh, tương ứng với một lô NSX/HSD chỉ có duy nhất một bản ghi tồn kho).
@@ -119,7 +119,7 @@ Lưu giữ thông tin chung về các giao dịch kho.
 | `code` | VARCHAR(50) | NOT NULL, UNIQUE | Mã phiếu duy nhất tự sinh |
 | `type` | receipt_type | NOT NULL | Loại phiếu: `IMPORT`, `EXPORT`, `TRANSFER`, `ADJUST` |
 | `status` | receipt_status| NOT NULL, DEFAULT 'COMPLETED' | Trạng thái: `DRAFT`, `COMPLETED`, `CANCELLED` |
-| `payment_status` | VARCHAR(50) | NOT NULL, DEFAULT 'UNPAID' | Trạng thái thanh toán: `UNPAID` (Chưa trả), `PAID` (Đã thanh toán) |
+| `payment_status` | VARCHAR(50) | NOT NULL, DEFAULT 'UNPAID' | Trạng thái thanh toán: `UNPAID` (Chưa trả), `PAID` (Đã thanh toán). Đối với phiếu `TRANSFER`, cột này được sử dụng để lưu trạng thái đi đường: `IN_TRANSIT` (Đang đi đường), `RECEIVED` (Đã nhận hàng và cộng kho đích) |
 | `source_branch_id` | INT | FOREIGN KEY | Kho xuất hàng (NULL nếu là IMPORT, ADJUST_IN) |
 | `dest_branch_id` | INT | FOREIGN KEY | Kho nhận hàng (NULL nếu là EXPORT, ADJUST_OUT) |
 | `created_by` | INT | NOT NULL, FOREIGN KEY | Nhân viên lập phiếu |
@@ -178,7 +178,7 @@ Theo dõi việc xin chuyển nhân viên sang chi nhánh khác.
 | `from_branch_id` | INT | NOT NULL, FOREIGN KEY | Chi nhánh gốc |
 | `to_branch_id` | INT | NOT NULL, FOREIGN KEY | Chi nhánh mới đề xuất |
 | `created_by` | INT | NOT NULL, FOREIGN KEY | Manager gửi đề xuất |
-| `status` | VARCHAR(50) | NOT NULL, DEFAULT 'PENDING' | Trạng thái: `PENDING`, `APPROVED`, `REJECTED` |
+| `status` | VARCHAR(50) | NOT NULL, DEFAULT 'PENDING' | Trạng thái quy trình 3 bước: `PENDING` (Chờ nhân viên xác nhận), `STAFF_CONFIRMED` (Chờ quản lý thông qua), `MANAGER_APPROVED` (Chờ Admin duyệt), `APPROVED` (Đã duyệt thành công), `REJECTED` (Đơn bị từ chối) |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Thời điểm đề xuất |
 | `approved_by` | INT | FOREIGN KEY | Admin phê duyệt/từ chối |
 | `approved_at` | TIMESTAMP | | Thời điểm phê duyệt |
