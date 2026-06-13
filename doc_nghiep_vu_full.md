@@ -18,7 +18,9 @@ Hệ thống sử dụng cơ chế kiểm soát truy cập dựa trên vai trò 
 
 | Nhóm Chức Năng | Hành Động | ADMIN | MANAGER (Chi nhánh X) | STAFF (Chi nhánh X) | Ràng Buộc Nghiệp Vụ |
 | :--- | :--- | :---: | :---: | :---: | :--- |
-| **Tài khoản cá nhân** | Đổi mật khẩu | ✅ | ✅ | ✅ | Tự thực hiện cho chính mình |
+| **Xác thực hệ thống**| Đăng nhập, Đăng xuất | ✅ | ✅ | ✅ | Tài khoản ở trạng thái ACTIVE mới được truy cập |
+| **Tài khoản cá nhân**| Đổi mật khẩu | ✅ | ✅ | ✅ | Tự thực hiện cho chính mình |
+| **Quản lý Người dùng**| CRUD tài khoản nhân viên | ✅ | Chỉ STAFF cùng CN | ❌ | Manager chỉ quản lý Staff cùng chi nhánh. Không tự xóa/khóa chính mình. Không xóa tài khoản đã lập phiếu. |
 | **Quản lý Chi nhánh** | CRUD chi nhánh | ✅ | ❌ | ❌ | Admin thao tác toàn cục |
 | **Quản lý Danh mục** | CRUD danh mục | ✅ | ❌ | ❌ | Phân loại sản phẩm toàn hệ thống |
 | **Quản lý Sản phẩm** | CRUD sản phẩm | ✅ | ✅ | ❌ | Không cho phép sửa `has_expiry` nếu sản phẩm đã có giao dịch |
@@ -27,11 +29,17 @@ Hệ thống sử dụng cơ chế kiểm soát truy cập dựa trên vai trò 
 | **Phiếu kho (Receipt)** | Tạo phiếu nháp (DRAFT) | ✅ | ✅ | ✅ | Nhân viên lập phiếu nháp chưa trừ kho |
 | | Duyệt phiếu (DRAFT -> COMPLETED) | ✅ | Chỉ CN X | ❌ | Sau khi duyệt mới cộng/trừ kho thực tế |
 | | Hủy phiếu (DRAFT -> CANCELLED) | ✅ | Chỉ CN X | ❌ | Không thể sửa/xóa phiếu đã COMPLETED/CANCELLED |
+| | Xem lịch sử & chi tiết phiếu | Tất cả | Chỉ CN X | Chỉ CN X | Lọc xem các phiếu kho liên quan chi nhánh (kho xuất hoặc nhận thuộc CN X). |
 | **Kiểm kê kho** | Tạo phiên kiểm kê (DRAFT) | ✅ | ✅ | ✅ | Nhập số liệu đếm thực tế |
 | | Hoàn tất kiểm kê (COMPLETED) | ✅ | Chỉ CN X | ❌ | Tự động sinh phiếu ADJUST_IN/OUT tương ứng |
+| | Hủy phiên kiểm kê (DRAFT -> CANCELLED) | ✅ | Chỉ CN X | ❌ | Hủy bỏ phiên kiểm đếm chưa hoàn tất |
 | **Điều chuyển nhân sự**| Gửi yêu cầu chuyển chi nhánh | ❌ | Chỉ CN X | ✅ | Staff tự gửi đơn cho chính mình, hoặc Manager đề xuất. (Admin cập nhật trực tiếp qua CRUD User). |
 | | Phê duyệt/Xác nhận yêu cầu | ✅ | Chỉ CN X | ✅ | Staff xác nhận đồng ý (BĐ1), Manager duyệt thông qua (BĐ2), Admin duyệt cuối cùng (BĐ3). |
 | **Quản lý Đối tác** | CRUD NCC & Khách hàng | ✅ | ✅ | ❌ | Ghi nhận thông tin liên hệ và công nợ. Đối tác được quản lý toàn cục (không phân chia chi nhánh do cấu trúc DB không có branch_id). |
+| | Thanh toán & Cập nhật công nợ | ✅ | Chỉ CN X | ❌ | Cập nhật `payment_status` sang PAID để tự động giảm trừ công nợ tương ứng. |
+| **Sao lưu & Phục hồi**| Sao lưu & Phục hồi dữ liệu | ✅ | ❌ | ❌ | Thực hiện trực tiếp trên giao diện quản trị Web (dạng JSON hoặc SQL). |
+| **Nhập/Xuất dữ liệu**| Nhập hàng loạt từ Excel | ✅ | ✅ | ❌ | Sử dụng file Excel mẫu để thêm nhanh sản phẩm, nhà cung cấp. |
+| | Xuất báo cáo Excel / In PDF | ✅ | Chỉ CN X | Chỉ CN X | Xuất báo cáo xuất-nhập-tồn ra Excel, in hóa đơn giao dịch ra PDF. |
 | **Nhật ký hoạt động** | Tra cứu Audit Log | ✅ | ❌ | ❌ | Chỉ Admin truy vết lịch sử thao tác hệ thống |
 
 ---
