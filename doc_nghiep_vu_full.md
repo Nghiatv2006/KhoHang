@@ -29,9 +29,9 @@ Hệ thống sử dụng cơ chế kiểm soát truy cập dựa trên vai trò 
 | | Hủy phiếu (DRAFT -> CANCELLED) | ✅ | Chỉ CN X | ❌ | Không thể sửa/xóa phiếu đã COMPLETED/CANCELLED |
 | **Kiểm kê kho** | Tạo phiên kiểm kê (DRAFT) | ✅ | ✅ | ✅ | Nhập số liệu đếm thực tế |
 | | Hoàn tất kiểm kê (COMPLETED) | ✅ | Chỉ CN X | ❌ | Tự động sinh phiếu ADJUST_IN/OUT tương ứng |
-| **Điều chuyển nhân sự**| Gửi yêu cầu chuyển chi nhánh | ❌ | Chỉ CN X | ❌ | Manager gửi yêu cầu điều chuyển Staff thuộc quyền |
-| | Phê duyệt yêu cầu chuyển | ✅ | ❌ | ❌ | Admin duyệt để chính thức cập nhật chi nhánh mới |
-| **Quản lý Đối tác** | CRUD NCC & Khách hàng | ✅ | ✅ | ❌ | Ghi nhận thông tin liên hệ và công nợ |
+| **Điều chuyển nhân sự**| Gửi yêu cầu chuyển chi nhánh | ❌ | Chỉ CN X | ✅ | Staff tự gửi đơn cho chính mình, hoặc Manager đề xuất. (Admin cập nhật trực tiếp qua CRUD User). |
+| | Phê duyệt/Xác nhận yêu cầu | ✅ | Chỉ CN X | ✅ | Staff xác nhận đồng ý (BĐ1), Manager duyệt thông qua (BĐ2), Admin duyệt cuối cùng (BĐ3). |
+| **Quản lý Đối tác** | CRUD NCC & Khách hàng | ✅ | ✅ | ❌ | Ghi nhận thông tin liên hệ và công nợ. Đối tác được quản lý toàn cục (không phân chia chi nhánh do cấu trúc DB không có branch_id). |
 | **Nhật ký hoạt động** | Tra cứu Audit Log | ✅ | ❌ | ❌ | Chỉ Admin truy vết lịch sử thao tác hệ thống |
 
 ---
@@ -49,8 +49,9 @@ Hệ thống sử dụng cơ chế kiểm soát truy cập dựa trên vai trò 
 ### 3.2. Quản lý Tài khoản (User CRUD)
 *   **Ràng buộc khi Thêm/Sửa Người dùng:**
     *   `username` phải là duy nhất trên toàn hệ thống.
-    *   Nhân viên vai trò `MANAGER` và `STAFF` bắt buộc phải được gán vào một chi nhánh cụ thể (`branch_id IS NOT NULL`). Vai trò `ADMIN` được phép để trống chi nhánh (`branch_id = NULL`).
+    *   Nhân viên vai trò `MANAGER` và `STAFF` bắt buộc phải được gán vào một chi nhánh cụ thể (`branch_id IS NOT NULL`). Vai trò `ADMIN` bắt buộc phải để trống chi nhánh (`branch_id = NULL`) trên phương diện logic nghiệp vụ để quản trị toàn cục (mặc dù DB check constraint cho phép khác NULL).
     *   Mật khẩu khi lưu vào cơ sở dữ liệu bắt buộc phải được băm bằng thuật toán `BCrypt`. Khi cập nhật thông tin user, nếu để trống trường password thì hệ thống sẽ giữ nguyên mật khẩu cũ.
+    *   **Ràng buộc xóa vật lý (Physical Deletion Constraints):** Không cho phép xóa vật lý bất kỳ tài khoản người dùng nào đã phát sinh giao dịch trong hệ thống (được tham chiếu trong bảng `receipts` hoặc `stocktakes` với vai trò người tạo) do ràng buộc khóa ngoại DB (`RESTRICT`). Để vô hiệu hóa tài khoản, quản lý hoặc Admin phải cập nhật trạng thái tài khoản sang `LOCKED`.
 *   **Quy tắc phân cấp Quản lý:**
     *   `ADMIN` có quyền CRUD toàn bộ tài khoản bao gồm cả ADMIN khác và các MANAGER, STAFF của tất cả chi nhánh.
     *   `MANAGER` chi nhánh X chỉ có quyền xem, thêm, sửa, khóa hoặc xóa các tài khoản có vai trò `STAFF` trực thuộc chi nhánh X. MANAGER không được nhìn thấy hoặc thao tác với tài khoản ADMIN hoặc tài khoản của chi nhánh khác.
@@ -92,10 +93,10 @@ Hệ thống sử dụng cơ chế kiểm soát truy cập dựa trên vai trò 
 *   Một sản phẩm có thể xuất hiện nhiều dòng trong kho của một chi nhánh nếu chúng thuộc các lô sản xuất hoặc có ngày hạn sử dụng khác nhau.
 
 ### 6.2. Cảnh báo tồn kho thấp & Hạn sử dụng
-*   **Ngưỡng tồn kho thấp:** Hệ thống so sánh tổng số lượng tồn kho của một sản phẩm tại chi nhánh với ngưỡng `low_stock_threshold` của chi nhánh đó. Nếu số lượng tồn kho $\le$ ngưỡng cấu hình, dòng sản phẩm đó trên giao diện sẽ được đánh dấu cảnh báo (highlight đỏ).
+*   **Ngưỡng tồn kho thấp:** Hệ thống so sánh tổng số lượng tồn kho của một sản phẩm tại chi nhánh với ngưỡng `low_stock_threshold` của chi nhánh đó. Nếu số lượng tồn kho $\le$ ngưỡng cấu hình, dòng sản phẩm đó trên giao diện sẽ được đánh dấu cảnh báo (highlight đỏ). Đối với tài khoản ADMIN khi chọn chế độ xem tồn kho của "Tất cả chi nhánh", hệ thống sẽ sử dụng một ngưỡng cảnh báo tồn kho toàn cục (được lưu tại Preferences của ứng dụng khách) để làm căn cứ đánh dấu cảnh báo.
 *   **Quản lý hạn sử dụng:**
     *   Hệ thống cung cấp chức năng lọc danh sách các lô hàng sắp hết hạn (HSD nằm trong khoảng cảnh báo $N$ ngày) hoặc đã hết hạn để thủ kho xử lý tiêu hủy/trả hàng.
-    *   Nguyên tắc xuất kho FEFO (First-Expired-First-Out) bắt buộc áp dụng: Lô hàng nào có HSD gần nhất sẽ được hệ thống gợi ý chọn để xuất trước.
+    *   Nguyên tắc xuất kho FEFO (First-Expired-First-Out) bắt buộc áp dụng cho các sản phẩm có quản lý hạn sử dụng: Lô hàng nào có HSD gần nhất sẽ được hệ thống gợi ý chọn để xuất trước. Đối với các sản phẩm không quản lý hạn sử dụng (mặc định HSD `1970-01-01`), hệ thống sẽ gợi ý xuất theo thứ tự lô nhập trước xuất trước (FIFO).
 
 ---
 
@@ -151,13 +152,15 @@ graph TD
     *   **Bước 1 (Xuất điều chuyển):** Khi phiếu xuất đi được phê duyệt, hệ thống trừ số lượng tồn kho tại chi nhánh nguồn (`source_branch_id`), đồng thời lưu trạng thái `payment_status` là `'IN_TRANSIT'` (Đang đi đường). Hàng hóa tạm thời bị trừ khỏi kho nguồn nhưng chưa được cộng vào kho đích.
     *   **Bước 2 (Xác nhận nhập):** Khi hàng hóa thực tế tới chi nhánh đích, nhân viên tại chi nhánh đích thực hiện đếm thực tế và bấm Xác nhận nhận hàng. Hệ thống cộng số lượng nhận thực tế vào tồn kho của chi nhánh đích (`dest_branch_id`), đồng thời chuyển trạng thái `payment_status` của phiếu thành `'RECEIVED'` (Đã nhận hàng) để hoàn tất phiếu.
     *   **Xử lý hao hụt vận chuyển:** Nếu số lượng nhận thực tế ít hơn số lượng xuất đi, hệ thống tự động ghi nhận lượng hao hụt và sinh một phiếu cân bằng giảm (`ADJUST_OUT` ở trạng thái `COMPLETED`) tại chi nhánh nguồn tương ứng với số lượng chênh lệch hao hụt để đảm bảo tính nhất quán của số liệu sổ sách.
+    *   **Lưu ý kỹ thuật về số lượng:** Do bảng `receipt_details` chỉ có một trường `quantity` lưu số lượng xuất, hệ thống không lưu trữ số lượng thực nhận trực tiếp trên chi tiết phiếu điều chuyển gốc. Số lượng gốc xuất đi vẫn được giữ nguyên ở phiếu `TRANSFER` để làm cơ sở đối chiếu, còn lượng hao hụt sẽ được quản lý gián tiếp qua phiếu `ADJUST_OUT` tự động sinh nói trên.
 
 ---
 
 ## 8. NGHIỆP VỤ KIỂM KÊ KHO (STOCKTAKE)
 Kiểm kê kho là nghiệp vụ định kỳ của chi nhánh để đối chiếu và sửa sai lệch giữa sổ sách phần mềm và thực tế hàng hóa trong kho.
-*   **Khởi tạo phiên kiểm kê:** STAFF tạo một phiếu kiểm kê mới cho chi nhánh của mình ở trạng thái `DRAFT`.
+*   **Khởi tạo phiên kiểm kê:** STAFF tạo một phiếu kiểm kê mới cho chi nhánh của mình ở trạng thái `DRAFT`. Mã phiên kiểm kê được tự động sinh theo quy tắc: **tiền tố ST + 8 ký tự UUID ngẫu nhiên** (ví dụ: `STa1b2c3d4`), cơ chế phòng tránh trùng tương tự như phiếu kho.
 *   **Nhập số liệu thực tế:** Nhân viên tiến hành kiểm đếm thực tế từng lô hàng và nhập số lượng vào cột `actual_quantity`. Hệ thống sẽ tự động hiển thị số lượng tồn kho sổ sách hiện tại (`expected_quantity`) để đối chiếu chênh lệch.
+*   **Ràng buộc kiểm soát giao dịch song song:** Để tránh sai lệch số liệu kiểm kê tự động, trong thời gian phiên kiểm kê đang ở trạng thái `DRAFT`, hệ thống khuyến nghị khóa việc phê duyệt các phiếu kho (nhập, xuất, điều chuyển) liên quan đến chi nhánh đó. Nếu không khóa, hệ thống bắt buộc phải cập nhật lại (re-snapshot) trường `expected_quantity` dựa trên tồn kho thực tế ngay trước khi chuyển trạng thái kiểm kê sang `COMPLETED`.
 *   **Xác nhận hoàn tất kiểm kê (Duyệt kiểm kê):**
     *   Chỉ `MANAGER` hoặc `ADMIN` mới có quyền chuyển trạng thái phiên kiểm kê từ `DRAFT` sang `COMPLETED`.
     *   Khi hoàn tất phiên kiểm kê, hệ thống tính toán chênh lệch cho từng dòng chi tiết:
@@ -179,6 +182,7 @@ Nhằm quản lý biến động nhân sự giữa các kho hàng vật lý và 
     *   Chỉ có `ADMIN` hệ thống mới có quyền đưa ra quyết định phê duyệt cuối cùng (`APPROVED`) hoặc từ chối (`REJECTED`).
     *   Nếu chọn **APPROVED (Duyệt):** Hệ thống tự động cập nhật trường `branch_id` của nhân viên đó trong bảng `users` sang chi nhánh mới (`to_branch_id`), cập nhật ngày duyệt và người duyệt. Từ thời điểm này, nhân viên đó chỉ có quyền đăng nhập và thao tác dữ liệu của chi nhánh mới.
     *   Nếu chọn **REJECTED (Từ chối):** Đơn chuyển sang trạng thái hủy, nhân viên tiếp tục làm việc tại chi nhánh cũ.
+*   **Lưu ý CSDL về phê duyệt trung gian:** Do bảng `branch_transfer_requests` chỉ lưu vết người phê duyệt cuối cùng ở trường `approved_by` (chỉ dành cho Admin), bước phê duyệt trung gian ở bước 2 của Manager không được lưu bằng cột riêng trong bảng này mà được ghi nhận thông qua việc cập nhật `status = 'MANAGER_APPROVED'` và được lưu vết chi tiết trong bảng `audit_logs`.
 
 ---
 
@@ -193,30 +197,37 @@ Nhằm quản lý biến động nhân sự giữa các kho hàng vật lý và 
 
 ---
 
-## 10. NGHIỆP VỤ QUẢN LÝ ĐỐI TÁC & CÔNG NỢ (PARTNERS & FINANCE)
+## 11. NGHIỆP VỤ QUẢN LÝ ĐỐI TÁC & CÔNG NỢ (PARTNERS & FINANCE)
 
-### 10.1. Nhà cung cấp (Suppliers)
+### 11.1. Nhà cung cấp (Suppliers)
 *   Lưu thông tin: Tên công ty, thông tin liên lạc, địa chỉ, trạng thái hoạt động (`ACTIVE`/`INACTIVE`) và công nợ (`debt`).
 *   **Tác động công nợ:** Khi duyệt một phiếu nhập kho (`IMPORT`) có trạng thái thanh toán là `UNPAID`, hệ thống sẽ tự động cộng giá trị hóa đơn (Tổng số lượng $\times$ Đơn giá giao dịch của các dòng chi tiết) vào công nợ của Nhà cung cấp đó (`suppliers.debt += total_receipt_value`). Khi kho thực hiện trả tiền cho NCC, thủ kho sẽ cập nhật trạng thái thanh toán của phiếu nhập tương ứng sang `PAID` và hệ thống sẽ trừ công nợ tương ứng.
+*   **Ràng buộc xóa vật lý:** Không cho phép xóa vật lý bất kỳ Nhà cung cấp nào đã có liên kết giao dịch trong bảng `receipts` (khóa ngoại `RESTRICT`). Thủ kho hoặc quản lý chỉ có thể cập nhật trạng thái hoạt động sang `INACTIVE` để ngưng hợp tác.
 
-### 10.2. Khách hàng (Customers)
+### 11.2. Khách hàng (Customers)
 *   Lưu thông tin: Họ tên, số điện thoại, địa chỉ, trạng thái hoạt động và công nợ (`debt`).
 *   **Tác động công nợ:** Khi duyệt một phiếu xuất kho (`EXPORT`) có trạng thái thanh toán là `UNPAID`, hệ thống tự động cộng giá trị hóa đơn xuất vào số nợ khách hàng phải trả cho doanh nghiệp (`customers.debt += total_receipt_value`). Khi khách hàng thanh toán xong, phiếu xuất chuyển sang trạng thái `PAID` và nợ của khách hàng được giảm trừ tương ứng.
+*   **Ràng buộc xóa vật lý:** Tương tự Nhà cung cấp, không cho phép xóa vật lý Khách hàng đã phát sinh giao dịch (khóa ngoại `RESTRICT`), chỉ được chuyển trạng thái sang `INACTIVE`.
+
+### 11.3. Hạn chế trong quản lý Thanh toán & Công nợ
+*   **Thanh toán công nợ đơn giản:** Hệ thống quản lý công nợ ở mức tổng hợp dựa trên cờ trạng thái `payment_status` (`UNPAID` / `PAID`) của phiếu kho và cộng dồn vào cột `debt`. Hệ thống không lưu trữ chi tiết lịch sử giao dịch thanh toán hoặc hỗ trợ thanh toán một phần (partial payment) do cấu trúc CSDL hiện tại chưa hỗ trợ bảng thanh toán riêng.
 
 ---
 
-## 11. NGHIỆP VỤ NHẬT KÝ HOẠT ĐỘNG (AUDIT LOGGING)
+## 12. NGHIỆP VỤ NHẬT KÝ HOẠT ĐỘNG (AUDIT LOGGING)
 *   Bảng `audit_logs` đóng vai trò là bằng chứng giám sát (Audit Trail). Hệ thống không cho phép bất kỳ ai (kể cả ADMIN) được quyền chỉnh sửa hoặc xóa dữ liệu trong bảng này.
 *   **Các hành động bắt buộc phải ghi log:**
     *   `LOGIN` / `LOGOUT`: Đăng nhập thành công, đăng nhập thất bại, đăng xuất.
     *   `CREATE` / `UPDATE` / `DELETE` trên các bảng cấu hình: `users`, `products`, `branches`, `categories`, `suppliers`, `customers`.
     *   `DRAFT` / `APPROVE` / `CANCEL` trên các bảng giao dịch: `receipts`, `stocktakes`.
+    *   `CREATE` / `CONFIRM` / `APPROVE` / `REJECT` trên quy trình điều chuyển nhân sự (`branch_transfer_requests`).
     *   `LOCK` / `UNLOCK`: Khóa hoặc mở khóa tài khoản người dùng.
 *   **Nội dung chi tiết (`details`):** Ghi rõ trạng thái trước và sau khi thay đổi dưới dạng văn bản mô tả hoặc định dạng JSON của đối tượng bị thay đổi nhằm phục vụ công tác đối soát khi xảy ra thất thoát hàng hóa.
+*   **Lưu ý kỹ thuật về bảo mật Log:** Quy tắc không cho phép sửa/xóa bảng nhật ký hoạt động được kiểm soát và thực thi chặt chẽ ở mức logic nghiệp vụ phần mềm (Application Level), do CSDL PostgreSQL hiện tại chưa cấu hình trigger chặn thao tác này trực tiếp trên DB.
 
 ---
 
-## 12. CÁC QUY TẮC HIỂN THỊ & KỸ THUẬT QUAN TRỌNG
+## 13. CÁC QUY TẮC HIỂN THỊ & KỸ THUẬT QUAN TRỌNG
 *   **Định dạng Tiền tệ:** Tiền tệ luôn được định dạng theo Locale của Đức (GERMANY) với dấu chấm làm phân cách hàng nghìn (ví dụ: `29.900.000 VNĐ`). Mẫu định dạng: `#,##0`.
 *   **Định dạng Ngày tháng:** Hiển thị thống nhất theo chuẩn Việt Nam: `dd/MM/yyyy` (ví dụ: `11/06/2026`).
 *   **Giao dịch an toàn Database:** Toàn bộ logic cập nhật số lượng tồn kho của phiếu kho và kiểm kê bắt buộc phải chạy trong môi trường Spring `@Transactional` với chính sách rollback mọi ngoại lệ (`rollbackFor = Exception.class`).
