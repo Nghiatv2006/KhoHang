@@ -49,7 +49,7 @@ public class AuthController {
                     .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
                     .body(body);
         } catch (RuntimeException ex) {
-            // Trả về mã lỗi 400 Bad Request kèm thông báo lỗi nghiệp vụ
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }
     }
 

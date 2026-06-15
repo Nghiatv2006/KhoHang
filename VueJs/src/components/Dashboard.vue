@@ -237,12 +237,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch, onMounted } from 'vue';
 import UserManagement from './UserManagement.vue';
 import BranchManagement from './BranchManagement.vue';
 
 const emit = defineEmits(['logout']);
-const currentTab = ref('overview');
+const currentTab = ref(window.location.hash.replace('#', '') || 'overview');
+
+watch(currentTab, (newTab) => {
+  window.location.hash = newTab;
+});
+
+onMounted(() => {
+  window.addEventListener('hashchange', () => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash) {
+      currentTab.value = hash;
+    }
+  });
+});
 </script>
 
 <style scoped>
