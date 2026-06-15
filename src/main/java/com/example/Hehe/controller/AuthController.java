@@ -50,7 +50,21 @@ public class AuthController {
                     .body(body);
         } catch (RuntimeException ex) {
             // Trả về mã lỗi 400 Bad Request kèm thông báo lỗi nghiệp vụ
-            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout() {
+        // Xoá cookie bằng cách set maxAge = 0
+        ResponseCookie deleteCookie = ResponseCookie.from("accessToken", "")
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .maxAge(0)
+                .sameSite("Strict")
+                .build();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, deleteCookie.toString())
+                .body(Map.of("message", "Đăng xuất thành công"));
     }
 }

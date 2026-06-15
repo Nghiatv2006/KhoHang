@@ -221,23 +221,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { api } from '../api';
 
-const currentUser = 'admin'; 
+const savedUser = localStorage.getItem('user_profile');
+const currentUser = savedUser ? JSON.parse(savedUser).username : '';
 
-const branches = ref([
-  { id: 1, name: 'Chi nhánh Hà Nội' },
-  { id: 2, name: 'Chi nhánh TP.HCM' },
-  { id: 3, name: 'Chi nhánh Đà Nẵng' }
-]);
-
-const users = ref([
-  { id: 1, username: 'admin', fullName: 'Quản trị viên', role: 'ADMIN', branchId: null, status: 'ACTIVE', createdAt: '11/06/2026', hasTransactions: false },
-  { id: 2, username: 'manager_hn', fullName: 'Lê Cường', role: 'MANAGER', branchId: 1, status: 'ACTIVE', createdAt: '12/06/2026', hasTransactions: true },
-  { id: 3, username: 'staff_hn_1', fullName: 'Đặng Thảo', role: 'STAFF', branchId: 1, status: 'ACTIVE', createdAt: '12/06/2026', hasTransactions: true },
-  { id: 4, username: 'manager_hcm', fullName: 'Phạm My', role: 'MANAGER', branchId: 2, status: 'ACTIVE', createdAt: '13/06/2026', hasTransactions: false },
-  { id: 5, username: 'staff_locked', fullName: 'Lý Nam', role: 'STAFF', branchId: 2, status: 'LOCKED', createdAt: '13/06/2026', hasTransactions: false }
-]);
+const branches = ref<any[]>([]);
+const users = ref<any[]>([]);
 
 const filters = ref({ search: '', role: '', branchId: '', status: '' });
 const alert = ref({ show: false, message: '', type: 'success' });
@@ -247,8 +238,28 @@ const isEditMode = ref(false);
 const panelError = ref('');
 const form = ref({ id: 0, username: '', fullName: '', password: '', role: 'STAFF', branchId: '' as any, status: 'ACTIVE' });
 
+const fetchBranches = async () => {
+  try {
+    const res = await api.get('/api/branches');
+    if (res.ok) branches.value = await res.json();
+  } catch (e) {}
+};
+
+const fetchUsers = async () => {
+  try {
+    const res = await api.get('/api/users');
+    if (res.ok) users.value = await res.json();
+  } catch (e) {}
+};
+
+onMounted(() => {
+  fetchBranches();
+  fetchUsers();
+});
+
 // Light Mode Premium Gradients
 const getAvatarGradient = (username: string) => {
+  if (!username) return 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)';
   const gradients = [
     'linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%)',
     'linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%)',
@@ -269,7 +280,7 @@ const showAlert = (msg: string, type: 'success' | 'error' = 'success') => {
 };
 
 const getBranchName = (branchId: number | null) => {
-  if (branchId === null) return 'Toàn hệ thống';
+  if (!branchId) return 'Toàn hệ thống';
   return branches.value.find(b => b.id === branchId)?.name || '-';
 };
 
@@ -282,11 +293,11 @@ const roleClass = (role: string) => {
 const filteredUsers = computed(() => {
   return users.value.filter(u => {
     const s = filters.value.search.toLowerCase();
-    const matchSearch = u.username.toLowerCase().includes(s) || u.fullName.toLowerCase().includes(s);
+    const matchSearch = (u.username || '').toLowerCase().includes(s) || (u.fullName || '').toLowerCase().includes(s);
     const matchRole = !filters.value.role || u.role === filters.value.role;
     let matchBranch = true;
     if (filters.value.branchId) {
-      matchBranch = filters.value.branchId === '0' ? u.branchId === null : u.branchId === parseInt(filters.value.branchId);
+      matchBranch = filters.value.branchId === '0' ? !u.branchId : u.branchId === parseInt(filters.value.branchId);
     }
     const matchStatus = !filters.value.status || u.status === filters.value.status;
     return matchSearch && matchRole && matchBranch && matchStatus;
@@ -311,45 +322,79 @@ const openEditPanel = (user: any) => {
 
 const closePanel = () => { activePanel.value = false; form.value.id = 0; };
 
-const toggleStatus = (id: number) => {
+const toggleStatus = async (id: number) => {
   const user = users.value.find(u => u.id === id);
   if (!user) return;
   if (user.username === currentUser) return showAlert('Không thể tự khóa tài khoản của chính mình!', 'error');
-  user.status = user.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
-  form.value.status = user.status; 
-  showAlert(`Đã ${user.status === 'ACTIVE' ? 'mở khóa' : 'khóa'} tài khoản ${user.username}`);
-};
-
-const deleteUser = (id: number) => {
-  const user = users.value.find(u => u.id === id);
-  if (!user) return;
-  if (user.username === currentUser) return showAlert('Không thể tự xóa chính mình!', 'error');
-  if (user.hasTransactions) return showAlert(`Tài khoản đã phát sinh dữ liệu, chỉ có thể KHÓA.`, 'error');
-  if (confirm(`Xóa vĩnh viễn tài khoản ${user.username}?`)) {
-    users.value = users.value.filter(u => u.id !== user.id);
-    showAlert(`Đã xóa ${user.username}`);
-    closePanel();
+  
+  try {
+    const res = await api.patch(`/api/users/${id}/toggle-status`, {});
+    if (res.ok) {
+      fetchUsers();
+      showAlert(`Đã thay đổi trạng thái tài khoản ${user.username}`);
+      closePanel();
+    } else {
+      const data = await res.json();
+      showAlert(data.message || 'Lỗi đổi trạng thái', 'error');
+    }
+  } catch (e) {
+    showAlert('Lỗi kết nối máy chủ', 'error');
   }
 };
 
-const submitForm = () => {
+const deleteUser = async (id: number) => {
+  const user = users.value.find(u => u.id === id);
+  if (!user) return;
+  if (user.username === currentUser) return showAlert('Không thể tự xóa chính mình!', 'error');
+  
+  if (confirm(`Xóa vĩnh viễn tài khoản ${user.username}?`)) {
+    try {
+      const res = await api.delete(`/api/users/${id}`);
+      if (res.ok) {
+        fetchUsers();
+        showAlert(`Đã xóa ${user.username}`);
+        closePanel();
+      } else {
+        const data = await res.json();
+        showAlert(data.message || 'Lỗi khi xóa tài khoản', 'error');
+      }
+    } catch (e) {
+      showAlert('Lỗi kết nối máy chủ', 'error');
+    }
+  }
+};
+
+const submitForm = async () => {
   panelError.value = '';
   if (form.value.role !== 'ADMIN' && !form.value.branchId) return panelError.value = 'Vui lòng chọn chi nhánh.';
-  const finalBranch = form.value.role === 'ADMIN' ? null : parseInt(form.value.branchId);
+  const finalBranchId = form.value.role === 'ADMIN' ? null : parseInt(form.value.branchId);
 
-  if (isEditMode.value) {
-    const user = users.value.find(u => u.id === form.value.id);
-    if (user) {
-      user.fullName = form.value.fullName; user.role = form.value.role; user.branchId = finalBranch;
-      showAlert(`Đã cập nhật ${user.username}`); closePanel();
+  const payload = {
+    username: form.value.username,
+    fullName: form.value.fullName,
+    password: form.value.password,
+    role: form.value.role,
+    branchId: finalBranchId
+  };
+
+  try {
+    let res;
+    if (isEditMode.value) {
+      res = await api.put(`/api/users/${form.value.id}`, payload);
+    } else {
+      res = await api.post('/api/users', payload);
     }
-  } else {
-    if (users.value.some(u => u.username === form.value.username)) return panelError.value = 'Tên đăng nhập đã tồn tại.';
-    users.value.push({
-      id: Date.now(), username: form.value.username, fullName: form.value.fullName, role: form.value.role,
-      branchId: finalBranch, status: 'ACTIVE', createdAt: new Date().toLocaleDateString('vi-VN'), hasTransactions: false
-    });
-    showAlert(`Đã tạo tài khoản ${form.value.username}`); closePanel();
+
+    if (res.ok) {
+      showAlert(isEditMode.value ? `Đã cập nhật ${form.value.username}` : `Đã tạo tài khoản ${form.value.username}`);
+      closePanel();
+      fetchUsers();
+    } else {
+      const data = await res.json();
+      panelError.value = data.message || 'Lưu dữ liệu thất bại';
+    }
+  } catch (error) {
+    panelError.value = 'Lỗi kết nối máy chủ.';
   }
 };
 </script>

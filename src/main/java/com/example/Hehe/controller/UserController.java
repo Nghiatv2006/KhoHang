@@ -22,6 +22,22 @@ public class UserController {
         this.userService = userService;
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<?> getCurrentUser(@AuthenticationPrincipal User currentUser) {
+        if (currentUser == null) {
+            return ResponseEntity.status(401).body(Map.of("message", "Unauthorized"));
+        }
+        return ResponseEntity.ok(Map.of(
+                "id", currentUser.getId(),
+                "username", currentUser.getUsername(),
+                "fullName", currentUser.getFullName(),
+                "role", currentUser.getRole(),
+                "branchId", currentUser.getBranch() != null ? currentUser.getBranch().getId() : "",
+                "branchName", currentUser.getBranch() != null ? currentUser.getBranch().getName() : "",
+                "status", currentUser.getStatus()
+        ));
+    }
+
     @GetMapping
     public ResponseEntity<?> searchUsers(
             @RequestParam(required = false) String keyword,

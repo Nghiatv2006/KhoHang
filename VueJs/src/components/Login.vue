@@ -82,6 +82,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import { api } from '../api';
 
 const emit = defineEmits<{ (e: 'login-success', role: string): void }>();
 
@@ -90,7 +91,7 @@ const password = ref('');
 const loading = ref(false);
 const error = ref('');
 
-const handleLogin = () => {
+const handleLogin = async () => {
   error.value = '';
   if (!username.value || !password.value) {
     error.value = 'Vui lòng nhập đầy đủ thông tin.';
@@ -98,14 +99,24 @@ const handleLogin = () => {
   }
 
   loading.value = true;
-  setTimeout(() => {
-    loading.value = false;
-    if ((username.value === 'admin' || username.value === 'manager') && password.value === '123456') {
-      emit('login-success', username.value);
+  try {
+    const response = await api.post('/api/auth/login', { username: username.value, password: password.value });
+    
+    const data = await response.json();
+    
+    if (response.ok) {
+      // API trả về HttpOnly Cookie chứa JWT an toàn
+      // Ta chỉ lưu thông tin cơ bản của user vào localStorage để hiển thị UI
+      localStorage.setItem('user_profile', JSON.stringify(data));
+      emit('login-success', data.role);
     } else {
-      error.value = 'Tên đăng nhập hoặc mật khẩu không chính xác';
+      error.value = data.message || 'Tên đăng nhập hoặc mật khẩu không chính xác';
     }
-  }, 1200);
+  } catch (err) {
+    error.value = 'Lỗi kết nối đến máy chủ. Vui lòng thử lại sau.';
+  } finally {
+    loading.value = false;
+  }
 };
 </script>
 

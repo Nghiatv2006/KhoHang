@@ -20,17 +20,9 @@
         <div class="stat-val mono text-gray-900">{{ branches.length }}</div>
       </div>
       <div class="stat-card glass-panel group">
-        <div class="stat-lbl">ĐANG HOẠT ĐỘNG</div>
-        <div class="stat-val mono text-green-700">{{ branches.filter(b => b.status === 'ACTIVE').length }}</div>
-      </div>
-      <div class="stat-card glass-panel group">
-        <div class="stat-lbl">TẠM NGƯNG</div>
-        <div class="stat-val mono text-orange-600">{{ branches.filter(b => b.status === 'INACTIVE').length }}</div>
-      </div>
-      <div class="stat-card glass-panel group">
         <div class="stat-lbl">TRUNG BÌNH CẢNH BÁO TỒN</div>
         <div class="stat-val mono text-gray-700">
-          {{ Math.round(branches.reduce((sum, b) => sum + b.lowStockThreshold, 0) / (branches.length || 1)) }}
+          {{ branches.length ? Math.round(branches.reduce((sum, b) => sum + b.lowStockThreshold, 0) / branches.length) : 0 }}
         </div>
       </div>
     </div>
@@ -39,15 +31,7 @@
     <div class="toolbar glass-panel staggered-in" style="animation-delay: 100ms">
       <div class="search-box">
         <span class="material-symbols-outlined search-ico">search</span>
-        <input v-model="filters.search" type="text" placeholder="Tìm theo mã hoặc tên chi nhánh..." />
-      </div>
-      
-      <div class="filters-grp">
-        <select v-model="filters.status" class="filter-sel">
-          <option value="">Tất cả trạng thái</option>
-          <option value="ACTIVE">Hoạt động (ACTIVE)</option>
-          <option value="INACTIVE">Tạm ngưng (INACTIVE)</option>
-        </select>
+        <input v-model="filters.search" type="text" placeholder="Tìm theo tên chi nhánh..." />
       </div>
     </div>
 
@@ -61,9 +45,7 @@
             <thead>
               <tr>
                 <th>Chi nhánh</th>
-                <th v-if="!activePanel">Mã (Code)</th>
                 <th v-if="!activePanel">Ngưỡng tồn thấp</th>
-                <th>Trạng Thái</th>
               </tr>
             </thead>
             <tbody>
@@ -86,24 +68,15 @@
                   </div>
                 </td>
                 <td v-if="!activePanel">
-                  <span class="badge badge-code">{{ branch.code }}</span>
-                </td>
-                <td v-if="!activePanel">
                   <div class="flex items-center gap-1.5 text-gray-700">
                     <span class="material-symbols-outlined text-[16px] text-orange-500">warning</span>
                     <span class="font-mono font-semibold">{{ branch.lowStockThreshold }}</span>
                   </div>
                 </td>
-                <td>
-                  <span class="pill-badge" :class="branch.status === 'ACTIVE' ? 'pill-active' : 'pill-inactive'">
-                    <span class="status-dot" :class="branch.status === 'ACTIVE' ? 'dot-active' : 'dot-inactive'"></span>
-                    {{ branch.status }}
-                  </span>
-                </td>
               </tr>
               
               <tr v-if="filteredBranches.length === 0">
-                <td :colspan="activePanel ? 2 : 4">
+                <td :colspan="activePanel ? 1 : 2">
                   <div class="empty-state">
                     <div class="empty-ico-box">
                       <span class="material-symbols-outlined text-gray-500 text-4xl">domain_disabled</span>
@@ -136,7 +109,7 @@
           </div>
 
           <h3 class="detail-title text-gray-900">{{ isEditMode ? form.name : 'Chi nhánh mới' }}</h3>
-          <p class="detail-sub mono text-gray-600">{{ isEditMode ? '#' + form.code : 'Nhập thông tin bên dưới' }}</p>
+          <p class="detail-sub mono text-gray-600">{{ isEditMode ? 'Chỉnh sửa' : 'Nhập thông tin bên dưới' }}</p>
         </div>
 
         <div class="detail-body p-6 bg-gray-50/50">
@@ -146,20 +119,6 @@
           </div>
 
           <form @submit.prevent="submitForm" class="detail-form">
-            <div class="form-group">
-              <label>MÃ CHI NHÁNH <span class="req">*</span></label>
-              <input 
-                v-model="form.code" 
-                type="text" 
-                :disabled="isEditMode" 
-                required 
-                placeholder="VD: HN01" 
-                @input="form.code = form.code.toUpperCase()"
-                class="font-mono uppercase"
-              />
-              <span v-if="!isEditMode" class="form-hint">Mã duy nhất, viết hoa, không dấu.</span>
-            </div>
-
             <div class="form-group">
               <label>TÊN CHI NHÁNH <span class="req">*</span></label>
               <input v-model="form.name" type="text" required placeholder="Nhập tên chi nhánh..." />
@@ -182,12 +141,8 @@
 
           <!-- Danger Actions (Edit mode only) -->
           <div v-if="isEditMode" class="danger-zone border-t border-gray-200 mt-6 pt-6">
-            <h4 class="text-gray-900 font-semibold mb-3">Quản lý trạng thái</h4>
+            <h4 class="text-gray-900 font-semibold mb-3">Quản lý chi nhánh</h4>
             <div class="danger-actions">
-              <button class="btn-outline-warning" @click="toggleStatus(form.id)">
-                <span class="material-symbols-outlined">{{ form.status === 'ACTIVE' ? 'pause_circle' : 'play_circle' }}</span>
-                {{ form.status === 'ACTIVE' ? 'Tạm ngưng hoạt động' : 'Kích hoạt lại' }}
-              </button>
               <button class="btn-outline-error" @click="deleteBranch(form.id)">
                 <span class="material-symbols-outlined">delete</span> Xóa chi nhánh vĩnh viễn
               </button>
@@ -217,42 +172,50 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { api } from '../api';
 
-const branches = ref([
-  { id: 1, code: 'HQ', name: 'Tổng kho Hà Nội (HQ)', address: 'Số 1, Đại Cồ Việt, Hai Bà Trưng, Hà Nội', lowStockThreshold: 10, status: 'ACTIVE', hasData: true },
-  { id: 2, code: 'HCM01', name: 'Chi nhánh Quận 1', address: '123 Lê Lợi, Bến Nghé, Quận 1, TP.HCM', lowStockThreshold: 5, status: 'ACTIVE', hasData: true },
-  { id: 3, code: 'DN01', name: 'Chi nhánh Hải Châu', address: '456 Bạch Đằng, Hải Châu, Đà Nẵng', lowStockThreshold: 5, status: 'ACTIVE', hasData: false },
-  { id: 4, code: 'HN02', name: 'Chi nhánh Cầu Giấy', address: '789 Xuân Thủy, Dịch Vọng Hậu, Cầu Giấy, Hà Nội', lowStockThreshold: 5, status: 'INACTIVE', hasData: false }
-]);
-
-const filters = ref({ search: '', status: '' });
+const branches = ref<any[]>([]);
+const filters = ref({ search: '' });
 const alert = ref({ show: false, message: '', type: 'success' });
 
 const activePanel = ref(false);
 const isEditMode = ref(false);
 const panelError = ref('');
-const form = ref({ id: 0, code: '', name: '', address: '', lowStockThreshold: 5, status: 'ACTIVE' });
+const form = ref({ id: 0, name: '', address: '', lowStockThreshold: 5 });
 
 const showAlert = (msg: string, type: 'success' | 'error' = 'success') => {
   alert.value = { show: true, message: msg, type };
   setTimeout(() => { alert.value.show = false; }, 3000);
 };
 
+const fetchBranches = async () => {
+  try {
+    const res = await api.get('/api/branches');
+    if (res.ok) {
+      branches.value = await res.json();
+    }
+  } catch (error) {
+    showAlert('Không thể kết nối đến máy chủ', 'error');
+  }
+};
+
+onMounted(() => {
+  fetchBranches();
+});
+
 const filteredBranches = computed(() => {
   return branches.value.filter(b => {
     const s = filters.value.search.toLowerCase();
-    const matchSearch = b.code.toLowerCase().includes(s) || b.name.toLowerCase().includes(s);
-    const matchStatus = !filters.value.status || b.status === filters.value.status;
-    return matchSearch && matchStatus;
+    return b.name.toLowerCase().includes(s) || b.address.toLowerCase().includes(s);
   });
 });
 
-const clearFilters = () => { filters.value = { search: '', status: '' }; };
+const clearFilters = () => { filters.value = { search: '' }; };
 
 const openAddPanel = () => {
   activePanel.value = true; isEditMode.value = false; panelError.value = '';
-  form.value = { id: 0, code: '', name: '', address: '', lowStockThreshold: 5, status: 'ACTIVE' };
+  form.value = { id: 0, name: '', address: '', lowStockThreshold: 5 };
 };
 
 const openEditPanel = (branch: any) => {
@@ -266,55 +229,63 @@ const openEditPanel = (branch: any) => {
 
 const closePanel = () => { activePanel.value = false; form.value.id = 0; };
 
-const toggleStatus = (id: number) => {
+const deleteBranch = async (id: number) => {
   const branch = branches.value.find(b => b.id === id);
   if (!branch) return;
-  branch.status = branch.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-  form.value.status = branch.status; 
-  showAlert(`Đã ${branch.status === 'ACTIVE' ? 'kích hoạt' : 'tạm ngưng'} chi nhánh ${branch.code}`);
-};
-
-const deleteBranch = (id: number) => {
-  const branch = branches.value.find(b => b.id === id);
-  if (!branch) return;
-  if (branch.hasData) return showAlert(`Chi nhánh đã có dữ liệu (nhân sự/hàng hóa), không thể xóa!`, 'error');
   if (confirm(`Bạn có chắc chắn muốn xóa chi nhánh ${branch.name}? Hành động này không thể hoàn tác.`)) {
-    branches.value = branches.value.filter(b => b.id !== branch.id);
-    showAlert(`Đã xóa chi nhánh ${branch.code}`);
-    closePanel();
+    try {
+      const res = await api.delete(`/api/branches/${id}`);
+      if (res.ok) {
+        showAlert(`Đã xóa chi nhánh ${branch.name}`);
+        closePanel();
+        fetchBranches();
+      } else {
+        const data = await res.json();
+        showAlert(data.message || 'Chi nhánh này đang có dữ liệu, không thể xóa!', 'error');
+      }
+    } catch (e) {
+      showAlert('Lỗi kết nối đến máy chủ', 'error');
+    }
   }
 };
 
-const submitForm = () => {
+const submitForm = async () => {
   panelError.value = '';
-  if (!form.value.code || !form.value.name || !form.value.address) return panelError.value = 'Vui lòng điền đầy đủ thông tin.';
+  if (!form.value.name || !form.value.address) return panelError.value = 'Vui lòng điền đầy đủ thông tin.';
   if (form.value.lowStockThreshold < 0) return panelError.value = 'Ngưỡng tồn kho không được âm.';
 
-  if (isEditMode.value) {
-    const branch = branches.value.find(b => b.id === form.value.id);
-    if (branch) {
-      if (branches.value.some(b => b.name.toLowerCase() === form.value.name.toLowerCase() && b.id !== form.value.id)) {
-        return panelError.value = 'Tên chi nhánh đã tồn tại.';
-      }
-      Object.assign(branch, form.value);
-      showAlert(`Đã cập nhật chi nhánh ${branch.code}`);
-      closePanel();
+  try {
+    let res;
+    if (isEditMode.value) {
+      res = await api.put(`/api/branches/${form.value.id}`, {
+        name: form.value.name,
+        address: form.value.address,
+        lowStockThreshold: form.value.lowStockThreshold
+      });
+    } else {
+      res = await api.post('/api/branches', {
+        name: form.value.name,
+        address: form.value.address,
+        lowStockThreshold: form.value.lowStockThreshold
+      });
     }
-  } else {
-    if (branches.value.some(b => b.code === form.value.code)) return panelError.value = 'Mã chi nhánh đã tồn tại.';
-    if (branches.value.some(b => b.name.toLowerCase() === form.value.name.toLowerCase())) return panelError.value = 'Tên chi nhánh đã tồn tại.';
-    
-    branches.value.push({
-      id: Date.now(), ...form.value, hasData: false
-    });
-    showAlert(`Đã tạo chi nhánh ${form.value.code}`);
-    closePanel();
+
+    if (res.ok) {
+      showAlert(isEditMode.value ? 'Đã cập nhật chi nhánh' : 'Đã tạo chi nhánh mới');
+      closePanel();
+      fetchBranches();
+    } else {
+      const data = await res.json();
+      panelError.value = data.message || 'Lưu dữ liệu thất bại';
+    }
+  } catch (error) {
+    panelError.value = 'Lỗi kết nối máy chủ.';
   }
 };
 </script>
 
 <style scoped>
-/* ── Soft Muted Light Theme (Slightly Darker than UserManagement) ── */
+/* ── Soft Muted Light Theme ── */
 * { box-sizing: border-box; }
 .mono { font-family: 'Geist Mono', monospace; }
 
@@ -351,7 +322,7 @@ const submitForm = () => {
 .btn-secondary:active { transform: scale(0.96); }
 
 /* ── Stats ── */
-.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.stats-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
 .glass-panel {
   background: #ffffff;
   border: 1px solid #e5e7eb;
@@ -373,14 +344,6 @@ const submitForm = () => {
   background: #ffffff; color: #111827; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
 }
 .search-box input:focus { border-color: #b91c1c; outline: none; box-shadow: 0 0 0 3px rgba(185,28,28,0.1); }
-
-.filters-grp { display: flex; gap: 12px; }
-.filter-sel {
-  height: 40px; padding: 0 32px 0 14px; border-radius: 8px; border: 1px solid #d1d5db;
-  font-size: 13.5px; font-family: inherit; color: #374151; cursor: pointer; outline: none; background: #ffffff;
-  transition: all 0.2s; font-weight: 500;
-}
-.filter-sel:focus { border-color: #b91c1c; box-shadow: 0 0 0 3px rgba(185,28,28,0.1); }
 
 /* ── Split Layout ── */
 .split-layout { display: flex; gap: 24px; align-items: flex-start; }
@@ -418,16 +381,6 @@ const submitForm = () => {
 .branch-address { font-size: 12.5px; color: #6b7280; margin-top: 2px; }
 .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
 
-/* ── Badges ── */
-.badge-code { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; padding: 4px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 700; font-family: 'Geist Mono'; letter-spacing: 0.05em; }
-
-.pill-badge { padding: 4px 12px; border-radius: 20px; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
-.pill-active { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
-.pill-inactive { background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
-.status-dot { width: 6px; height: 6px; border-radius: 50%; }
-.dot-active { background: #16a34a; box-shadow: 0 0 0 2px #dcfce7; }
-.dot-inactive { background: #ea580c; box-shadow: 0 0 0 2px #ffedd5; }
-
 /* ── Detail Pane Header ── */
 .detail-hero {
   padding: 36px 24px 24px; position: relative;
@@ -456,18 +409,15 @@ const submitForm = () => {
   font-weight: 500; color: #111827; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
 }
 .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #b91c1c; box-shadow: 0 0 0 3px rgba(185,28,28,0.1); }
-.form-group input:disabled { background: #f3f4f6; color: #9ca3af; cursor: not-allowed; }
 .form-hint { display: block; font-size: 12.5px; color: #6b7280; margin-top: 6px; }
 
 /* Danger Zone */
 .danger-actions { display: flex; flex-direction: column; gap: 12px; }
 
-.btn-outline-warning, .btn-outline-error {
+.btn-outline-error {
   background: #ffffff; height: 42px; border-radius: 8px; padding: 0 16px; font-size: 13.5px; font-weight: 600; font-family: inherit;
   display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: all 0.2s; width: 100%;
 }
-.btn-outline-warning { border: 1px solid #fcd34d; color: #b45309; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
-.btn-outline-warning:hover { background: #fffbeb; transform: translateY(-1px); border-color: #f59e0b; }
 .btn-outline-error { border: 1px solid #fecaca; color: #b91c1c; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
 .btn-outline-error:hover { background: #fef2f2; transform: translateY(-1px); border-color: #f87171; }
 
