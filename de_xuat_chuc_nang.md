@@ -60,6 +60,18 @@ Dưới đây là các tính năng được bổ sung để nâng tầm đồ á
     *   Tài khoản `MANAGER` và `STAFF` khi đăng nhập hệ thống sẽ **bị giới hạn quyền truy cập**: chỉ được phép xem báo cáo doanh thu, lịch sử phiếu kho, tồn kho thực tế và thông tin đối tác trực thuộc đúng chi nhánh làm việc của mình (`branch_id`). Các truy vấn SQL dưới Spring Boot sẽ tự động chèn thêm điều kiện `WHERE branch_id = :userBranchId`.
     *   Tài khoản `ADMIN` có quyền xem toàn cục, lọc và so sánh số liệu giữa tất cả các chi nhánh.
 
+### 2.6. Quản lý vị trí kệ hàng & Theo dõi sức chứa kho (Bin Location & Capacity Management)
+> [!NOTE]
+> **Trạng thái đề xuất:** Tính năng dự phòng - Sẽ suy nghĩ và cân nhắc tích hợp sau.
+
+*   **Mục tiêu:** Quản lý chi tiết vị trí sắp xếp vật lý của sản phẩm và kiểm soát không gian lưu trữ thực tế tại các chi nhánh để tối ưu hóa không gian.
+*   **Nghiệp vụ chi tiết:**
+    *   **Quản lý vị trí kệ hàng (Bin Location Management):** Phân chia kho thành các vị trí chi tiết (ví dụ: Dãy A - Kệ 01 - Tầng 2). Sản phẩm tồn kho và các chi tiết giao dịch (nhập, xuất, điều chuyển, kiểm kê) sẽ được liên kết trực tiếp tới vị trí kệ này (thông qua bảng mới `locations` và bổ sung `location_id` vào các bảng liên quan).
+    *   **Theo dõi sức chứa kho (Warehouse Capacity Tracking):**
+        *   Mỗi kệ hàng được cấu hình sức chứa tối đa (`max_capacity`).
+        *   Khi duyệt phiếu nhập kho hoặc nhận hàng điều chuyển, hệ thống tự động kiểm tra xem lượng hàng nhập vào kệ có vượt quá sức chứa còn trống hay không để cảnh báo hoặc ngăn chặn.
+        *   Giao diện hiển thị trực quan tỷ lệ lấp đầy (Occupancy Rate) của từng kệ hoặc từng chi nhánh kho.
+
 ---
 
 ## 3. BÁO CÁO PHÂN TÍCH (BI) & XUẤT NHẬP DỮ LIỆU FILE
