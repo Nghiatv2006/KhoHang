@@ -1,5 +1,44 @@
-# TÀI LIỆU TẢ CHI TIẾT NGHIỆP VỤ HỆ THỐNG
-## HỆ THỐNG QUẢN LÝ KHO HÀNG ĐA CHI NHÁNH (KhoHang)
+# TÀI LIỆU MÔ TẢ CHI TIẾT NGHIỆP VỤ HỆ THỐNG
+## HỆ THỐNG QUẢN LÝ KHO HÀNG ĐA CHI NHÁNH — WAREHUB
+
+---
+
+## 0. LÝ DO RA ĐỜI
+
+### Bối cảnh
+Doanh nghiệp đang vận hành **nhiều kho hàng vật lý ở các địa điểm khác nhau**. Khi quy mô mở rộng, việc quản lý thủ công bằng Excel hoặc các phần mềm riêng lẻ tại từng kho phát sinh một loạt vấn đề nghiêm trọng:
+
+### Các vấn đề cần giải quyết
+
+**1. Mất kiểm soát tồn kho liên chi nhánh**
+Không có cái nhìn tổng thể về tồn kho toàn hệ thống: không biết chi nhánh nào đang có bao nhiêu hàng, lô nào sắp hết hạn, chỗ nào đang thiếu hàng để điều phối kịp thời.
+
+**2. Không truy vết được trách nhiệm**
+Khi xảy ra thất thoát hoặc sai lệch hàng hóa, không có cách nào xác định ai đã thực hiện thao tác gì và vào lúc nào — thiếu audit trail để đối soát.
+
+**3. Rủi ro từ hàng hóa có hạn sử dụng**
+Hàng hóa nhập về không được theo dõi theo lô (NSX/HSD), dẫn đến: xuất sai lô, hàng hết hạn vẫn còn trong kho, hoặc phải tiêu hủy hàng loạt do quản lý kém.
+
+**4. Quy trình nhập xuất kho thiếu kiểm soát**
+Nhân viên có thể tự ý nhập xuất kho mà không qua phê duyệt của cấp quản lý, dẫn đến số liệu sổ sách không khớp thực tế kho vật lý.
+
+**5. Công nợ đối tác không minh bạch**
+Không theo dõi được doanh nghiệp đang nợ nhà cung cấp bao nhiêu, khách hàng đang thiếu bao nhiêu tiền — gây rủi ro tài chính và tranh chấp.
+
+**6. Quản lý nhân sự đa kho phức tạp**
+Việc điều chuyển nhân viên giữa các kho không có quy trình rõ ràng, dễ dẫn đến nhầm lẫn quyền truy cập dữ liệu sau khi chuyển.
+
+### Giải pháp WAREHUB mang lại
+
+| Vấn đề | Giải pháp |
+| :--- | :--- |
+| Dữ liệu phân tán | Tập trung toàn bộ chi nhánh về **một hệ thống duy nhất** |
+| Thiếu phân quyền | Cơ chế RBAC 3 cấp: **ADMIN / MANAGER / STAFF** |
+| Hàng hết hạn | Theo dõi tồn kho **theo lô hàng (NSX/HSD)**, áp dụng nguyên tắc **FEFO** |
+| Không kiểm soát giao dịch | Quy trình phê duyệt **DRAFT → COMPLETED** bắt buộc qua Manager/Admin |
+| Không truy vết | **Audit Log** ghi lại toàn bộ thao tác, không ai được sửa/xóa |
+| Công nợ mờ | Tự động cập nhật công nợ khi duyệt phiếu UNPAID |
+| Điều chuyển nhân sự | Quy trình **3 bước** có xác nhận từ Staff, Manager và Admin |
 
 ---
 

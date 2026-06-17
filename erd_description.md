@@ -35,24 +35,24 @@ Sơ đồ ERD được chia làm 5 cụm nghiệp vụ tương ứng với 5 ph�
 Dưới đây là danh sách thuộc tính của từng thực thể được vẽ trong sơ đồ:
 
 ### 2.1. Phân hệ Danh mục & Đối tác (Xanh dương)
-*   **`Branches` (Chi nhánh):** `id` (Khóa chính - gạch chân), `code` (Mã), `name` (Tên), `address` (Địa chỉ).
-*   **`Categories` (Danh mục):** `id` (Khóa chính - gạch chân), `name` (Tên), `description` (Mô tả).
-*   **`Suppliers` (Nhà cung cấp):** `id` (Khóa chính - gạch chân), `name` (Tên), `contact` (Thông tin liên hệ).
+*   **`Branches` (Chi nhánh):** `id` (Khóa chính - gạch chân), `name` (Tên), `address` (Địa chỉ), `low_stock_threshold` (Ngưỡng cảnh báo tồn kho thấp).
+*   **`Categories` (Danh mục):** `id` (Khóa chính - gạch chân), `name` (Tên danh mục).
+*   **`Suppliers` (Nhà cung cấp):** `id` (Khóa chính - gạch chân), `name` (Tên), `contact` (Thông tin liên hệ), `debt` (Công nợ phải trả), `status` (Trạng thái hoạt động: ACTIVE/INACTIVE).
 
 ### 2.2. Phân hệ Nhân sự & Khách hàng (Xanh lá)
-*   **`Customers` (Khách hàng):** `id` (Khóa chính - gạch chân), `name` (Tên), `email` (Email), `phone number` (Số điện thoại).
-*   **`Users` (Người dùng):** `id` (Khóa chính - gạch chân), `username` (Tên đăng nhập), `password` (Mật khẩu đã mã hóa), `role` (Vai trò).
+*   **`Customers` (Khách hàng):** `id` (Khóa chính - gạch chân), `name` (Tên), `email` (Email), `phone number` (Số điện thoại), `debt` (Công nợ khách hàng phải trả), `status` (Trạng thái hoạt động: ACTIVE/INACTIVE).
+*   **`Users` (Người dùng):** `id` (Khóa chính - gạch chân), `username` (Tên đăng nhập), `password` (Mật khẩu đã mã hóa), `role` (Vai trò: ADMIN/MANAGER/STAFF), `branch_id` (Chi nhánh làm việc), `email` (Email), `status` (Trạng thái tài khoản: ACTIVE/LOCKED).
 
 ### 2.3. Phân hệ Sản phẩm & Phiếu kho (Vàng)
-*   **`Products` (Sản phẩm):** `id` (Khóa chính - gạch chân), `code` (Mã), `name` (Tên), `price` (Đơn giá), `description` (Mô tả), `category_id` (Khóa ngoại danh mục).
-*   **`Inventories` (Tồn kho):** `id` (Khóa chính - gạch chân), `quantity` (Số lượng tồn), `location` (Vị trí lưu trữ).
-*   **`Receipts` (Phiếu kho):** `id` (Khóa chính - gạch chân), `type` (Loại phiếu), `status` (Trạng thái), `created date` (Ngày lập phiếu).
-*   **`Receipt Details` (Chi tiết phiếu kho):** `id` (Khóa chính - gạch chân), `quantity` (Số lượng giao dịch), `unit price` (Đơn giá giao dịch).
+*   **`Products` (Sản phẩm):** `id` (Khóa chính - gạch chân), `code` (Mã sản phẩm - viết hoa), `name` (Tên), `price` (Đơn giá), `unit` (Đơn vị tính), `category_id` (Khóa ngoại danh mục), `has_expiry` (Có quản lý hạn sử dụng không), `mfg_date` (Ngày sản xuất mặc định), `exp_date` (Hạn sử dụng mặc định).
+*   **`Inventories` (Tồn kho):** `id` (Khóa chính - gạch chân), `quantity` (Số lượng tồn), `mfg_date` (Ngày sản xuất của lô), `exp_date` (Hạn sử dụng của lô), `last_updated` (Thời điểm cập nhật gần nhất). *Khóa nghiệp vụ duy nhất: `(branch_id, product_id, mfg_date, exp_date)` - quản lý tồn kho theo từng lô.*
+*   **`Receipts` (Phiếu kho):** `id` (Khóa chính - gạch chân), `type` (Loại phiếu: IMPORT/EXPORT/TRANSFER/ADJUST_IN/ADJUST_OUT), `status` (Trạng thái: DRAFT/COMPLETED/CANCELLED), `created_at` (Ngày lập phiếu), `payment_status` (Trạng thái thanh toán: UNPAID/PAID).
+*   **`Receipt Details` (Chi tiết phiếu kho):** `id` (Khóa chính - gạch chân), `quantity` (Số lượng giao dịch), `price` (Đơn giá giao dịch), `mfg_date` (Ngày sản xuất lô hàng), `exp_date` (Hạn sử dụng lô hàng).
 
 ### 2.4. Phân hệ Kiểm kê & Điều chuyển nhân sự (Cam)
-*   **`Stocktakes` (Kiểm kê):** `id` (Khóa chính - gạch chân), `check date` (Ngày kiểm kê), `status` (Trạng thái).
-*   **`Stocktake Details` (Chi tiết kiểm kê):** `id` (Khóa chính - gạch chân), `actual quantity` (Số lượng thực tế), `note` (Ghi chú).
-*   **`Branch Transfer Requests` (Yêu cầu chuyển chi nhánh):** `id` (Khóa chính - gạch chân), `code` (Mã yêu cầu), `request date` (Ngày yêu cầu), `status` (Trạng thái), `from branch` (Chi nhánh nguồn hiện tại), `from branch actual quantity` (Số lượng thực tế tại chi nhánh nguồn). *Lưu ý: Trong CSDL thực tế, thực thể này quản lý điều chuyển công tác nhân viên và được chuẩn hóa thành các trường `staff_id`, `from_branch_id`, `to_branch_id`, `created_by`, `approved_by` để đảm bảo tính toàn vẹn dữ liệu.*
+*   **`Stocktakes` (Kiểm kê):** `id` (Khóa chính - gạch chân), `check date` (Ngày kiểm kê), `status` (Trạng thái: DRAFT/COMPLETED/CANCELLED).
+*   **`Stocktake Details` (Chi tiết kiểm kê):** `id` (Khóa chính - gạch chân), `actual_quantity` (Số lượng thực tế đếm được), `expected_quantity` (Số lượng sổ sách - để đối chiếu chênh lệch), `adjustment_receipt_id` (Khóa ngoại trỏ tới phiếu cân bằng kho tự động sinh), `notes` (Ghi chú).
+*   **`Branch Transfer Requests` (Yêu cầu chuyển chi nhánh):** `id` (Khóa chính - gạch chân), `staff_id` (Nhân viên cần điều chuyển), `from_branch_id` (Chi nhánh nguồn), `to_branch_id` (Chi nhánh đích), `created_by` (Người lập yêu cầu - Manager hoặc Staff), `approved_by` (Admin duyệt cuối), `created_at` (Ngày tạo yêu cầu), `status` (Trạng thái: PENDING/STAFF_CONFIRMED/MANAGER_APPROVED/APPROVED/REJECTED).
 
 ### 2.5. Phân hệ Nhật ký hệ thống (Tím)
 *   **`Audit Logs` (Nhật ký):** `id` (Khóa chính - gạch chân), `action` (Hành động), `time` (Thời gian ghi log), `details` (Thông tin chi tiết).
@@ -93,9 +93,9 @@ Các hình thoi màu trắng thể hiện sự liên kết nghiệp vụ giữa 
 *   **Hình thoi `performs at` (Chi nhánh - Kiểm kê):**
     *   *Kết nối:* `Branches` (1) <---> `Stocktakes` (N).
     *   *Ý nghĩa:* Đợt kiểm kê được thực hiện trực tiếp tại một chi nhánh kho nhất định.
-*   **Hình thoi `transfers` (Yêu cầu điều chuyển - Chi tiết kiểm kê):**
-    *   *Kết nối:* `Branch Transfer Requests` (N) <---> `Stocktake Details` (1).
-    *   *Ý nghĩa:* Mối quan hệ logic nghiệp vụ: khi nhân viên được điều chuyển sang chi nhánh mới, chi nhánh làm việc của họ thay đổi, quyết định kho hàng mà nhân viên đó sẽ thực hiện kiểm kê thực tế. (Mối quan hệ này không nối trực tiếp bằng khóa ngoại ở mức database mà đi gián tiếp qua thực thể `Users`).
+*   **Hình thoi `generates` (Chi tiết kiểm kê - Phiếu kho):**
+    *   *Kết nối:* `Stocktake Details` (N) <---> `Receipts` (1).
+    *   *Ý nghĩa:* Khi hoàn tất phiên kiểm kê, nếu phát hiện chênh lệch giữa số lượng thực tế và sổ sách, hệ thống tự động sinh ra một phiếu cân bằng kho (`ADJUST_IN` nếu thừa, `ADJUST_OUT` nếu thiếu). ID của phiếu cân bằng này được lưu vào cột `adjustment_receipt_id` của dòng chi tiết kiểm kê tương ứng.
 
 ---
 
@@ -106,21 +106,21 @@ Các hình thoi này nằm hoàn toàn bên trong các phân vùng nghiệp vụ
 ### 4.1. Phân hệ Sản phẩm & Phiếu kho (Màu Vàng)
 *   **Hình thoi `tracks` (Sản phẩm - Tồn kho):**
     *   *Kết nối:* `Products` (1) <---> `Inventories` (N).
-    *   *Ý nghĩa:* Hệ thống theo dõi thông tin tồn kho chi tiết (số lượng, vị trí) của từng sản phẩm.
-*   **Hình thoi `contains` (Sản phẩm - Chi tiết phiếu):**
+    *   *Ý nghĩa:* Hệ thống theo dõi tồn kho chi tiết theo từng lô (mfg_date, exp_date) của từng sản phẩm tại từng chi nhánh.
+*   **Hình thoi `contains` (Phiếu kho - Chi tiết phiếu):**
     *   *Kết nối:* `Receipts` (1) <---> `Receipt Details` (N).
-    *   *Ý nghĩa:* Phiếu kho chứa thông tin các dòng chi tiết sản phẩm cụ thể.
-*   **Hình thoi `contains` có hướng (Tồn kho - Chi tiết phiếu):**
+    *   *Ý nghĩa:* Phiếu kho chứa nhiều dòng chi tiết sản phẩm, mỗi dòng ghi nhận một lô hàng cụ thể.
+*   **Hình thoi `contains` (Tồn kho - Chi tiết phiếu):**
     *   *Kết nối:* `Inventories` (1) <---> `Receipt Details` (N).
-    *   *Ý nghĩa:* Giao dịch xuất/nhập/điều chuyển hàng hóa chi tiết tác động trực tiếp và làm thay đổi số lượng tồn của sản phẩm tương ứng.
+    *   *Ý nghĩa:* Chi tiết giao dịch nhập/xuất tác động trực tiếp vào số lượng tồn của lô hàng tương ứng.
 
 ### 4.2. Phân hệ Kiểm kê & Điều chuyển (Màu Cam)
 *   **Hình thoi `contains` (Kiểm kê - Chi tiết kiểm kê):**
     *   *Kết nối:* `Stocktakes` (1) <---> `Stocktake Details` (N).
-    *   *Ý nghĩa:* Đợt kiểm kê gồm nhiều dòng sản phẩm cần đếm thực tế.
-*   **Hình thoi `adjusts` (Chi tiết kiểm kê - Chi tiết phiếu kho):**
-    *   *Kết nối:* `Stocktake Details` (N) <---> `Receipt Details` (1).
-    *   *Ý nghĩa:* Kết quả kiểm đếm thực tế chênh lệch sẽ làm căn cứ để sinh phiếu cân bằng kho nhằm tự động điều chỉnh số lượng tồn.
+    *   *Ý nghĩa:* Một phiên kiểm kê gồm nhiều dòng, mỗi dòng ghi nhận số lượng thực tế của một lô hàng.
+*   **Hình thoi `adjusts` (Chi tiết phiếu - Chi tiết kiểm kê):**
+    *   *Kết nối:* `Receipt Details` (N) <---> `Stocktake Details` (1).
+    *   *Ý nghĩa:* Các dòng chi tiết của phiếu cân bằng kho tự động sinh liên kết ngược lại với dòng kiểm kê tương ứng để đối soát.
 
 ---
 
@@ -131,14 +131,14 @@ Bảng đối chiếu cách sơ đồ khái niệm ERD được hiện thực h�
 | Mối quan hệ trên ERD | Thực thể kết nối trên ERD | Hiện thực hóa trong SQL Schema |
 | :--- | :--- | :--- |
 | **`stores`** | `Branches` <---> `Products` | Liên kết gián tiếp qua bảng `inventories` (chứa khóa ngoại `branch_id` và `product_id`). |
-| **`tracks`** | `Products` <---> `Inventories` | Khóa ngoại `product_id` trong bảng `inventories` trỏ đến `products`. |
+| **`tracks`** | `Products` <---> `Inventories` | Khóa ngoại `product_id` trong bảng `inventories` trỏ đến `products`. Khóa nghiệp vụ: `(branch_id, product_id, mfg_date, exp_date)`. |
 | **`supplies`** | `Suppliers` <---> `Products` | Liên kết gián tiếp qua bảng `receipts` (khóa ngoại `supplier_id`) và bảng `receipt_details` (khóa ngoại `product_id`). |
-| **`adjusts`** | `Stocktake Details` <---> `Receipt Details` | Bảng `stocktake_details` chứa cột `adjustment_receipt_id` trỏ thẳng tới bảng `receipts` (đầu phiếu điều chỉnh). |
+| **`adjusts`** | `Receipt Details` <---> `Stocktake Details` | Các dòng chi tiết phiếu cân bằng (`ADJUST_IN/OUT`) liên kết ngược lại với dòng chi tiết kiểm kê để đối soát. |
+| **`generates`** | `Stocktake Details` <---> `Receipts` | Bảng `stocktake_details` chứa cột `adjustment_receipt_id` là khóa ngoại trỏ tới bảng `receipts` — lưu ID phiếu cân bằng kho được tự động sinh khi hoàn tất kiểm kê. |
 | **`has staff`** | `Branches` <---> `Users` | Bảng `users` chứa khóa ngoại `branch_id` trỏ tới bảng `branches`. |
 | **`receives`** | `Customers` <---> `Receipts` | Bảng `receipts` chứa khóa ngoại `customer_id` trỏ tới bảng `customers`. |
 | **`creates`** (Phiếu kho) | `Users` <---> `Receipts` | Bảng `receipts` chứa khóa ngoại `created_by` trỏ tới bảng `users`. |
 | **`records`** | `Users` <---> `Audit Logs` | Bảng `audit_logs` chứa khóa ngoại `user_id` trỏ tới bảng `users`. |
 | **`performs at`** | `Branches` <---> `Stocktakes` | Bảng `stocktakes` chứa khóa ngoại `branch_id` trỏ tới bảng `branches`. |
 | **`creates`** (Kiểm kê) | `Users` <---> `Stocktakes` | Bảng `stocktakes` chứa khóa ngoại `created_by` trỏ tới bảng `users`. |
-| **`requests`** | `Users` <---> `Branch Transfer Requests` | Bảng `branch_transfer_requests` chứa khóa ngoại `staff_id` hoặc `created_by` trỏ tới `users`. |
-| **`transfers`** | `BTR` <---> `Stocktake Details` | Mối quan hệ logic nghiệp vụ. Trong CSDL thực tế, liên kết này được thực hiện gián tiếp thông qua việc cập nhật `branch_id` của nhân viên trong bảng `users` (BTR -> Users -> Stocktakes -> Stocktake Details), không có khóa ngoại nối trực tiếp giữa hai bảng này. |
+| **`requests`** | `Users` <---> `Branch Transfer Requests` | Bảng `branch_transfer_requests` chứa khóa ngoại `staff_id` (nhân viên được chuyển) và `created_by` (người tạo yêu cầu) cùng trỏ tới `users`. |
