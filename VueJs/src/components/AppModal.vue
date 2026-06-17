@@ -6,13 +6,6 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{ close: [] }>()
-
-const sizeClass = {
-  sm: 'max-w-sm',
-  md: 'max-w-lg',
-  lg: 'max-w-2xl',
-  xl: 'max-w-4xl',
-}
 </script>
 
 <template>

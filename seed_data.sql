@@ -29,9 +29,9 @@ INSERT INTO suppliers (name, contact_info, address) VALUES
 ('Nhà Phân Phối Thực Phẩm Vàng', '0987654321', 'KCN Tân Bình, TP.HCM');
 
 -- Thêm Khách hàng (Customers)
-INSERT INTO customers (name, contact_info, address) VALUES
-('Nguyễn Văn A', '0912223334', 'Ba Đình, Hà Nội'),
-('Trần Thị B', '0933445566', 'Quận 3, TP.HCM');
+INSERT INTO customers (name, contact_info, address, debt) VALUES
+('Nguyễn Văn A', '0912223334', 'Ba Đình, Hà Nội', 5000000),
+('Trần Thị B', '0933445566', 'Quận 3, TP.HCM', 12500000);
 
 
 -- ==============================================================================
@@ -54,12 +54,12 @@ INSERT INTO users (username, password, full_name, role, branch_id, status) VALUE
 -- ==============================================================================
 
 -- Thêm Sản phẩm (Products)
-INSERT INTO products (code, name, unit, price, category_id, has_expiry, mfg_date, exp_date) VALUES
-('IP15', 'iPhone 15 Pro Max 256GB', 'Chiếc', 29900000, 1, FALSE, '1970-01-01', '1970-01-01'),
-('MACM2', 'MacBook Air M2 8GB/256GB', 'Chiếc', 25500000, 2, FALSE, '1970-01-01', '1970-01-01'),
-('AIRPODS', 'AirPods Pro 2', 'Hộp', 5500000, 3, FALSE, '1970-01-01', '1970-01-01'),
-('MILK_OLD', 'Sữa tươi tiệt trùng 1L (Lô cũ)', 'Hộp', 35000, 4, TRUE, '2024-01-01', '2024-07-01'),
-('MILK_NEW', 'Sữa tươi tiệt trùng 1L (Lô mới)', 'Hộp', 35000, 4, TRUE, '2024-05-01', '2024-11-01');
+INSERT INTO products (code, name, unit, price, category_id, has_expiry, mfg_date, exp_date, quantity) VALUES
+('IP15', 'iPhone 15 Pro Max 256GB', 'Chiếc', 29900000, 1, FALSE, '1970-01-01', '1970-01-01', 62),
+('MACM2', 'MacBook Air M2 8GB/256GB', 'Chiếc', 25500000, 2, FALSE, '1970-01-01', '1970-01-01', 20),
+('AIRPODS', 'AirPods Pro 2', 'Hộp', 5500000, 3, FALSE, '1970-01-01', '1970-01-01', 1),
+('MILK_OLD', 'Sữa tươi tiệt trùng 1L (Lô cũ)', 'Hộp', 35000, 4, TRUE, '2024-01-01', '2024-07-01', 100),
+('MILK_NEW', 'Sữa tươi tiệt trùng 1L (Lô mới)', 'Hộp', 35000, 4, TRUE, '2024-05-01', '2024-11-01', 200);
 
 -- Thêm Tồn kho (Inventories)
 INSERT INTO inventories (branch_id, product_id, mfg_date, exp_date, quantity) VALUES

@@ -1,186 +1,387 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { api } from '../api'
+import * as echarts from 'echarts'
 
-const user = ref<any>(JSON.parse(localStorage.getItem('wh_user') || '{}'))
-const isAdmin = computed(() => user.value?.role === 'ADMIN')
-
-interface StatCard { label: string; value: string | number; icon: string; color: string; bg: string }
-
-const stats = ref<StatCard[]>([
-  { label: 'Tổng sản phẩm', value: '—', icon: 'inventory_2', color: 'text-blue-600', bg: 'bg-blue-50' },
-  { label: 'Tổng chi nhánh', value: '—', icon: 'store', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  { label: 'Nhà cung cấp', value: '—', icon: 'local_shipping', color: 'text-violet-600', bg: 'bg-violet-50' },
-  { label: 'Người dùng', value: '—', icon: 'group', color: 'text-amber-600', bg: 'bg-amber-50' },
-])
-
+const router = useRouter()
 const products = ref<any[]>([])
+const categories = ref<any[]>([])
+const customers = ref<any[]>([])
+const suppliers = ref<any[]>([])
 const branches = ref<any[]>([])
+
 const loading = ref(true)
+const errorMsg = ref('')
+
+const pieChartRef = ref<HTMLElement | null>(null)
+const debtChartRef = ref<HTMLElement | null>(null)
+const qtyChartRef = ref<HTMLElement | null>(null)
+const barChartRef = ref<HTMLElement | null>(null)
+
+let pieChartInst: echarts.ECharts | null = null
+let debtChartInst: echarts.ECharts | null = null
+let qtyChartInst: echarts.ECharts | null = null
+let barChartInst: echarts.ECharts | null = null
 
 onMounted(async () => {
   try {
-    const [pRes, bRes, sRes, uRes] = await Promise.allSettled([
+    const [pRes, cRes, cuRes, sRes, bRes] = await Promise.allSettled([
       api.get('/api/products'),
-      api.get('/api/branches'),
+      api.get('/api/categories'),
+      api.get('/api/customers'),
       api.get('/api/suppliers'),
-      api.get('/api/users'),
+      api.get('/api/branches'),
     ])
-
-    if (pRes.status === 'fulfilled' && pRes.value.ok) {
-      const data = await pRes.value.json()
-      products.value = data.slice(0, 6)
-      stats.value[0].value = data.length
-    }
-    if (bRes.status === 'fulfilled' && bRes.value.ok) {
-      const data = await bRes.value.json()
-      branches.value = data
-      stats.value[1].value = data.length
-    }
-    if (sRes.status === 'fulfilled' && sRes.value.ok) {
-      const data = await sRes.value.json()
-      stats.value[2].value = data.length
-    }
-    if (uRes.status === 'fulfilled' && uRes.value.ok) {
-      const data = await uRes.value.json()
-      stats.value[3].value = data.length
-    }
+    
+    if (pRes.status === 'fulfilled' && pRes.value.ok) products.value = await pRes.value.json()
+    else errorMsg.value += 'Lỗi API Sản phẩm. '
+    
+    if (cRes.status === 'fulfilled' && cRes.value.ok) categories.value = await cRes.value.json()
+    else errorMsg.value += 'Lỗi API Danh mục. '
+    
+    if (cuRes.status === 'fulfilled' && cuRes.value.ok) customers.value = await cuRes.value.json()
+    else errorMsg.value += 'Lỗi API Khách hàng. '
+    
+    if (sRes.status === 'fulfilled' && sRes.value.ok) suppliers.value = await sRes.value.json()
+    else errorMsg.value += 'Lỗi API Nhà cung cấp. '
+    
+    if (bRes.status === 'fulfilled' && bRes.value.ok) branches.value = await bRes.value.json()
+    else errorMsg.value += 'Lỗi API Chi nhánh. '
+    
+  } catch (err: any) {
+    errorMsg.value = 'Lỗi kết nối máy chủ: ' + err.message
   } finally {
     loading.value = false
+    await nextTick()
+    if (!errorMsg.value) {
+      initCharts()
+    }
   }
 })
 
-function formatCurrency(val: any) {
-  if (!val) return '—'
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(val)
+// SAFELY PARSE DATA
+const totalValue = computed(() => products.value.reduce((s, p) => s + (Number(p.price) || 0) * (Number(p.quantity) || 0), 0))
+const totalQty = computed(() => products.value.reduce((s, p) => s + (Number(p.quantity) || 0), 0))
+const totalDebt = computed(() => customers.value.reduce((s, c) => s + (Number(c.debt) || 0), 0))
+const topProducts = computed(() => [...products.value].sort((a, b) => (Number(b.quantity) || 0) - (Number(a.quantity) || 0)).slice(0, 5))
+const topCustomers = computed(() => [...customers.value].sort((a, b) => (Number(b.debt) || 0) - (Number(a.debt) || 0)).slice(0, 5))
+
+// Revenue By Category
+const revenueByCategory = computed(() => {
+  const map = new Map<string, { name: string; val: number; qty: number }>()
+  products.value.forEach(p => {
+    const cName = p.categoryName || 'Chưa phân loại'
+    if (!map.has(cName)) {
+      map.set(cName, { name: cName, val: 0, qty: 0 })
+    }
+    const c = map.get(cName)!
+    c.val += (Number(p.price) || 0) * (Number(p.quantity) || 0)
+    c.qty += (Number(p.quantity) || 0)
+  })
+  return Array.from(map.values()).filter(c => c.val > 0 || c.qty > 0).sort((a, b) => b.val - a.val)
+})
+
+function initCharts() {
+  if (pieChartRef.value) pieChartInst = echarts.init(pieChartRef.value)
+  if (debtChartRef.value) debtChartInst = echarts.init(debtChartRef.value)
+  if (qtyChartRef.value) qtyChartInst = echarts.init(qtyChartRef.value)
+  if (barChartRef.value) barChartInst = echarts.init(barChartRef.value)
+  
+  updateCharts()
+
+  window.addEventListener('resize', () => {
+    pieChartInst?.resize()
+    debtChartInst?.resize()
+    qtyChartInst?.resize()
+    barChartInst?.resize()
+  })
 }
 
-const greeting = computed(() => {
-  const h = new Date().getHours()
-  if (h < 12) return 'Chào buổi sáng'
-  if (h < 18) return 'Chào buổi chiều'
-  return 'Chào buổi tối'
-})
+function updateCharts() {
+  // Chart 1
+  if (pieChartInst) {
+    const data = revenueByCategory.value.map(c => ({ value: c.val, name: c.name }))
+    pieChartInst.setOption({
+      tooltip: { trigger: 'item', formatter: '{b}: {c} đ ({d}%)', backgroundColor: 'rgba(0, 0, 0, 0.8)', textStyle: { color: '#fff' } },
+      legend: { bottom: '0%', left: 'center', textStyle: { color: '#8094ae' } },
+      series: [{
+        type: 'pie', radius: ['40%', '70%'],
+        itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+        label: { show: false },
+        data: data.length > 0 ? data : [{ value: 0, name: 'Chưa có', itemStyle: { color: '#e2e8f0' } }]
+      }]
+    })
+  }
+
+  // Chart 2
+  if (debtChartInst) {
+    let othersDebt = 0;
+    const sorted = [...customers.value].sort((a, b) => (Number(b.debt) || 0) - (Number(a.debt) || 0));
+    const top5 = sorted.slice(0, 5);
+    const others = sorted.slice(5);
+    others.forEach(c => othersDebt += Number(c.debt) || 0);
+    const data = top5.map(c => ({ value: Number(c.debt) || 0, name: c.name || 'Khách vãng lai' })).filter(d => d.value > 0);
+    if (othersDebt > 0) data.push({ value: othersDebt, name: 'Khách hàng khác' });
+
+    debtChartInst.setOption({
+      tooltip: { trigger: 'item', formatter: '{b}: {c} đ ({d}%)', backgroundColor: 'rgba(0, 0, 0, 0.8)', textStyle: { color: '#fff' } },
+      legend: { bottom: '0%', left: 'center', textStyle: { color: '#8094ae' } },
+      series: [{
+        type: 'pie', radius: ['40%', '70%'],
+        itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+        label: { show: false },
+        data: data.length > 0 ? data : [{ value: 0, name: 'Không có nợ', itemStyle: { color: '#e2e8f0' } }]
+      }]
+    })
+  }
+
+  // Chart 3
+  if (qtyChartInst) {
+    const names = revenueByCategory.value.length > 0 ? revenueByCategory.value.map(c => c.name) : ['Trống']
+    const quantities = revenueByCategory.value.length > 0 ? revenueByCategory.value.map(c => c.qty) : [0]
+    qtyChartInst.setOption({
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, backgroundColor: 'rgba(0, 0, 0, 0.8)', textStyle: { color: '#fff' } },
+      grid: { left: '3%', right: '4%', bottom: '3%', top: '5%', containLabel: true },
+      xAxis: { type: 'category', data: names, axisLabel: { color: '#8094ae', width: 80, overflow: 'truncate' } },
+      yAxis: { type: 'value', splitLine: { lineStyle: { color: 'rgba(0,0,0,0.05)' } } },
+      series: [{ name: 'Số lượng', type: 'bar', data: quantities, itemStyle: { color: '#0ea5e9', borderRadius: [4, 4, 0, 0] } }]
+    })
+  }
+
+  // Chart 4
+  if (barChartInst) {
+    const names = topProducts.value.length > 0 ? topProducts.value.map(p => p.name) : ['Trống']
+    const quantities = topProducts.value.length > 0 ? topProducts.value.map(p => Number(p.quantity) || 0) : [0]
+    barChartInst.setOption({
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, backgroundColor: 'rgba(0, 0, 0, 0.8)', textStyle: { color: '#fff' } },
+      grid: { left: '3%', right: '4%', bottom: '3%', top: '5%', containLabel: true },
+      xAxis: { type: 'value', splitLine: { lineStyle: { color: 'rgba(0,0,0,0.05)' } } },
+      yAxis: { type: 'category', data: names, axisLabel: { color: '#8094ae', width: 100, overflow: 'truncate' } },
+      series: [{ name: 'Tồn kho', type: 'bar', data: quantities, itemStyle: { color: '#4361ee', borderRadius: [0, 4, 4, 0] } }]
+    })
+  }
+}
+
+watch([products, customers, categories], () => {
+  if (!loading.value) {
+    updateCharts()
+  }
+}, { deep: true })
+
+function formatVND(val: number) {
+  if (!val) return '0đ'
+  return new Intl.NumberFormat('vi-VN').format(val) + 'đ'
+}
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Greeting -->
-    <div class="bg-gradient-to-r from-[#003d9b] to-[#0052cc] rounded-2xl p-6 text-white shadow-lg">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-blue-200 text-sm mb-1">{{ greeting }},</p>
-          <h2 class="text-2xl font-bold">{{ user?.fullName || 'Người dùng' }} 👋</h2>
-          <p class="text-blue-200 text-sm mt-1.5 flex items-center gap-1.5">
-            <span class="material-symbols-outlined text-base">business</span>
-            {{ user?.branchName || 'Tất cả chi nhánh' }} &mdash; {{ user?.role }}
-          </p>
-        </div>
-        <div class="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center">
-          <span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 48">warehouse</span>
-        </div>
+  <div v-if="loading" class="text-center p-12 text-[#8094ae]">
+    <i class="fas fa-spinner fa-spin text-3xl mb-4 text-[#4361ee]"></i>
+    <p>Đang tải dữ liệu...</p>
+  </div>
+  
+  <div v-else class="max-w-[1400px]">
+
+    <div v-if="errorMsg" class="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl flex items-start shadow-sm">
+      <i class="fas fa-exclamation-triangle text-xl mr-3 mt-0.5"></i>
+      <div>
+        <h4 class="font-bold mb-1">Cảnh báo tải dữ liệu</h4>
+        <p class="text-sm m-0">{{ errorMsg }}</p>
       </div>
     </div>
 
-    <!-- Stats cards -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      <div
-        v-for="(stat, i) in stats"
-        :key="i"
-        class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 card-hover"
-      >
-        <div class="flex items-start justify-between mb-3">
-          <div :class="['w-10 h-10 rounded-xl flex items-center justify-center', stat.bg]">
-            <span :class="['material-symbols-outlined text-xl', stat.color]"
-              style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24">{{ stat.icon }}</span>
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+      <!-- Card 1: Blue -->
+      <div class="bg-gradient-to-br from-[#4361ee] to-[#3b5bdb] text-white rounded-[16px] p-6 shadow-[0_4px_15px_rgba(67,97,238,0.25)] hover:-translate-y-1 hover:shadow-lg transition-transform duration-300">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-4 bg-white/20 text-white backdrop-blur-sm">
+          <i class="fas fa-wallet"></i>
+        </div>
+        <div class="text-[1.75rem] font-extrabold leading-tight mb-1">{{ formatVND(totalValue) }}</div>
+        <div class="text-[0.875rem] font-medium text-white/80">Tổng giá trị kho</div>
+      </div>
+
+      <!-- Card 2: Green -->
+      <div class="bg-gradient-to-br from-[#05b171] to-[#049d63] text-white rounded-[16px] p-6 shadow-[0_4px_15px_rgba(5,177,113,0.25)] hover:-translate-y-1 hover:shadow-lg transition-transform duration-300">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-4 bg-white/20 text-white backdrop-blur-sm">
+          <i class="fas fa-check-circle"></i>
+        </div>
+        <div class="text-[1.75rem] font-extrabold leading-tight mb-1">{{ products.length }}</div>
+        <div class="text-[0.875rem] font-medium text-white/80">Tổng mặt hàng</div>
+      </div>
+
+      <!-- Card 3: Cyan -->
+      <div class="bg-gradient-to-br from-[#0ea5e9] to-[#0284c7] text-white rounded-[16px] p-6 shadow-[0_4px_15px_rgba(14,165,233,0.25)] hover:-translate-y-1 hover:shadow-lg transition-transform duration-300">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-4 bg-white/20 text-white backdrop-blur-sm">
+          <i class="fas fa-users"></i>
+        </div>
+        <div class="text-[1.75rem] font-extrabold leading-tight mb-1">{{ customers.length }}</div>
+        <div class="text-[0.875rem] font-medium text-white/80">Khách hàng</div>
+      </div>
+
+      <!-- Card 4: Yellow/Orange -->
+      <div class="bg-gradient-to-br from-[#f4bd0e] to-[#d97706] text-white rounded-[16px] p-6 shadow-[0_4px_15px_rgba(244,189,14,0.25)] hover:-translate-y-1 hover:shadow-lg transition-transform duration-300">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-4 bg-white/20 text-white backdrop-blur-sm">
+          <i class="fas fa-building"></i>
+        </div>
+        <div class="text-[1.75rem] font-extrabold leading-tight mb-1">{{ formatVND(totalDebt) }}</div>
+        <div class="text-[0.875rem] font-medium text-white/80">Phải thu (AR)</div>
+      </div>
+    </div>
+
+    <!-- Tables Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+      
+      <!-- Top Selling -->
+      <div class="lg:col-span-7">
+        <div class="bg-red-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#ea4f52] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden h-full flex flex-col">
+          <div class="p-6 border-b border-[#f1f5f9] flex items-center">
+            <h6 class="font-bold text-[#364a63] m-0"><i class="fas fa-fire text-[#ea4f52] mr-2"></i>Mặt hàng tồn nhiều nhất</h6>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-[#f1f5f9]">
+                  <th class="p-4 text-[0.75rem] uppercase font-semibold text-[#8094ae]">Tên sản phẩm</th>
+                  <th class="p-4 text-[0.75rem] uppercase font-semibold text-[#8094ae] text-center">Tồn kho</th>
+                  <th class="p-4 text-[0.75rem] uppercase font-semibold text-[#8094ae] text-right">Giá trị</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in topProducts" :key="item.id" class="border-b border-[#f1f5f9] hover:bg-white/60 transition-colors">
+                  <td class="p-4 font-bold text-[#364a63]">{{ item.name }}</td>
+                  <td class="p-4 text-center">
+                    <span class="inline-block px-3 py-1 bg-white text-[#4361ee] font-bold text-xs rounded-full shadow-sm">
+                      {{ item.quantity }}
+                    </span>
+                  </td>
+                  <td class="p-4 text-right font-bold text-[#05b171]">
+                    {{ formatVND((Number(item.price) || 0) * (Number(item.quantity) || 0)) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
-        <div v-if="loading" class="h-8 w-16 bg-slate-100 rounded animate-pulse" />
-        <div v-else class="text-2xl font-bold text-slate-800">{{ stat.value }}</div>
-        <div class="text-slate-500 text-sm mt-0.5">{{ stat.label }}</div>
+      </div>
+
+      <!-- VIP Customers -->
+      <div class="lg:col-span-5">
+        <div class="bg-amber-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#f4bd0e] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden h-full flex flex-col">
+          <div class="p-6 border-b border-[#f1f5f9] flex items-center">
+            <h6 class="font-bold text-[#364a63] m-0"><i class="fas fa-crown text-[#f4bd0e] mr-2"></i>Khách nợ nhiều nhất</h6>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <tbody>
+                <tr v-for="(item, index) in topCustomers" :key="item.id" class="border-b border-[#f1f5f9] hover:bg-white/60 transition-colors">
+                  <td class="p-4 w-[60px]">
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
+                         :class="index === 0 ? 'bg-[#f4bd0e] text-black shadow-sm' : 'bg-white text-[#8094ae] shadow-sm'">
+                      {{ index + 1 }}
+                    </div>
+                  </td>
+                  <td class="p-4">
+                    <div class="font-bold text-[#364a63]">{{ item.name }}</div>
+                    <div class="text-xs text-[#8094ae] mt-0.5">{{ item.phone }}</div>
+                  </td>
+                  <td class="p-4 text-right font-bold text-[#4361ee]">
+                    {{ formatVND(Number(item.debt) || 0) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Products + Branches grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
-      <!-- Recent Products -->
-      <div class="lg:col-span-3 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h3 class="font-semibold text-slate-800 flex items-center gap-2">
-            <span class="material-symbols-outlined text-blue-500 text-lg"
-              style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24">inventory_2</span>
-            Sản phẩm gần đây
-          </h3>
-          <RouterLink to="/products" class="text-xs text-[#0052cc] hover:underline font-medium">Xem tất cả →</RouterLink>
-        </div>
-        <div v-if="loading" class="p-6 space-y-3">
-          <div v-for="i in 4" :key="i" class="h-10 bg-slate-50 rounded-lg animate-pulse" />
-        </div>
-        <div v-else-if="products.length === 0" class="p-10 text-center text-slate-400">
-          <span class="material-symbols-outlined text-4xl block mb-2">inventory_2</span>
-          Chưa có sản phẩm nào
-        </div>
-        <table v-else class="w-full text-sm">
+    <!-- Revenue Category -->
+    <div class="bg-sky-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#0ea5e9] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden mb-8">
+      <div class="p-6 border-b border-[#f1f5f9] flex items-center">
+        <h6 class="font-bold text-[#364a63] m-0"><i class="fas fa-chart-pie text-[#0ea5e9] mr-2"></i>Giá trị kho theo danh mục</h6>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
           <thead>
-            <tr class="border-b border-slate-100 bg-slate-50">
-              <th class="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Tên sản phẩm</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Danh mục</th>
-              <th class="text-right px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Giá xuất</th>
+            <tr class="border-b border-[#f1f5f9]">
+              <th class="p-4 text-[0.75rem] uppercase font-semibold text-[#8094ae]">Danh mục</th>
+              <th class="p-4 text-[0.75rem] uppercase font-semibold text-[#8094ae]">Tỷ trọng</th>
+              <th class="p-4 text-[0.75rem] uppercase font-semibold text-[#8094ae] text-center">Số lượng</th>
+              <th class="p-4 text-[0.75rem] uppercase font-semibold text-[#8094ae] text-right">Tổng tiền</th>
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-for="p in products"
-              :key="p.id"
-              class="border-b border-slate-50 hover:bg-slate-50 transition-colors"
-            >
-              <td class="px-6 py-3.5">
-                <div class="font-medium text-slate-800">{{ p.name }}</div>
-                <div class="text-xs text-slate-400 font-mono">{{ p.sku }}</div>
+            <tr v-for="item in revenueByCategory" :key="item.name" class="border-b border-[#f1f5f9] hover:bg-white/60 transition-colors">
+              <td class="p-4 font-bold text-[#364a63]">{{ item.name }}</td>
+              <td class="p-4 w-[40%]">
+                <div class="flex items-center gap-4">
+                  <div class="flex-1 h-1.5 bg-white rounded-full overflow-hidden shadow-inner">
+                    <div class="h-full bg-[#4361ee] rounded-full" :style="{ width: `${totalValue > 0 ? (item.val / totalValue) * 100 : 0}%` }"></div>
+                  </div>
+                  <span class="font-bold text-[#4361ee] text-sm">{{ totalValue > 0 ? ((item.val / totalValue) * 100).toFixed(0) : 0 }}%</span>
+                </div>
               </td>
-              <td class="px-4 py-3.5 text-slate-600">{{ p.categoryName || '—' }}</td>
-              <td class="px-6 py-3.5 text-right font-mono text-slate-700 font-medium">{{ formatCurrency(p.salePrice) }}</td>
+              <td class="p-4 text-center font-medium text-[#364a63]">{{ item.qty }}</td>
+              <td class="p-4 text-right font-bold text-[#364a63]">
+                {{ formatVND(item.val) }}
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
+    </div>
 
-      <!-- Branches -->
-      <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-          <h3 class="font-semibold text-slate-800 flex items-center gap-2">
-            <span class="material-symbols-outlined text-emerald-500 text-lg"
-              style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24">store</span>
-            Chi nhánh
-          </h3>
-          <RouterLink v-if="isAdmin" to="/branches" class="text-xs text-[#0052cc] hover:underline font-medium">Quản lý →</RouterLink>
+    <!-- BIỂU ĐỒ ROW 1 (Pie Charts) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <!-- Category Distribution (Donut Chart) -->
+      <div class="bg-sky-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#0ea5e9] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col">
+        <div class="p-6 border-b border-[#f1f5f9]">
+          <h6 class="font-bold text-[#364a63] m-0"><i class="fas fa-chart-pie text-[#0ea5e9] mr-2"></i>Tỷ trọng giá trị danh mục</h6>
         </div>
-        <div v-if="loading" class="p-4 space-y-2">
-          <div v-for="i in 3" :key="i" class="h-16 bg-slate-50 rounded-xl animate-pulse" />
+        <div class="p-4 relative" style="height: 350px;">
+          <div ref="pieChartRef" class="w-full h-full"></div>
         </div>
-        <div v-else-if="branches.length === 0" class="p-8 text-center text-slate-400 text-sm">
-          Chưa có chi nhánh
+      </div>
+
+      <!-- Debt Distribution (Donut Chart) -->
+      <div class="bg-amber-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#f4bd0e] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col">
+        <div class="p-6 border-b border-[#f1f5f9]">
+          <h6 class="font-bold text-[#364a63] m-0"><i class="fas fa-chart-pie text-[#f4bd0e] mr-2"></i>Tỷ trọng công nợ khách hàng</h6>
         </div>
-        <div v-else class="p-3 space-y-2">
-          <div
-            v-for="b in branches"
-            :key="b.id"
-            class="flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors"
-          >
-            <div class="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
-              <span class="material-symbols-outlined text-emerald-500 text-lg"
-                style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24">store</span>
-            </div>
-            <div class="min-w-0">
-              <div class="font-medium text-slate-800 text-sm truncate">{{ b.name }}</div>
-              <div class="text-xs text-slate-400 truncate mt-0.5">{{ b.address }}</div>
-              <div class="text-xs text-amber-600 mt-0.5">
-                Ngưỡng tồn kho: <span class="font-semibold">{{ b.lowStockThreshold }}</span>
-              </div>
-            </div>
-          </div>
+        <div class="p-4 relative" style="height: 350px;">
+          <div ref="debtChartRef" class="w-full h-full"></div>
         </div>
       </div>
     </div>
+
+    <!-- BIỂU ĐỒ ROW 2 (Bar Charts) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <!-- Quantity by Category (Bar Chart) -->
+      <div class="bg-sky-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#0ea5e9] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col">
+        <div class="p-6 border-b border-[#f1f5f9]">
+          <h6 class="font-bold text-[#364a63] m-0"><i class="fas fa-chart-bar text-[#0ea5e9] mr-2"></i>Số lượng tồn theo danh mục</h6>
+        </div>
+        <div class="p-4 relative" style="height: 350px;">
+          <div ref="qtyChartRef" class="w-full h-full"></div>
+        </div>
+      </div>
+
+      <!-- Low Stock (Bar Chart) -->
+      <div class="bg-indigo-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col">
+        <div class="p-6 border-b border-[#f1f5f9] flex justify-between items-center">
+          <h6 class="font-bold text-[#364a63] m-0"><i class="fas fa-chart-bar text-[#4361ee] mr-2"></i>Sản phẩm tồn nhiều nhất</h6>
+          <span v-if="topProducts.length > 0" class="px-3 py-1 bg-white shadow-sm text-[#4361ee] rounded-full text-xs font-bold">
+            {{ topProducts.length }} mặt hàng
+          </span>
+        </div>
+        <div class="p-4 relative" style="height: 350px;">
+          <div ref="barChartRef" class="w-full h-full"></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
+

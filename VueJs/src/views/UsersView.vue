@@ -162,147 +162,171 @@ function formatDate(dt: string) {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <!-- Tabs -->
-    <div class="flex items-center gap-1 bg-white rounded-xl p-1 border border-slate-100 shadow-sm w-fit">
-      <button
-        v-for="tab in [{ key: 'users', label: 'Nhân viên', icon: 'group' }, { key: 'transfers', label: 'Điều chuyển', icon: 'swap_horiz' }]"
-        :key="tab.key"
-        :class="['flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-all', activeTab === tab.key ? 'bg-[#0052cc] text-white shadow' : 'text-slate-500 hover:text-slate-700']"
-        @click="activeTab = tab.key as any"
-      >
-        <span class="material-symbols-outlined text-base">{{ tab.icon }}</span>
-        {{ tab.label }}
-        <span v-if="tab.key === 'transfers' && transfers.filter(t => ['PENDING_STAFF','STAFF_CONFIRMED','MANAGER_APPROVED'].includes(t.status)).length > 0"
-          class="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
-          {{ transfers.filter(t => ['PENDING_STAFF','STAFF_CONFIRMED','MANAGER_APPROVED'].includes(t.status)).length }}
-        </span>
-      </button>
+  <div class="space-y-6 max-w-[1400px] mx-auto">
+    <!-- Header & Tabs -->
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
+      <div>
+        <h2 class="text-2xl font-bold text-[#364a63] m-0">Quản lý Nhân viên</h2>
+        <p class="text-[#8094ae] text-sm mt-1">Quản lý tài khoản, vai trò và phân công chi nhánh</p>
+      </div>
+      
+      <!-- Tabs -->
+      <div class="flex items-center gap-6 border-b border-[#e2e8f0]">
+        <button
+          v-for="tab in [{ key: 'users', label: 'Nhân viên', icon: 'fas fa-users' }, { key: 'transfers', label: 'Điều chuyển', icon: 'fas fa-exchange-alt' }]"
+          :key="tab.key"
+          :class="[
+            'flex items-center gap-2 pb-3 px-1 text-sm font-bold transition-colors relative',
+            activeTab === tab.key ? 'text-[#4361ee]' : 'text-[#8094ae] hover:text-[#364a63]'
+          ]"
+          @click="activeTab = tab.key as any"
+        >
+          <i :class="tab.icon"></i>
+          {{ tab.label }}
+          <span v-if="tab.key === 'transfers' && transfers.filter(t => ['PENDING_STAFF','STAFF_CONFIRMED','MANAGER_APPROVED'].includes(t.status)).length > 0"
+            class="bg-[#ea4f52] text-white text-[10px] rounded-full min-w-[20px] h-[20px] px-1 flex items-center justify-center font-bold shadow-sm">
+            {{ transfers.filter(t => ['PENDING_STAFF','STAFF_CONFIRMED','MANAGER_APPROVED'].includes(t.status)).length }}
+          </span>
+          <div v-if="activeTab === tab.key" class="absolute bottom-[-1px] left-0 w-full h-[2px] bg-[#4361ee] rounded-t-full"></div>
+        </button>
+      </div>
     </div>
 
     <!-- USERS TAB -->
-    <template v-if="activeTab === 'users'">
-      <div class="flex items-center gap-3 flex-wrap">
-        <div class="relative flex-1 min-w-48">
-          <span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-lg">search</span>
-          <input v-model="uSearch" type="text" placeholder="Tìm theo tên, username..." class="w-full h-10 pl-10 pr-4 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#0052cc] focus:ring-2 focus:ring-[#0052cc]/10 bg-white" />
+    <div v-if="activeTab === 'users'" class="bg-indigo-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden">
+      <!-- Toolbar -->
+      <div class="p-5 border-b border-[#f1f5f9] flex items-center justify-between flex-wrap gap-4 bg-[#f8f9fa]/50">
+        <div class="flex items-center gap-3 flex-1 min-w-[300px]">
+          <div class="relative w-[250px]">
+            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae]"></i>
+            <input v-model="uSearch" type="text" placeholder="Tìm theo tên, username..." class="w-full h-[42px] pl-11 pr-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
+          </div>
+          <select v-model="uRoleFilter" class="h-[42px] px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] cursor-pointer">
+            <option value="">Tất cả vai trò</option>
+            <option value="ADMIN">Admin</option>
+            <option value="MANAGER">Manager</option>
+            <option value="STAFF">Nhân viên</option>
+          </select>
+          <select v-model="uStatusFilter" class="h-[42px] px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] cursor-pointer">
+            <option value="">Tất cả trạng thái</option>
+            <option value="ACTIVE">Hoạt động</option>
+            <option value="INACTIVE">Ngừng HĐ</option>
+          </select>
         </div>
-        <select v-model="uRoleFilter" class="h-10 px-3 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#0052cc] bg-white text-slate-700">
-          <option value="">Tất cả vai trò</option>
-          <option value="ADMIN">Admin</option>
-          <option value="MANAGER">Manager</option>
-          <option value="STAFF">Nhân viên</option>
-        </select>
-        <select v-model="uStatusFilter" class="h-10 px-3 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#0052cc] bg-white text-slate-700">
-          <option value="">Tất cả trạng thái</option>
-          <option value="ACTIVE">Hoạt động</option>
-          <option value="INACTIVE">Ngừng HĐ</option>
-        </select>
-        <button v-if="isAdmin" class="h-10 px-4 bg-[#0052cc] hover:bg-[#003d9b] text-white rounded-xl text-sm font-medium flex items-center gap-2 transition-colors shadow-sm" @click="openAddUser">
-          <span class="material-symbols-outlined text-base">person_add</span> Thêm nhân viên
+        <button v-if="isAdmin" class="bg-[#4361ee] text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-sm flex items-center gap-2" @click="openAddUser">
+          <i class="fas fa-user-plus"></i> Thêm nhân viên
         </button>
       </div>
 
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div v-if="uLoading" class="p-6 space-y-3"><div v-for="i in 5" :key="i" class="h-14 bg-slate-50 rounded-xl animate-pulse" /></div>
-        <div v-else-if="filteredUsers.length === 0" class="py-16 text-center text-slate-400">
-          <span class="material-symbols-outlined text-5xl block mb-2 opacity-40">group</span>
-          Không có nhân viên nào
+      <!-- Table -->
+      <div class="overflow-x-auto">
+        <div v-if="uLoading" class="p-8 space-y-4"><div v-for="i in 5" :key="i" class="h-12 bg-[#f8f9fa] rounded-xl animate-pulse" /></div>
+        <div v-else-if="filteredUsers.length === 0" class="py-20 text-center text-[#8094ae]">
+          <i class="fas fa-users-slash text-5xl mb-4 opacity-40"></i>
+          <div class="font-bold text-[#364a63]">Không tìm thấy nhân viên nào</div>
         </div>
-        <table v-else class="w-full text-sm">
-          <thead><tr class="border-b border-slate-100 bg-slate-50">
-            <th class="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Nhân viên</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Vai trò</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Chi nhánh</th>
-            <th class="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Trạng thái</th>
-            <th v-if="isAdmin" class="px-6 py-3" />
-          </tr></thead>
+        <table v-else class="w-full text-left border-collapse">
+          <thead class="bg-white">
+            <tr>
+              <th class="p-4 text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Nhân viên</th>
+              <th class="p-4 text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Vai trò</th>
+              <th class="p-4 text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Chi nhánh</th>
+              <th class="p-4 text-center text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Trạng thái</th>
+              <th v-if="isAdmin" class="p-4 border-b border-[#f1f5f9] w-[140px]"></th>
+            </tr>
+          </thead>
           <tbody>
-            <tr v-for="u in filteredUsers" :key="u.id" class="border-b border-slate-50 hover:bg-slate-50/80 transition-colors">
-              <td class="px-6 py-4">
+            <tr v-for="u in filteredUsers" :key="u.id" class="border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer group hover:-translate-y-[1px]" @dblclick="isAdmin ? openEditUser(u) : null">
+              <td class="p-4 first:rounded-l-xl last:rounded-r-xl">
                 <div class="flex items-center gap-3">
-                  <div class="w-9 h-9 rounded-full bg-[#0052cc]/10 flex items-center justify-center text-[#0052cc] font-bold text-sm flex-shrink-0">
+                  <div class="w-10 h-10 rounded-full bg-[#eef2ff] border border-[#dbeafe] flex items-center justify-center text-[#4361ee] font-bold text-sm flex-shrink-0 group-hover:bg-white group-hover:border-[#4361ee]/30 transition-colors">
                     {{ u.fullName?.charAt(0) || '?' }}
                   </div>
                   <div>
-                    <div class="font-semibold text-slate-800">{{ u.fullName }}</div>
-                    <div class="text-xs text-slate-400 font-mono">@{{ u.username }}</div>
+                    <div class="font-bold text-[#364a63]">{{ u.fullName }}</div>
+                    <div class="text-xs text-[#8094ae] font-mono mt-0.5">@{{ u.username }}</div>
                   </div>
                 </div>
               </td>
-              <td class="px-4 py-4"><StatusBadge :value="u.role" type="role" /></td>
-              <td class="px-4 py-4 text-slate-600"><span v-if="u.branchName">{{ u.branchName }}</span><span v-else class="text-slate-300">Chưa phân công</span></td>
-              <td class="px-4 py-4 text-center"><StatusBadge :value="u.status" type="status" /></td>
-              <td v-if="isAdmin" class="px-6 py-4">
-                <div class="flex items-center justify-end gap-1">
-                  <button class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors" @click="toggleUser(u)" :title="u.status === 'ACTIVE' ? 'Vô hiệu hóa' : 'Kích hoạt'">
-                    <span class="material-symbols-outlined text-base">{{ u.status === 'ACTIVE' ? 'toggle_on' : 'toggle_off' }}</span>
+              <td class="p-4 first:rounded-l-xl last:rounded-r-xl"><StatusBadge :value="u.role" type="role" /></td>
+              <td class="p-4 first:rounded-l-xl last:rounded-r-xl">
+                <span v-if="u.branchName" class="font-medium text-[#364a63]"><i class="fas fa-store text-[#8094ae] mr-1"></i> {{ u.branchName }}</span>
+                <span v-else class="text-[#8094ae] text-sm italic">Chưa phân công</span>
+              </td>
+              <td class="p-4 text-center first:rounded-l-xl last:rounded-r-xl"><StatusBadge :value="u.status" type="status" /></td>
+              <td v-if="isAdmin" class="p-4 first:rounded-l-xl last:rounded-r-xl">
+                <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <button class="w-8 h-8 rounded-lg text-[#8094ae] bg-white hover:bg-[#e2e8f0] flex items-center justify-center transition-colors cursor-pointer shadow-sm border border-[#e2e8f0]/50" @click.stop="toggleUser(u)" :title="u.status === 'ACTIVE' ? 'Vô hiệu hóa' : 'Kích hoạt'">
+                    <i :class="['fas text-sm', u.status === 'ACTIVE' ? 'fa-toggle-on text-[#05b171]' : 'fa-toggle-off text-[#8094ae]']"></i>
                   </button>
-                  <button class="w-8 h-8 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-600 flex items-center justify-center transition-colors" @click="openEditUser(u)">
-                    <span class="material-symbols-outlined text-base">edit</span>
+                  <button class="w-8 h-8 rounded-lg text-[#0ea5e9] bg-white hover:bg-[#e0f2fe] flex items-center justify-center transition-colors cursor-pointer shadow-sm border border-[#e2e8f0]/50" @click.stop="openEditUser(u)" title="Sửa">
+                    <i class="fas fa-pen text-sm"></i>
                   </button>
-                  <button class="w-8 h-8 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 flex items-center justify-center transition-colors" @click="confirmDeleteUser(u)">
-                    <span class="material-symbols-outlined text-base">delete</span>
+                  <button class="w-8 h-8 rounded-lg text-[#ea4f52] bg-white hover:bg-[#ffe4e6] flex items-center justify-center transition-colors cursor-pointer shadow-sm border border-[#e2e8f0]/50" @click.stop="confirmDeleteUser(u)" title="Xóa">
+                    <i class="fas fa-trash text-sm"></i>
                   </button>
                 </div>
               </td>
             </tr>
           </tbody>
         </table>
-        <div v-if="!uLoading && filteredUsers.length > 0" class="px-6 py-3 border-t border-slate-100 text-xs text-slate-400">
-          {{ filteredUsers.length }} nhân viên
+        <div v-if="!uLoading && filteredUsers.length > 0" class="px-6 py-4 bg-[#f8f9fa] border-t border-[#f1f5f9] text-xs font-bold text-[#8094ae]">
+          Tổng cộng: {{ filteredUsers.length }} nhân viên
         </div>
       </div>
-    </template>
+    </div>
 
     <!-- TRANSFERS TAB -->
-    <template v-if="activeTab === 'transfers'">
+    <div v-if="activeTab === 'transfers'" class="space-y-6">
       <div class="flex justify-end">
-        <button v-if="isManager" class="h-10 px-4 bg-[#0052cc] hover:bg-[#003d9b] text-white rounded-xl text-sm font-medium flex items-center gap-2 transition-colors shadow-sm" @click="showTransferModal = true">
-          <span class="material-symbols-outlined text-base">swap_horiz</span> Tạo yêu cầu điều chuyển
+        <button v-if="isManager" class="bg-[#4361ee] text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-sm flex items-center gap-2" @click="showTransferModal = true">
+          <i class="fas fa-exchange-alt"></i> Tạo yêu cầu điều chuyển
         </button>
       </div>
 
       <!-- Timeline-style transfer list -->
-      <div v-if="tLoading" class="p-6 space-y-3 bg-white rounded-2xl"><div v-for="i in 3" :key="i" class="h-24 bg-slate-50 rounded-xl animate-pulse" /></div>
-      <div v-else-if="transfers.length === 0" class="bg-white rounded-2xl shadow-sm border border-slate-100 py-16 text-center text-slate-400">
-        <span class="material-symbols-outlined text-5xl block mb-2 opacity-40">swap_horiz</span>
-        Không có yêu cầu điều chuyển nào
+      <div v-if="tLoading" class="p-6 space-y-4 bg-white rounded-[16px] border border-[#f1f5f9]"><div v-for="i in 3" :key="i" class="h-24 bg-[#f8f9fa] rounded-xl animate-pulse" /></div>
+      <div v-else-if="transfers.length === 0" class="bg-white rounded-[16px] shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-[#f1f5f9] py-20 text-center text-[#8094ae]">
+        <i class="fas fa-random text-5xl mb-4 opacity-40"></i>
+        <div class="font-bold text-[#364a63]">Không có yêu cầu điều chuyển nào</div>
       </div>
-      <div v-else class="space-y-3">
+      <div v-else class="space-y-4">
         <div
           v-for="t in transfers"
           :key="t.id"
-          class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5"
+          class="bg-sky-50 rounded-[16px] shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-[#f1f5f9] p-6 hover:shadow-md transition-shadow relative overflow-hidden"
         >
+          <!-- Left color border indicator -->
+          <div class="absolute left-0 top-0 bottom-0 w-1" :class="t.status === 'APPROVED' ? 'bg-[#05b171]' : t.status === 'REJECTED' || t.status === 'CANCELLED' ? 'bg-[#ea4f52]' : 'bg-[#4361ee]'"></div>
+          
           <div class="flex items-start justify-between gap-4">
             <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 flex-wrap mb-2">
-                <span class="font-semibold text-slate-800">{{ t.staffName || `Nhân viên #${t.staffId}` }}</span>
-                <span class="material-symbols-outlined text-slate-400 text-base">arrow_forward</span>
-                <span class="font-semibold text-[#0052cc]">{{ t.targetBranchName || `Chi nhánh #${t.targetBranchId}` }}</span>
+              <div class="flex items-center gap-3 flex-wrap mb-3">
+                <span class="font-bold text-[#364a63] text-lg">{{ t.staffName || `Nhân viên #${t.staffId}` }}</span>
+                <i class="fas fa-arrow-right text-[#8094ae]"></i>
+                <span class="font-bold text-[#4361ee] text-lg">{{ t.targetBranchName || `Chi nhánh #${t.targetBranchId}` }}</span>
                 <StatusBadge :value="t.status" type="transfer" />
               </div>
-              <div class="text-sm text-slate-500 mb-1">{{ t.reason || 'Không có lý do' }}</div>
-              <div class="text-xs text-slate-400 flex items-center gap-1">
-                <span class="material-symbols-outlined text-sm">schedule</span>
-                {{ formatDate(t.createdAt) }}
-                <span v-if="t.fromBranchName" class="ml-2">Từ: {{ t.fromBranchName }}</span>
+              <div class="text-[#526484] bg-[#f8f9fa] p-3 rounded-lg text-sm border border-[#e2e8f0] mb-3">
+                <strong>Lý do:</strong> {{ t.reason || 'Không có lý do' }}
               </div>
+              <div class="text-xs font-bold text-[#8094ae] flex items-center gap-4 uppercase tracking-wider">
+                <span><i class="fas fa-clock mr-1"></i> {{ formatDate(t.createdAt) }}</span>
+                <span v-if="t.fromBranchName"><i class="fas fa-store mr-1"></i> Từ: {{ t.fromBranchName }}</span>
+              </div>
+              
               <!-- 3-step progress -->
-              <div class="flex items-center gap-2 mt-3">
+              <div class="flex items-center gap-2 mt-5 bg-[#f8f9fa] p-4 rounded-xl border border-[#f1f5f9]">
                 <div v-for="(step, i) in [
                   { label: 'NV xác nhận', done: ['STAFF_CONFIRMED','MANAGER_APPROVED','APPROVED'].includes(t.status) },
                   { label: 'Manager duyệt', done: ['MANAGER_APPROVED','APPROVED'].includes(t.status) },
                   { label: 'Admin phê duyệt', done: t.status === 'APPROVED' },
-                ]" :key="i" class="flex items-center gap-1">
-                  <div :class="['w-5 h-5 rounded-full flex items-center justify-center text-xs', step.done ? 'bg-emerald-500' : t.status === 'REJECTED' || t.status === 'CANCELLED' ? 'bg-red-100' : 'bg-slate-100']">
-                    <span class="material-symbols-outlined text-xs" :class="step.done ? 'text-white' : 'text-slate-400'">
-                      {{ step.done ? 'check' : t.status === 'REJECTED' || t.status === 'CANCELLED' ? 'close' : 'circle' }}
-                    </span>
+                ]" :key="i" class="flex items-center gap-2">
+                  <div :class="['w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm', step.done ? 'bg-[#05b171] text-white' : t.status === 'REJECTED' || t.status === 'CANCELLED' ? 'bg-[#ffe4e6] text-[#ea4f52]' : 'bg-[#e2e8f0] text-[#8094ae]']">
+                    <i :class="step.done ? 'fas fa-check' : t.status === 'REJECTED' || t.status === 'CANCELLED' ? 'fas fa-times' : 'fas fa-circle text-[8px]'"></i>
                   </div>
-                  <span class="text-xs text-slate-500 whitespace-nowrap">{{ step.label }}</span>
-                  <div v-if="i < 2" class="w-8 h-px bg-slate-200" />
+                  <span class="text-xs font-bold" :class="step.done ? 'text-[#364a63]' : 'text-[#8094ae]'">{{ step.label }}</span>
+                  <div v-if="i < 2" class="w-10 h-[2px]" :class="step.done ? 'bg-[#05b171]' : 'bg-[#e2e8f0]'" />
                 </div>
               </div>
             </div>
@@ -310,82 +334,109 @@ function formatDate(dt: string) {
             <!-- Actions -->
             <div v-if="['PENDING_STAFF','STAFF_CONFIRMED','MANAGER_APPROVED'].includes(t.status)" class="flex flex-col gap-2 flex-shrink-0">
               <button
-                class="h-8 px-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1"
+                class="h-10 px-5 bg-[#05b171] hover:bg-[#04935e] text-white rounded-xl text-sm font-bold transition-all shadow-sm flex items-center gap-2"
                 @click="approveTransfer(t.id)"
               >
-                <span class="material-symbols-outlined text-sm">check</span> Duyệt
+                <i class="fas fa-check"></i> Phê duyệt
               </button>
               <button
-                class="h-8 px-4 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1"
+                class="h-10 px-5 bg-[#fff1f2] hover:bg-[#ffe4e6] text-[#ea4f52] border border-[#fecdd3] rounded-xl text-sm font-bold transition-all flex items-center gap-2"
                 @click="rejectTransfer(t.id)"
               >
-                <span class="material-symbols-outlined text-sm">close</span> Từ chối
+                <i class="fas fa-times"></i> Từ chối
               </button>
             </div>
           </div>
         </div>
       </div>
-    </template>
+    </div>
 
-    <!-- User Modal -->
-    <AppModal :show="showUserModal" :title="editingUser ? 'Sửa nhân viên' : 'Thêm nhân viên'" @close="showUserModal = false">
-      <div class="p-6 space-y-4">
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Tên đăng nhập <span class="text-red-500">*</span></label>
-            <input v-model="userForm.username" type="text" :disabled="!!editingUser" placeholder="username" class="w-full h-10 px-3 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#0052cc] focus:ring-2 focus:ring-[#0052cc]/10 font-mono disabled:bg-slate-50 disabled:text-slate-400" />
+    <!-- ── USER RIGHT PANEL ── -->
+    <Teleport to="body">
+      <!-- Backdrop -->
+      <Transition name="fade">
+        <div v-if="showUserModal" @click="showUserModal = false" class="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[100]"></div>
+      </Transition>
+
+      <!-- Panel -->
+      <Transition name="slide-panel">
+        <div v-if="showUserModal" class="fixed inset-y-0 right-0 z-[101] w-[450px] bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] flex flex-col border-l border-[#e2e8f0]">
+          <!-- Header -->
+          <div class="px-6 py-5 border-b border-[#f1f5f9] flex justify-between items-center bg-gradient-to-r from-[#f8fafc] to-white">
+            <h3 class="font-bold text-[#364a63] text-lg flex items-center gap-2">
+              <i class="fas fa-user-circle text-[#4361ee]"></i>
+              {{ editingUser ? 'Sửa nhân viên' : 'Thêm nhân viên' }}
+            </h3>
+            <button @click="showUserModal = false" class="text-[#8094ae] hover:text-[#ea4f52] transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50">
+              <i class="fas fa-times"></i>
+            </button>
           </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Họ và tên <span class="text-red-500">*</span></label>
-            <input v-model="userForm.fullName" type="text" placeholder="Họ tên đầy đủ" class="w-full h-10 px-3 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#0052cc] focus:ring-2 focus:ring-[#0052cc]/10" />
+          
+          <!-- Body -->
+          <div class="p-6 flex-1 overflow-y-auto space-y-5 custom-scrollbar">
+            <div class="grid grid-cols-2 gap-5">
+              <div>
+                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Tên đăng nhập <span class="text-[#ea4f52]">*</span></label>
+                <input v-model="userForm.username" type="text" :disabled="!!editingUser" placeholder="username" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] font-mono disabled:opacity-60 disabled:cursor-not-allowed text-[#364a63]" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Họ và tên <span class="text-[#ea4f52]">*</span></label>
+                <input v-model="userForm.fullName" type="text" placeholder="Họ tên đầy đủ" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63]" />
+              </div>
+              <div class="col-span-2">
+                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Mật khẩu <span v-if="!editingUser" class="text-[#ea4f52]">*</span></label>
+                <input v-model="userForm.password" type="password" :placeholder="editingUser ? 'Để trống nếu không đổi' : 'Nhập mật khẩu'" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63]" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Vai trò</label>
+                <select v-model="userForm.role" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] cursor-pointer">
+                  <option value="ADMIN">Admin</option>
+                  <option value="MANAGER">Manager</option>
+                  <option value="STAFF">Nhân viên</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Chi nhánh</label>
+                <select v-model="userForm.branchId" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] cursor-pointer">
+                  <option value="">-- Chưa phân công --</option>
+                  <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
+                </select>
+              </div>
+              <div class="col-span-2">
+                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Trạng thái</label>
+                <select v-model="userForm.status" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] cursor-pointer">
+                  <option value="ACTIVE">Hoạt động</option>
+                  <option value="INACTIVE">Ngừng hoạt động</option>
+                </select>
+              </div>
+            </div>
           </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Mật khẩu {{ editingUser ? '(để trống nếu không đổi)' : '*' }}</label>
-            <input v-model="userForm.password" type="password" placeholder="Mật khẩu..." class="w-full h-10 px-3 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#0052cc] focus:ring-2 focus:ring-[#0052cc]/10" />
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Vai trò</label>
-            <select v-model="userForm.role" class="w-full h-10 px-3 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#0052cc] bg-white">
-              <option value="ADMIN">Admin</option>
-              <option value="MANAGER">Manager</option>
-              <option value="STAFF">Nhân viên</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Chi nhánh</label>
-            <select v-model="userForm.branchId" class="w-full h-10 px-3 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#0052cc] bg-white">
-              <option value="">-- Không có --</option>
-              <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Trạng thái</label>
-            <select v-model="userForm.status" class="w-full h-10 px-3 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#0052cc] bg-white">
-              <option value="ACTIVE">Hoạt động</option>
-              <option value="INACTIVE">Ngừng hoạt động</option>
-            </select>
+          
+          <!-- Footer -->
+          <div class="p-6 border-t border-[#f1f5f9] bg-[#f8fafc] flex gap-3">
+            <button class="flex-1 h-11 bg-white border border-[#e2e8f0] hover:bg-[#f8f9fa] text-[#364a63] rounded-xl text-sm font-bold transition-colors shadow-sm" @click="showUserModal = false">Hủy bỏ</button>
+            <button class="flex-1 h-11 bg-[#4361ee] hover:bg-[#3a0ca3] text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2" :disabled="uSaving" @click="saveUser">
+              <i v-if="uSaving" class="fas fa-spinner fa-spin"></i>
+              {{ uSaving ? 'Đang lưu...' : 'Lưu thông tin' }}
+            </button>
           </div>
         </div>
-        <div class="flex gap-3">
-          <button class="flex-1 h-10 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50" @click="showUserModal = false">Hủy</button>
-          <button class="flex-1 h-10 bg-[#0052cc] hover:bg-[#003d9b] text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2" :disabled="uSaving" @click="saveUser">
-            <span v-if="uSaving" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            {{ uSaving ? 'Đang lưu...' : 'Lưu' }}
-          </button>
-        </div>
-      </div>
-    </AppModal>
+      </Transition>
+    </Teleport>
 
     <!-- Transfer Request Modal -->
     <AppModal :show="showTransferModal" title="Tạo yêu cầu điều chuyển nhân sự" @close="showTransferModal = false">
-      <div class="p-6 space-y-4">
-        <div class="bg-blue-50 rounded-xl px-4 py-3 text-sm text-blue-700 flex items-start gap-2">
-          <span class="material-symbols-outlined text-base mt-0.5">info</span>
-          <span>Quy trình 3 bước: Nhân viên xác nhận → Manager duyệt → Admin phê duyệt</span>
+      <div class="p-6 space-y-5">
+        <div class="bg-[#eef2ff] border border-[#c7d2fe] rounded-xl px-5 py-4 text-sm text-[#4361ee] flex items-start gap-3">
+          <i class="fas fa-info-circle text-lg mt-0.5"></i>
+          <div>
+            <strong class="block mb-1">Quy trình điều chuyển:</strong>
+            1. NV xác nhận → 2. Manager duyệt → 3. Admin phê duyệt
+          </div>
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1.5">Nhân viên cần điều chuyển <span class="text-red-500">*</span></label>
-          <select v-model="transferForm.staffId" class="w-full h-10 px-3 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#0052cc] bg-white">
+          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Nhân viên cần điều chuyển <span class="text-[#ea4f52]">*</span></label>
+          <select v-model="transferForm.staffId" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] cursor-pointer">
             <option value="">-- Chọn nhân viên --</option>
             <option v-for="u in users.filter(u => u.role === 'STAFF')" :key="u.id" :value="u.id">
               {{ u.fullName }} ({{ u.branchName || 'Chưa phân công' }})
@@ -393,31 +444,48 @@ function formatDate(dt: string) {
           </select>
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1.5">Chi nhánh đích <span class="text-red-500">*</span></label>
-          <select v-model="transferForm.targetBranchId" class="w-full h-10 px-3 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#0052cc] bg-white">
+          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Chi nhánh đích <span class="text-[#ea4f52]">*</span></label>
+          <select v-model="transferForm.targetBranchId" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] cursor-pointer">
             <option value="">-- Chọn chi nhánh --</option>
             <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
           </select>
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1.5">Lý do điều chuyển</label>
-          <textarea v-model="transferForm.reason" rows="2" placeholder="Nhập lý do..." class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#0052cc] focus:ring-2 focus:ring-[#0052cc]/10 resize-none" />
+          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Lý do điều chuyển</label>
+          <textarea v-model="transferForm.reason" rows="3" placeholder="Nhập lý do chi tiết..." class="w-full px-4 py-3 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] resize-none"></textarea>
         </div>
-        <div class="flex gap-3">
-          <button class="flex-1 h-10 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50" @click="showTransferModal = false">Hủy</button>
-          <button class="flex-1 h-10 bg-[#0052cc] hover:bg-[#003d9b] text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2" :disabled="tSaving" @click="createTransfer">
-            <span v-if="tSaving" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+        <div class="flex gap-3 pt-4 border-t border-[#f1f5f9]">
+          <button class="flex-1 h-11 bg-[#f8f9fa] hover:bg-[#e2e8f0] text-[#364a63] rounded-xl text-sm font-bold transition-colors" @click="showTransferModal = false">Hủy bỏ</button>
+          <button class="flex-1 h-11 bg-[#4361ee] hover:bg-[#3a0ca3] text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md flex items-center justify-center gap-2 transition-all" :disabled="tSaving" @click="createTransfer">
+            <i v-if="tSaving" class="fas fa-spinner fa-spin"></i>
             {{ tSaving ? 'Đang tạo...' : 'Tạo yêu cầu' }}
           </button>
         </div>
       </div>
     </AppModal>
 
-    <ConfirmDialog :show="showDeleteUser" title="Xóa nhân viên" :message="`Bạn có chắc muốn xóa tài khoản '${deletingUser?.fullName}'?`" confirm-text="Xóa" :danger="true" @confirm="doDeleteUser" @cancel="showDeleteUser = false" />
+    <ConfirmDialog :show="showDeleteUser" title="Xóa nhân viên" :message="`Bạn có chắc muốn xóa tài khoản '${deletingUser?.fullName}'? Hành động này không thể hoàn tác.`" confirm-text="Xóa" :danger="true" @confirm="doDeleteUser" @cancel="showDeleteUser = false" />
   </div>
 </template>
 
 <style scoped>
 @keyframes spin { to { transform: rotate(360deg); } }
 .animate-spin { animation: spin 0.8s linear infinite; }
+
+.slide-panel-enter-active, .slide-panel-leave-active {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.slide-panel-enter-from, .slide-panel-leave-to {
+  transform: translateX(100%);
+}
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 </style>
