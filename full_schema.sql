@@ -11,6 +11,7 @@ CREATE TYPE receipt_status AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED');
 CREATE TYPE stocktake_status AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED');
 
 -- Bảng Chi nhánh (Branches)
+-- Lưu ý quy ước vận hành: Chi nhánh có id = 1 mặc định được xem là Kho Tổng (Main Branch).
 CREATE TABLE branches (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE,
@@ -22,17 +23,6 @@ CREATE TABLE branches (
 CREATE TABLE categories (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE
-);
-
--- Bảng Nhà cung cấp (Suppliers)
-CREATE TABLE suppliers (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    contact_info VARCHAR(255),
-    address TEXT,
-    debt NUMERIC(15, 2) NOT NULL DEFAULT 0.00,
-    status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Bảng Khách hàng (Customers)
@@ -102,14 +92,12 @@ CREATE TABLE receipts (
     source_branch_id INT,
     dest_branch_id INT,
     created_by INT NOT NULL,
-    supplier_id INT,
     customer_id INT,
     description VARCHAR(500),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_receipt_source_branch FOREIGN KEY (source_branch_id) REFERENCES branches(id) ON DELETE RESTRICT,
     CONSTRAINT fk_receipt_dest_branch FOREIGN KEY (dest_branch_id) REFERENCES branches(id) ON DELETE RESTRICT,
     CONSTRAINT fk_receipt_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
-    CONSTRAINT fk_receipt_supplier FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT,
     CONSTRAINT fk_receipt_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT
 );
 
@@ -156,24 +144,6 @@ CREATE TABLE stocktake_details (
     CONSTRAINT chk_stocktake_detail_dates CHECK (exp_date >= mfg_date)
 );
 
--- Bảng Yêu cầu chuyển chi nhánh (Branch Transfer Requests)
-CREATE TABLE branch_transfer_requests (
-    id SERIAL PRIMARY KEY,
-    staff_id INT NOT NULL,
-    from_branch_id INT NOT NULL,
-    to_branch_id INT NOT NULL,
-    created_by INT NOT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    approved_by INT,
-    approved_at TIMESTAMP,
-    CONSTRAINT fk_request_staff FOREIGN KEY (staff_id) REFERENCES users(id) ON DELETE CASCADE,
-    CONSTRAINT fk_request_from FOREIGN KEY (from_branch_id) REFERENCES branches(id) ON DELETE RESTRICT,
-    CONSTRAINT fk_request_to FOREIGN KEY (to_branch_id) REFERENCES branches(id) ON DELETE RESTRICT,
-    CONSTRAINT fk_request_manager FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
-    CONSTRAINT fk_request_admin FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL
-);
-
 -- Bảng Nhật ký hoạt động (Audit Logs)
 CREATE TABLE audit_logs (
     id SERIAL PRIMARY KEY,
@@ -186,7 +156,6 @@ CREATE TABLE audit_logs (
     CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- INDEXES HỖ TRỢ TRUY VẤN
 CREATE INDEX idx_products_code_name ON products (code, name);
 CREATE INDEX idx_inventories_branch_product ON inventories (branch_id, product_id);
 CREATE INDEX idx_inventories_last_updated ON inventories (last_updated DESC);
@@ -194,9 +163,5 @@ CREATE INDEX idx_receipts_created_at ON receipts (created_at DESC);
 CREATE INDEX idx_receipts_branches ON receipts (source_branch_id, dest_branch_id);
 CREATE INDEX idx_receipts_type_status ON receipts (type, status);
 CREATE INDEX idx_stocktakes_branch ON stocktakes (branch_id);
-CREATE INDEX idx_transfer_requests_status ON branch_transfer_requests (status);
-CREATE INDEX idx_transfer_requests_staff ON branch_transfer_requests (staff_id);
-CREATE INDEX idx_transfer_requests_manager ON branch_transfer_requests (created_by);
-CREATE INDEX idx_suppliers_status ON suppliers (status);
 CREATE INDEX idx_customers_status ON customers (status);
 CREATE INDEX idx_receipts_payment_status ON receipts (payment_status);

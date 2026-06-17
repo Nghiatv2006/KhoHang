@@ -26,9 +26,6 @@ public class Product {
     @Column(name = "price")
     private BigDecimal price;
 
-    @Column(name = "quantity")
-    private Integer quantity;
-
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
@@ -84,14 +81,6 @@ public class Product {
 
     public void setPrice(BigDecimal price) {
         this.price = price;
-    }
-
-    public Integer getQuantity() {
-        return quantity;
-    }
-
-    public void setQuantity(Integer quantity) {
-        this.quantity = quantity;
     }
 
     public String getDescription() {

@@ -8,10 +8,16 @@ import com.example.Hehe.model.User;
 import com.example.Hehe.model.UserRole;
 import com.example.Hehe.repository.CategoryRepository;
 import com.example.Hehe.repository.ProductRepository;
+import com.example.Hehe.repository.BranchRepository;
+import com.example.Hehe.repository.InventoryRepository;
+import com.example.Hehe.model.Branch;
+import com.example.Hehe.model.Inventory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.data.jpa.domain.Specification;
 import jakarta.persistence.criteria.Predicate;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -27,19 +33,23 @@ public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final BranchRepository branchRepository;
+    private final InventoryRepository inventoryRepository;
 
-    public ProductServiceImpl(ProductRepository productRepository, CategoryRepository categoryRepository) {
+    public ProductServiceImpl(ProductRepository productRepository, CategoryRepository categoryRepository, BranchRepository branchRepository, InventoryRepository inventoryRepository) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
+        this.branchRepository = branchRepository;
+        this.inventoryRepository = inventoryRepository;
     }
 
     /**
      * Hàm dùng chung để kiểm tra quyền truy cập.
-     * Dựa theo kế hoạch, hiện tại chỉ có ADMIN mới được phép thao tác CRUD trên sản phẩm.
+     * Chỉ STAFF mới bị chặn, ADMIN và MANAGER được phép thay đổi sản phẩm.
      */
-    private void checkAdminPermission(User currentUser) {
-        if (currentUser.getRole() != UserRole.ADMIN) {
-            throw new RuntimeException("Bạn không có quyền thực hiện thao tác này. Yêu cầu quyền ADMIN.");
+    private void checkPermission(User currentUser) {
+        if (currentUser.getRole() == UserRole.STAFF) {
+            throw new RuntimeException("Bạn không có quyền thực hiện thao tác này. Yêu cầu quyền ADMIN hoặc MANAGER.");
         }
     }
 
@@ -101,7 +111,7 @@ public class ProductServiceImpl implements ProductService {
      */
     @Override
     public ProductResponse createProduct(ProductSaveRequest request, User currentUser) {
-        checkAdminPermission(currentUser);
+        checkPermission(currentUser);
 
         // Kiểm tra xem Category có tồn tại không
         Integer categoryId = request.getCategoryId();
@@ -125,7 +135,6 @@ public class ProductServiceImpl implements ProductService {
         // Gán các trường khác
         product.setName(request.getName());
         product.setPrice(request.getPrice());
-        product.setQuantity(request.getQuantity() == null ? 0 : request.getQuantity());
         product.setDescription(request.getDescription());
         product.setCategory(category);
         product.setManufacturingDate(request.getManufacturingDate());
@@ -138,6 +147,18 @@ public class ProductServiceImpl implements ProductService {
         // Lưu vào DB
         Product savedProduct = productRepository.save(product);
 
+        // Khởi tạo dòng tồn kho cho Kho Tổng (id = 1)
+        branchRepository.findById(1).ifPresent(mainBranch -> {
+            Inventory inventory = new Inventory();
+            inventory.setBranch(mainBranch);
+            inventory.setProduct(savedProduct);
+            inventory.setQuantity(0);
+            inventory.setManufacturingDate(savedProduct.getHasExpiry() ? savedProduct.getManufacturingDate() : LocalDate.of(1970, 1, 1));
+            inventory.setExpirationDate(savedProduct.getHasExpiry() ? savedProduct.getExpirationDate() : LocalDate.of(1970, 1, 1));
+            inventory.setLastUpdated(LocalDateTime.now());
+            inventoryRepository.save(inventory);
+        });
+
         return new ProductResponse(savedProduct);
     }
 
@@ -147,7 +168,7 @@ public class ProductServiceImpl implements ProductService {
      */
     @Override
     public ProductResponse updateProduct(@NonNull Integer id, ProductSaveRequest request, User currentUser) {
-        checkAdminPermission(currentUser);
+        checkPermission(currentUser);
 
 
         Product product = productRepository.findById(id)
@@ -169,7 +190,6 @@ public class ProductServiceImpl implements ProductService {
         // Cập nhật thông tin (Bỏ qua SKU)
         product.setName(request.getName());
         product.setPrice(request.getPrice());
-        product.setQuantity(request.getQuantity() != null ? request.getQuantity() : product.getQuantity());
         product.setDescription(request.getDescription());
         product.setCategory(category);
         product.setManufacturingDate(request.getManufacturingDate());
@@ -188,7 +208,7 @@ public class ProductServiceImpl implements ProductService {
      */
     @Override
     public void deleteProduct(@NonNull Integer id, User currentUser) {
-        checkAdminPermission(currentUser);
+        checkPermission(currentUser);
 
 
         Product product = productRepository.findById(id)

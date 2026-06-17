@@ -15,7 +15,8 @@
   3. Nếu user tồn tại + đúng mật khẩu → kiểm tra `status`:
      - `LOCKED` → từ chối, thông báo "tài khoản bị khóa".
      - `ACTIVE` → đăng nhập thành công, lưu user vào session.
-  4. Sai thông tin → thông báo lỗi chung (không phân biệt sai user hay sai pass).
+*   **Bước 2:** Lưu thông tin vào database.
+*   **Bước 3 (Khởi tạo tồn kho):** Hệ thống tự động tạo 1 dòng tồn kho (`inventories`) cho **Kho Tổng** với `quantity = 0`. (Giả định Kho Tổng có `id` = 1 hoặc được xác định qua cơ chế riêng). Các Kho Con không được tạo tồn kho tự động.hông báo lỗi chung (không phân biệt sai user hay sai pass).
 - **Output:** User object (id, username, fullName, role, branch, status)
 - **Phân quyền:** Không (ai cũng gọi được)
 
@@ -61,6 +62,10 @@
 - Hiện chỉ dùng qua ComboBox khi tạo/sửa sản phẩm.
 - CRUD cơ bản: id, name (unique).
 
+### 3.1. Phân quyền
+*   **Role hợp lệ**: `ADMIN`, `MANAGER`
+*   **Ngoại lệ**: `STAFF` không có quyền truy cập.quan chi nhánh của mình (source OR dest = chi nhánh mình).
+
 ---
 
 ## 4. Quản lý Tồn kho (Inventory)
@@ -97,46 +102,28 @@
 
 | Loại | source_branch | dest_branch | Ý nghĩa |
 |------|:---:|:---:|---|
-| IMPORT | NULL | Có | Nhập hàng từ NCC |
-| EXPORT | Có | NULL | Xuất bán hàng |
-| TRANSFER | Có | Có (khác nhau) | Điều chuyển nội bộ |
-| ADJUST_IN | NULL | Có | Cân bằng tăng |
-| ADJUST_OUT | Có | NULL | Cân bằng giảm |
+| IMPORT | NULL | Có | Nhập hàng vào chi nhánh Tổng (không gắn nhà cung cấp) |
+| EXPORT | Có | NULL | Xuất bán hàng cho khách hàng |
+| TRANSFER | Có | Có (khác nhau) | Điều chuyển nội bộ từ chi nhánh Tổng xuống chi nhánh Con |
+| ADJUST_IN | NULL | Có | Cân bằng tăng (do kiểm kê phát hiện thừa) |
+| ADJUST_OUT | Có | NULL | Cân bằng giảm (do kiểm kê phát hiện thiếu) |
 
 ### 5.2. Quy trình lập phiếu
 1. Chọn loại phiếu → hệ thống tự sinh mã phiếu unique (prefix 2 ký tự + UUID 8 ký tự, retry tối đa 5 lần nếu trùng).
-2. Chọn chi nhánh xuất/nhận (tùy loại). MANAGER/STAFF bị khóa vào chi nhánh của mình.
-3. Thêm từng dòng sản phẩm vào phiếu nháp (draft):
-   - Chọn sản phẩm → tự điền đơn vị, đơn giá (khóa không sửa giá), mặc định SL=1.
-   - NSX/HSD: nếu SP có `hasExpiry=true` → tự tích checkbox, điền sẵn, khóa (không cho sửa). Nếu không → khóa checkbox.
-   - Với EXPORT/TRANSFER: hiển thị tồn kho khả dụng theo lô, tự chọn lô đầu tiên (FIFO).
-   - Validate: qty > 0; nếu xuất thì không được > tồn hiện có (tính cả draft đã thêm).
-   - Nếu thêm trùng SP + lô → cộng dồn số lượng.
-4. Có thể xóa dòng khỏi draft.
-5. Xác nhận lập phiếu:
-   - Validate: code, chi nhánh, ít nhất 1 dòng.
-   - Tạo Receipt (status=COMPLETED) + ReceiptDetails.
-   - **Cập nhật tồn kho trong cùng 1 transaction (@Transactional):**
+2. Lập chi tiết phiếu:
+   * **Quyền:** `STAFF` tại Kho Con lập phiếu. `ADMIN` trực tiếp lập phiếu tại Kho Tổng.
+   * Ràng buộc: `quantity > 0` và `price >= 0`.
+   * Đối với `EXPORT`, `TRANSFER`, `ADJUST_OUT`: Hệ thống kiểm tra số lượng xuất không được vượt quá `quantity` hiện có trong bảng `inventories` của lô hàng tương ứng tại `source_branch_id`.
+3. Lưu nháp (Trạng thái `DRAFT`).
 
-### 5.3. Logic cập nhật tồn kho (ReceiptService.createReceipt)
-```
-IMPORT / ADJUST_IN:
-  → destBranch: findOrCreate Inventory(branch, product, mfgDate, expDate)
-  → quantity += detail.quantity
-  → lastUpdated = now()
-
-EXPORT / ADJUST_OUT:
-  → sourceBranch: find Inventory (phải tồn tại, nếu không → RuntimeException)
-  → if quantity < detail.quantity → RuntimeException "Không đủ tồn kho"
-  → quantity -= detail.quantity
-  → lastUpdated = now()
-
-TRANSFER:
-  → sourceBranch: trừ kho (giống EXPORT)
-  → destBranch: cộng kho (giống IMPORT)
-```
-- Nếu bất kỳ dòng nào lỗi → toàn bộ rollback (nhờ @Transactional).
-- Quantity không bao giờ < 0 (check ở cả application lẫn DB constraint).
+### 5.3. Quy trình duyệt phiếu
+*   **Quyền:** `MANAGER` duyệt phiếu tại Kho Con. `ADMIN` trực tiếp duyệt phiếu tại Kho Tổng.
+*   **Hành động:** Chuyển trạng thái từ `DRAFT` → `COMPLETED` (hoặc `CANCELLED` nếu từ chối).
+*   **Khi duyệt (COMPLETED):**
+    * Đối với `IMPORT`, `ADJUST_IN`: Cộng số lượng vào bảng `inventories` của `dest_branch_id` (nếu chưa có lô hàng thì `INSERT`, nếu có thì `UPDATE`).
+    * Đối với `EXPORT`, `ADJUST_OUT`: Trừ số lượng khỏi bảng `inventories` của `source_branch_id`.
+    * Đối với `TRANSFER`: Trừ số lượng ở `source_branch_id` và cộng số lượng ở `dest_branch_id`.
+*   **Lưu ý:** Phiếu đã `COMPLETED` hoặc `CANCELLED` sẽ bị khóa vĩnh viễn (không được UPDATE/DELETE).
 
 ### 5.4. Ghi chú phiếu
 - Field `description` (tối đa 500 ký tự), tùy chọn.

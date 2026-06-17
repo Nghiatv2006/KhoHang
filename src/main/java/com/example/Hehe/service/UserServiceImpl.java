@@ -24,13 +24,11 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final BranchRepository branchRepository;
     private final PasswordEncoder passwordEncoder;
-    private final com.example.Hehe.repository.BranchTransferRequestRepository transferRequestRepository;
 
-    public UserServiceImpl(UserRepository userRepository, BranchRepository branchRepository, PasswordEncoder passwordEncoder, com.example.Hehe.repository.BranchTransferRequestRepository transferRequestRepository) {
+    public UserServiceImpl(UserRepository userRepository, BranchRepository branchRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.branchRepository = branchRepository;
         this.passwordEncoder = passwordEncoder;
-        this.transferRequestRepository = transferRequestRepository;
     }
 
     @Override
@@ -212,7 +210,6 @@ public class UserServiceImpl implements UserService {
         }
 
         try {
-            transferRequestRepository.deleteByStaffId(id);
             userRepository.delete(user);
         } catch (DataIntegrityViolationException ex) {
             throw new RuntimeException("Tài khoản đã phát sinh dữ liệu giao dịch trong hệ thống, không thể xóa. Vui lòng sử dụng tính năng khóa tài khoản.");

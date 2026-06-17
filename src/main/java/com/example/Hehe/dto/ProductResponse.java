@@ -15,7 +15,7 @@ public class ProductResponse {
     private String sku;
     private String name;
     private BigDecimal price;
-    private Integer quantity;
+
     private String description;
     
     private Integer categoryId;
@@ -29,7 +29,7 @@ public class ProductResponse {
         this.sku = product.getSku();
         this.name = product.getName();
         this.price = product.getPrice();
-        this.quantity = product.getQuantity();
+
         this.description = product.getDescription();
         
         // Trích xuất ID và Tên của Category thay vì trả toàn bộ object Category
@@ -60,9 +60,6 @@ public class ProductResponse {
         return price;
     }
 
-    public Integer getQuantity() {
-        return quantity;
-    }
 
     public String getDescription() {
         return description;

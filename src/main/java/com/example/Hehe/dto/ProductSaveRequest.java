@@ -11,7 +11,7 @@ public class ProductSaveRequest {
 
     private String name;
     private BigDecimal price;
-    private Integer quantity;
+
     private String description;
     
     // ID của danh mục mà người dùng chọn
@@ -36,14 +36,6 @@ public class ProductSaveRequest {
 
     public void setPrice(BigDecimal price) {
         this.price = price;
-    }
-
-    public Integer getQuantity() {
-        return quantity;
-    }
-
-    public void setQuantity(Integer quantity) {
-        this.quantity = quantity;
     }
 
     public String getDescription() {

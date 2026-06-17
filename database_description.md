@@ -8,7 +8,7 @@ Hệ thống quản lý kho hàng nhiều chi nhánh sử dụng cơ sở dữ l
 
 *   `user_role`: Phân quyền người dùng, gồm `ADMIN` (Quản trị viên hệ thống), `MANAGER` (Quản lý chi nhánh), `STAFF` (Nhân viên kho).
 *   `user_status`: Trạng thái tài khoản người dùng, gồm `ACTIVE` (Đang hoạt động), `LOCKED` (Bị khóa).
-*   `receipt_type`: Loại giao dịch kho, gồm `IMPORT` (Nhập từ nhà cung cấp), `EXPORT` (Xuất bán), `TRANSFER` (Điều chuyển nội bộ giữa 2 chi nhánh), `ADJUST_IN` (Cân bằng tăng), `ADJUST_OUT` (Cân bằng giảm).
+*   `receipt_type`: Loại giao dịch kho, gồm `IMPORT` (Nhập vào kho tổng), `EXPORT` (Xuất bán), `TRANSFER` (Điều chuyển nội bộ giữa 2 chi nhánh), `ADJUST_IN` (Cân bằng tăng), `ADJUST_OUT` (Cân bằng giảm).
 *   `receipt_status`: Trạng thái phiếu kho, gồm `DRAFT` (Phiếu nháp - chưa cập nhật tồn kho), `COMPLETED` (Hoàn thành - đã thay đổi số lượng kho), `CANCELLED` (Đã hủy).
 *   `stocktake_status`: Trạng thái phiên kiểm kê, gồm `DRAFT` (Đang kiểm đếm), `COMPLETED` (Đã hoàn tất), `CANCELLED` (Đã hủy).
 
@@ -34,20 +34,7 @@ Phân loại nhóm sản phẩm trong hệ thống.
 | `id` | SERIAL | PRIMARY KEY | ID tự tăng của danh mục |
 | `name` | VARCHAR(255) | NOT NULL, UNIQUE | Tên danh mục (Ví dụ: Điện thoại di động) |
 
-### 2.3. Bảng Nhà Cung Cấp (`suppliers`)
-Đối tác cung cấp hàng hóa cho kho.
-
-| Tên Cột | Kiểu Dữ Liệu | Ràng Buộc | Mô Tả |
-| :--- | :--- | :--- | :--- |
-| `id` | SERIAL | PRIMARY KEY | ID tự tăng của nhà cung cấp |
-| `name` | VARCHAR(255) | NOT NULL | Tên công ty/nhà cung cấp |
-| `contact_info` | VARCHAR(255) | | Thông tin liên hệ (SĐT, Email...) |
-| `address` | TEXT | | Địa chỉ nhà cung cấp |
-| `debt` | NUMERIC(15,2) | NOT NULL, DEFAULT 0.00 | Công nợ hiện tại (Số tiền kho đang nợ nhà cung cấp) |
-| `status` | VARCHAR(50) | NOT NULL, DEFAULT 'ACTIVE' | Trạng thái: `ACTIVE` (Hợp tác) / `INACTIVE` (Ngừng hợp tác) |
-| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Ngày giờ tạo bản ghi |
-
-### 2.4. Bảng Khách Hàng (`customers`)
+### 2.3. Bảng Khách Hàng (`customers`)
 Khách hàng mua sản phẩm từ kho.
 
 | Tên Cột | Kiểu Dữ Liệu | Ràng Buộc | Mô Tả |
@@ -123,12 +110,11 @@ Lưu giữ thông tin chung về các giao dịch kho.
 | `source_branch_id` | INT | FOREIGN KEY | Kho xuất hàng (NULL nếu là IMPORT, ADJUST_IN) |
 | `dest_branch_id` | INT | FOREIGN KEY | Kho nhận hàng (NULL nếu là EXPORT, ADJUST_OUT) |
 | `created_by` | INT | NOT NULL, FOREIGN KEY | Nhân viên lập phiếu |
-| `supplier_id` | INT | FOREIGN KEY | Nhà cung cấp (Bắt buộc nếu là phiếu `IMPORT`) |
 | `customer_id` | INT | FOREIGN KEY | Khách hàng (Bắt buộc nếu là phiếu `EXPORT`) |
 | `description` | VARCHAR(500) | | Mô tả chi tiết hoặc lý do giao dịch |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Ngày lập phiếu |
 
-### 2.9. Bảng Chi Tiết Phiếu Kho (`receipt_details`)
+### 2.8. Bảng Chi Tiết Phiếu Kho (`receipt_details`)
 Lưu chi tiết danh sách sản phẩm và đơn giá tương ứng trong từng phiếu kho.
 
 | Tên Cột | Kiểu Dữ Liệu | Ràng Buộc | Mô Tả |
@@ -141,7 +127,7 @@ Lưu chi tiết danh sách sản phẩm và đơn giá tương ứng trong từn
 | `quantity` | INT | NOT NULL, CHECK (quantity > 0) | Số lượng giao dịch |
 | `price` | NUMERIC(15,2) | NOT NULL, CHECK (price >= 0) | Đơn giá giao dịch thực tế tại thời điểm lập phiếu |
 
-### 2.10. Bảng Kiểm Kê Kho (`stocktakes`)
+### 2.9. Bảng Kiểm Kê Kho (`stocktakes`)
 Lưu thông tin phiên kiểm đếm kho.
 
 | Tên Cột | Kiểu Dữ Liệu | Ràng Buộc | Mô Tả |
@@ -154,7 +140,7 @@ Lưu thông tin phiên kiểm đếm kho.
 | `notes` | TEXT | | Ghi chú, kết luận kiểm kê |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Thời gian lập |
 
-### 2.11. Bảng Chi Tiết Kiểm Kê (`stocktake_details`)
+### 2.10. Bảng Chi Tiết Kiểm Kê (`stocktake_details`)
 Chi tiết kết quả kiểm đếm từng lô hàng sản phẩm trong phiên kiểm kê.
 
 | Tên Cột | Kiểu Dữ Liệu | Ràng Buộc | Mô Tả |
@@ -168,22 +154,7 @@ Chi tiết kết quả kiểm đếm từng lô hàng sản phẩm trong phiên 
 | `actual_quantity` | INT | NOT NULL | Số lượng kiểm đếm thực tế |
 | `adjustment_receipt_id`| INT | FOREIGN KEY | Phiếu điều chỉnh tự sinh nếu có chênh lệch |
 
-### 2.12. Bảng Yêu Cầu Chuyển Chi Nhánh (`branch_transfer_requests`)
-Theo dõi việc xin chuyển nhân viên sang chi nhánh khác.
-
-| Tên Cột | Kiểu Dữ Liệu | Ràng Buộc | Mô Tả |
-| :--- | :--- | :--- | :--- |
-| `id` | SERIAL | PRIMARY KEY | ID tự tăng |
-| `staff_id` | INT | NOT NULL, FOREIGN KEY | Nhân viên cần chuyển |
-| `from_branch_id` | INT | NOT NULL, FOREIGN KEY | Chi nhánh gốc |
-| `to_branch_id` | INT | NOT NULL, FOREIGN KEY | Chi nhánh mới đề xuất |
-| `created_by` | INT | NOT NULL, FOREIGN KEY | Manager gửi đề xuất |
-| `status` | VARCHAR(50) | NOT NULL, DEFAULT 'PENDING' | Trạng thái quy trình 3 bước: `PENDING` (Chờ nhân viên xác nhận), `STAFF_CONFIRMED` (Chờ quản lý thông qua), `MANAGER_APPROVED` (Chờ Admin duyệt), `APPROVED` (Đã duyệt thành công), `REJECTED` (Đơn bị từ chối) |
-| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Thời điểm đề xuất |
-| `approved_by` | INT | FOREIGN KEY | Admin phê duyệt/từ chối |
-| `approved_at` | TIMESTAMP | | Thời điểm phê duyệt |
-
-### 2.13. Bảng Nhật Ký Hoạt Động (`audit_logs`)
+### 2.11. Bảng Nhật Ký Hoạt Động (`audit_logs`)
 Lưu lịch sử tác động dữ liệu.
 
 | Tên Cột | Kiểu Dữ Liệu | Ràng Buộc | Mô Tả |
