@@ -11,7 +11,6 @@ const currentUser = ref<any>(JSON.parse(localStorage.getItem('wh_user') || '{}')
 const isAdmin = computed(() => currentUser.value?.role === 'ADMIN')
 const isManager = computed(() => ['ADMIN', 'MANAGER'].includes(currentUser.value?.role))
 
-const activeTab = ref<'users' | 'transfers'>('users')
 
 // ── USERS ──────────────────────────────────────────────────────────────────
 const users = ref<any[]>([])
@@ -94,52 +93,6 @@ async function toggleUser(u: any) {
   } catch { toast.error('Có lỗi.') }
 }
 
-// ── TRANSFER REQUESTS ──────────────────────────────────────────────────────
-const transfers = ref<any[]>([])
-const tLoading = ref(true)
-const showTransferModal = ref(false)
-const transferForm = reactive({ staffId: '' as any, targetBranchId: '' as any, reason: '' })
-const tSaving = ref(false)
-
-async function loadTransfers() {
-  tLoading.value = true
-  try { const res = await api.get('/api/users/transfer-requests'); if (res.ok) transfers.value = await res.json() }
-  catch {} finally { tLoading.value = false }
-}
-
-async function createTransfer() {
-  if (!transferForm.staffId || !transferForm.targetBranchId) { toast.error('Vui lòng điền đầy đủ thông tin.'); return }
-  tSaving.value = true
-  try {
-    const res = await api.post('/api/users/transfer-requests', {
-      staffId: Number(transferForm.staffId),
-      targetBranchId: Number(transferForm.targetBranchId),
-      reason: transferForm.reason,
-    })
-    const data = await res.json()
-    if (res.ok) { toast.success('Tạo yêu cầu điều chuyển thành công!'); showTransferModal.value = false; await loadTransfers() }
-    else toast.error(data.message || 'Có lỗi xảy ra.')
-  } catch { toast.error('Không thể kết nối.') }
-  finally { tSaving.value = false }
-}
-
-async function approveTransfer(id: number) {
-  try {
-    const res = await api.post(`/api/users/transfer-requests/${id}/approve`, {})
-    const data = await res.json()
-    if (res.ok) { toast.success('Đã phê duyệt yêu cầu!'); await loadTransfers() }
-    else toast.error(data.message || 'Có lỗi.')
-  } catch { toast.error('Có lỗi.') }
-}
-
-async function rejectTransfer(id: number) {
-  try {
-    const res = await api.post(`/api/users/transfer-requests/${id}/reject`, {})
-    const data = await res.json()
-    if (res.ok) { toast.success('Đã từ chối yêu cầu!'); await loadTransfers() }
-    else toast.error(data.message || 'Có lỗi.')
-  } catch { toast.error('Có lỗi.') }
-}
 
 // Load
 async function loadUsers() {
@@ -149,7 +102,7 @@ async function loadUsers() {
 }
 
 onMounted(async () => {
-  await Promise.all([loadUsers(), loadTransfers()])
+  await loadUsers()
   try { const res = await api.get('/api/branches'); if (res.ok) branches.value = await res.json() } catch {}
 })
 
@@ -170,30 +123,10 @@ function formatDate(dt: string) {
         <p class="text-[#8094ae] text-sm mt-1">Quản lý tài khoản, vai trò và phân công chi nhánh</p>
       </div>
       
-      <!-- Tabs -->
-      <div class="flex items-center gap-6 border-b border-[#e2e8f0]">
-        <button
-          v-for="tab in [{ key: 'users', label: 'Nhân viên', icon: 'fas fa-users' }, { key: 'transfers', label: 'Điều chuyển', icon: 'fas fa-exchange-alt' }]"
-          :key="tab.key"
-          :class="[
-            'flex items-center gap-2 pb-3 px-1 text-sm font-bold transition-colors relative',
-            activeTab === tab.key ? 'text-[#4361ee]' : 'text-[#8094ae] hover:text-[#364a63]'
-          ]"
-          @click="activeTab = tab.key as any"
-        >
-          <i :class="tab.icon"></i>
-          {{ tab.label }}
-          <span v-if="tab.key === 'transfers' && transfers.filter(t => ['PENDING_STAFF','STAFF_CONFIRMED','MANAGER_APPROVED'].includes(t.status)).length > 0"
-            class="bg-[#ea4f52] text-white text-[10px] rounded-full min-w-[20px] h-[20px] px-1 flex items-center justify-center font-bold shadow-sm">
-            {{ transfers.filter(t => ['PENDING_STAFF','STAFF_CONFIRMED','MANAGER_APPROVED'].includes(t.status)).length }}
-          </span>
-          <div v-if="activeTab === tab.key" class="absolute bottom-[-1px] left-0 w-full h-[2px] bg-[#4361ee] rounded-t-full"></div>
-        </button>
-      </div>
     </div>
 
     <!-- USERS TAB -->
-    <div v-if="activeTab === 'users'" class="bg-indigo-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden">
+    <div class="bg-indigo-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden">
       <!-- Toolbar -->
       <div class="p-5 border-b border-[#f1f5f9] flex items-center justify-between flex-wrap gap-4 bg-[#f8f9fa]/50">
         <div class="flex items-center gap-3 flex-1 min-w-[300px]">
@@ -276,77 +209,6 @@ function formatDate(dt: string) {
       </div>
     </div>
 
-    <!-- TRANSFERS TAB -->
-    <div v-if="activeTab === 'transfers'" class="space-y-6">
-      <div class="flex justify-end">
-        <button v-if="isManager" class="bg-[#4361ee] text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-sm flex items-center gap-2" @click="showTransferModal = true">
-          <i class="fas fa-exchange-alt"></i> Tạo yêu cầu điều chuyển
-        </button>
-      </div>
-
-      <!-- Timeline-style transfer list -->
-      <div v-if="tLoading" class="p-6 space-y-4 bg-white rounded-[16px] border border-[#f1f5f9]"><div v-for="i in 3" :key="i" class="h-24 bg-[#f8f9fa] rounded-xl animate-pulse" /></div>
-      <div v-else-if="transfers.length === 0" class="bg-white rounded-[16px] shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-[#f1f5f9] py-20 text-center text-[#8094ae]">
-        <i class="fas fa-random text-5xl mb-4 opacity-40"></i>
-        <div class="font-bold text-[#364a63]">Không có yêu cầu điều chuyển nào</div>
-      </div>
-      <div v-else class="space-y-4">
-        <div
-          v-for="t in transfers"
-          :key="t.id"
-          class="bg-sky-50 rounded-[16px] shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-[#f1f5f9] p-6 hover:shadow-md transition-shadow relative overflow-hidden"
-        >
-          <!-- Left color border indicator -->
-          <div class="absolute left-0 top-0 bottom-0 w-1" :class="t.status === 'APPROVED' ? 'bg-[#05b171]' : t.status === 'REJECTED' || t.status === 'CANCELLED' ? 'bg-[#ea4f52]' : 'bg-[#4361ee]'"></div>
-          
-          <div class="flex items-start justify-between gap-4">
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-3 flex-wrap mb-3">
-                <span class="font-bold text-[#364a63] text-lg">{{ t.staffName || `Nhân viên #${t.staffId}` }}</span>
-                <i class="fas fa-arrow-right text-[#8094ae]"></i>
-                <span class="font-bold text-[#4361ee] text-lg">{{ t.targetBranchName || `Chi nhánh #${t.targetBranchId}` }}</span>
-                <StatusBadge :value="t.status" type="transfer" />
-              </div>
-              <div class="text-[#526484] bg-[#f8f9fa] p-3 rounded-lg text-sm border border-[#e2e8f0] mb-3">
-                <strong>Lý do:</strong> {{ t.reason || 'Không có lý do' }}
-              </div>
-              <div class="text-xs font-bold text-[#8094ae] flex items-center gap-4 uppercase tracking-wider">
-                <span><i class="fas fa-clock mr-1"></i> {{ formatDate(t.createdAt) }}</span>
-                <span v-if="t.fromBranchName"><i class="fas fa-store mr-1"></i> Từ: {{ t.fromBranchName }}</span>
-              </div>
-              
-              <!-- 3-step progress -->
-              <div class="flex items-center gap-2 mt-5 bg-[#f8f9fa] p-4 rounded-xl border border-[#f1f5f9]">
-                <div v-for="(step, i) in [
-                  { label: 'NV xác nhận', done: ['STAFF_CONFIRMED','MANAGER_APPROVED','APPROVED'].includes(t.status) },
-                  { label: 'Manager duyệt', done: ['MANAGER_APPROVED','APPROVED'].includes(t.status) },
-                  { label: 'Admin phê duyệt', done: t.status === 'APPROVED' },
-                ]" :key="i" class="flex items-center gap-2">
-                  <div :class="['w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm', step.done ? 'bg-[#05b171] text-white' : t.status === 'REJECTED' || t.status === 'CANCELLED' ? 'bg-[#ffe4e6] text-[#ea4f52]' : 'bg-[#e2e8f0] text-[#8094ae]']">
-                    <i :class="step.done ? 'fas fa-check' : t.status === 'REJECTED' || t.status === 'CANCELLED' ? 'fas fa-times' : 'fas fa-circle text-[8px]'"></i>
-                  </div>
-                  <span class="text-xs font-bold" :class="step.done ? 'text-[#364a63]' : 'text-[#8094ae]'">{{ step.label }}</span>
-                  <div v-if="i < 2" class="w-10 h-[2px]" :class="step.done ? 'bg-[#05b171]' : 'bg-[#e2e8f0]'" />
-                </div>
-              </div>
-            </div>
-
-            <!-- Actions -->
-            <div v-if="['PENDING_STAFF','STAFF_CONFIRMED','MANAGER_APPROVED'].includes(t.status)" class="flex flex-col gap-2 flex-shrink-0">
-              <button
-                class="h-10 px-5 bg-[#05b171] hover:bg-[#04935e] text-white rounded-xl text-sm font-bold transition-all shadow-sm flex items-center gap-2"
-                @click="approveTransfer(t.id)"
-              >
-                <i class="fas fa-check"></i> Phê duyệt
-              </button>
-              <button
-                class="h-10 px-5 bg-[#fff1f2] hover:bg-[#ffe4e6] text-[#ea4f52] border border-[#fecdd3] rounded-xl text-sm font-bold transition-all flex items-center gap-2"
-                @click="rejectTransfer(t.id)"
-              >
-                <i class="fas fa-times"></i> Từ chối
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -424,45 +286,6 @@ function formatDate(dt: string) {
       </Transition>
     </Teleport>
 
-    <!-- Transfer Request Modal -->
-    <AppModal :show="showTransferModal" title="Tạo yêu cầu điều chuyển nhân sự" @close="showTransferModal = false">
-      <div class="p-6 space-y-5">
-        <div class="bg-[#eef2ff] border border-[#c7d2fe] rounded-xl px-5 py-4 text-sm text-[#4361ee] flex items-start gap-3">
-          <i class="fas fa-info-circle text-lg mt-0.5"></i>
-          <div>
-            <strong class="block mb-1">Quy trình điều chuyển:</strong>
-            1. NV xác nhận → 2. Manager duyệt → 3. Admin phê duyệt
-          </div>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Nhân viên cần điều chuyển <span class="text-[#ea4f52]">*</span></label>
-          <select v-model="transferForm.staffId" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] cursor-pointer">
-            <option value="">-- Chọn nhân viên --</option>
-            <option v-for="u in users.filter(u => u.role === 'STAFF')" :key="u.id" :value="u.id">
-              {{ u.fullName }} ({{ u.branchName || 'Chưa phân công' }})
-            </option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Chi nhánh đích <span class="text-[#ea4f52]">*</span></label>
-          <select v-model="transferForm.targetBranchId" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] cursor-pointer">
-            <option value="">-- Chọn chi nhánh --</option>
-            <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Lý do điều chuyển</label>
-          <textarea v-model="transferForm.reason" rows="3" placeholder="Nhập lý do chi tiết..." class="w-full px-4 py-3 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] resize-none"></textarea>
-        </div>
-        <div class="flex gap-3 pt-4 border-t border-[#f1f5f9]">
-          <button class="flex-1 h-11 bg-[#f8f9fa] hover:bg-[#e2e8f0] text-[#364a63] rounded-xl text-sm font-bold transition-colors" @click="showTransferModal = false">Hủy bỏ</button>
-          <button class="flex-1 h-11 bg-[#4361ee] hover:bg-[#3a0ca3] text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md flex items-center justify-center gap-2 transition-all" :disabled="tSaving" @click="createTransfer">
-            <i v-if="tSaving" class="fas fa-spinner fa-spin"></i>
-            {{ tSaving ? 'Đang tạo...' : 'Tạo yêu cầu' }}
-          </button>
-        </div>
-      </div>
-    </AppModal>
 
     <ConfirmDialog :show="showDeleteUser" title="Xóa nhân viên" :message="`Bạn có chắc muốn xóa tài khoản '${deletingUser?.fullName}'? Hành động này không thể hoàn tác.`" confirm-text="Xóa" :danger="true" @confirm="doDeleteUser" @cancel="showDeleteUser = false" />
   </div>

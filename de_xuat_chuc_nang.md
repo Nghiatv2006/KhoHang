@@ -28,15 +28,7 @@ Dưới đây là các tính năng được bổ sung để nâng tầm đồ á
         *   Nếu **Đồng ý (Duyệt)**: Trạng thái phiếu chuyển thành **`COMPLETED`**. Lúc này hệ thống mới chính thức thực hiện cộng/trừ số lượng tồn kho tương ứng và khóa vĩnh viễn phiếu kho (không cho phép chỉnh sửa/xóa).
         *   Nếu **Từ chối**: Trạng thái phiếu chuyển thành **`CANCELLED`**. Phiếu bị hủy bỏ và lưu trữ ở dạng lịch sử để đối soát sau này.
 
-### 2.2. Quy trình điều chuyển nhân sự 3 bước (3-Step Branch Transfer Requests)
-*   **Mục tiêu:** Quản lý việc luân chuyển nhân sự giữa các kho, loại bỏ rủi ro tranh chấp hoặc nhân viên phản đối quyết định điều động.
-*   **Nghiệp vụ chi tiết:**
-    *   **Bước 1 (Đề xuất / Xác nhận từ Nhân viên):** Nhân viên (`STAFF`) tự lập đơn xin chuyển chi nhánh hoặc nếu `MANAGER` lập đơn điều động thì hệ thống yêu cầu tài khoản của `STAFF` đó phải bấm **Xác nhận đồng ý** trên giao diện của mình. Trạng thái đơn lúc này là `STAFF_CONFIRMED`.
-    *   **Bước 2 (Manager thông qua):** Quản lý chi nhánh hiện tại của nhân viên duyệt đơn nội bộ để xác nhận bàn giao công việc. Đơn chuyển trạng thái sang `MANAGER_APPROVED`.
-    *   **Bước 3 (Admin phê duyệt quyết định):** `ADMIN` xem xét tình hình nhân sự toàn chuỗi, thực hiện phê duyệt cuối cùng (`APPROVED`). 
-        *   Ngay khi được duyệt, hệ thống tự động chạy Transaction để **cập nhật lại cột `branch_id` của tài khoản `Users` đó sang chi nhánh mới**. Nhân viên chính thức thuộc quyền quản lý và chỉ thao tác được dữ liệu tại chi nhánh mới từ lần đăng nhập sau.
-
-### 2.3. Điều chuyển hàng hóa 2 bước (Two-Step Inventory Transfer)
+### 2.2. Điều chuyển hàng hóa 2 bước (Two-Step Inventory Transfer)
 *   **Mục tiêu:** Quản lý chính xác hàng hóa đang đi đường (In-Transit) giữa các chi nhánh, tránh việc hàng hóa "biến mất" ở kho này và lập tức "xuất hiện" ở kho kia khi chưa vận chuyển tới nơi.
 *   **Nghiệp vụ chi tiết:**
     *   **Bước 1 (Xuất điều chuyển):** Chi nhánh nguồn xuất hàng đi $\rightarrow$ Số lượng tồn kho tại chi nhánh nguồn lập tức bị trừ, hàng được ghi nhận vào trạng thái **`IN_TRANSIT` (Đang đi đường)**.
@@ -44,15 +36,14 @@ Dưới đây là các tính năng được bổ sung để nâng tầm đồ á
     *   **Xử lý hao hụt vận chuyển:** Nếu số lượng nhận thực tế ít hơn số lượng xuất đi $\rightarrow$ Hệ thống tự động ghi nhận lượng hao hụt vận chuyển vào chi tiết phiếu và sinh một phiếu điều chỉnh giảm (`ADJUST_OUT`) tương ứng để đảm bảo tính nhất quán của số liệu sổ sách.
 
 
-### 2.4. Quản lý công nợ đối tác & Thanh toán (Partner Debt & Payment Management)
-*   **Mục tiêu:** Quản lý dòng tiền mua bán hàng và kiểm soát dư nợ của Khách hàng/Nhà cung cấp.
+### 2.3. Quản lý công nợ khách hàng & Thanh toán (Customer Debt & Payment Management)
+*   **Mục tiêu:** Quản lý dòng tiền bán hàng và kiểm soát dư nợ của Khách hàng.
 *   **Nghiệp vụ chi tiết:**
     *   **Tự động ghi nhận nợ:**
-        *   Khi duyệt phiếu nhập kho (`IMPORT` + trạng thái `COMPLETED` + thanh toán `UNPAID`) $\rightarrow$ Công nợ của Nhà cung cấp (`suppliers.debt`) tự động **tăng lên** (doanh nghiệp tăng khoản nợ phải trả).
         *   Khi duyệt phiếu xuất kho (`EXPORT` + trạng thái `COMPLETED` + thanh toán `UNPAID`) $\rightarrow$ Công nợ của Khách hàng (`customers.debt`) tự động **tăng lên** (doanh nghiệp tăng khoản phải thu).
     *   **Thanh toán công nợ:**
         *   Cung cấp màn hình quản lý hóa đơn/phiếu kho chưa thanh toán (`UNPAID`). 
-        *   Khi người dùng thực hiện thanh toán (trả tiền cho NCC hoặc thu tiền khách hàng) $\rightarrow$ Chuyển trạng thái phiếu từ `UNPAID` sang `PAID`, đồng thời **giảm trừ công nợ** tương ứng của Khách hàng hoặc Nhà cung cấp trong CSDL.
+        *   Khi khách hàng thanh toán (thu tiền) $\rightarrow$ Chuyển trạng thái phiếu từ `UNPAID` sang `PAID`, đồng thời **giảm trừ công nợ** tương ứng của Khách hàng trong CSDL.
 
 ### 2.5. Bảo mật phân quyền dữ liệu theo chi nhánh (Data Isolation)
 *   **Mục tiêu:** Bảo mật dữ liệu kinh doanh nội bộ giữa các chi nhánh khác nhau.
@@ -92,7 +83,7 @@ Dưới đây là các tính năng được bổ sung để nâng tầm đồ á
     *   Cho phép `ADMIN` khôi phục dữ liệu bằng cách tải file đã sao lưu trước đó từ máy tính cá nhân lên thông qua giao diện Web (sử dụng Form Upload File).
     *   Backend sẽ đọc file dữ liệu này và tự động phục hồi/ghi đè vào cơ sở dữ liệu PostgreSQL. Thao tác hoàn toàn diễn ra trên giao diện Web, không cần dùng công cụ bên ngoài.
 *   **Nhập dữ liệu hàng loạt từ file Excel (Bulk Import Excel):**
-    *   Cho phép Admin/Manager tải lên file Excel mẫu (.xlsx) chứa danh sách sản phẩm mới hoặc nhà cung cấp mới. Hệ thống sử dụng thư viện **Apache POI** để phân tích file và thêm hàng loạt bản ghi vào database trong một transaction, giúp tiết kiệm thời gian nhập tay trên UI.
+    *   Cho phép Admin/Manager tải lên file Excel mẫu (.xlsx) chứa danh sách sản phẩm mới. Hệ thống sử dụng thư viện **Apache POI** để phân tích file và thêm hàng loạt bản ghi vào database trong một transaction, giúp tiết kiệm thời gian nhập tay trên UI.
 *   **Xuất báo cáo định dạng chuyên nghiệp:**
     *   Xuất báo cáo Nhập - Xuất - Tồn và Danh sách hàng tồn kho ra file Excel (.xlsx) được định dạng bảng biểu, màu sắc, font chữ chuyên nghiệp.
     *   Xuất/In hóa đơn phiếu kho ra file **PDF** để ký nhận bàn giao hàng hóa vật lý.
@@ -111,10 +102,9 @@ Kế hoạch 8 tuần được phân chia để đảm bảo các chức năng �
     *   Hiện thực hóa Quy trình duyệt phiếu kho 2 bước (DRAFT $\rightarrow$ COMPLETED/CANCELLED).
     *   Phát triển quy trình kiểm kê kho (Stocktake), tính toán chênh lệch và tự động sinh phiếu điều chỉnh.
     *   Quản lý hạn sử dụng theo lô và logic gợi ý xuất hàng hết hạn trước (FEFO).
-*   **Tuần 5-6 (Mức Khó - Đối tác, Công nợ & Nhân sự):**
-    *   Tích hợp Nhà cung cấp & Khách hàng. Xây dựng logic tự động tính công nợ (`debt`) và thanh toán phiếu kho.
-    *   Phát triển quy trình 3 bước phê duyệt điều chuyển nhân sự (`Branch Transfer Requests`).
-    *   Phát triển quy trình điều chuyển kho 2 bước (`IN_TRANSIT` $\rightarrow$ Nhận hàng $\rightarrow$ Xử lý hao hụt).
+*   **Tuần 5-6 (Mức Khó - Khách hàng, Công nợ & Nhập kho):**
+    *   Tích hợp quản lý Khách hàng. Xây dựng logic tự động tính công nợ (`customers.debt`) và thanh toán phiếu xuất kho.
+    *   Phát triển quy trình điều chuyển kho 2 bước (`IN_TRANSIT` $\rightarrow$ Nhận hàng $\rightarrow$ Xử lý hao hụt) giữa chi nhánh Tổng và chi nhánh Con.
 *   **Tuần 7-8 (Mức Rất khó - Phân tích, Backup & REST API):**
     *   Thiết kế Dashboard biểu đồ, Báo cáo hàng chậm tiêu thụ (Deadstock).
     *   Tích hợp tính năng Sao lưu & Phục hồi dữ liệu dạng file (.json / .sql) trực tiếp qua giao diện Web.

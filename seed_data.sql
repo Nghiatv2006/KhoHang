@@ -3,8 +3,7 @@
 -- Lưu ý: Hãy chạy toàn bộ schema.sql trước khi chạy file này.
 -- ==============================================================================
 
--- 1. Xoá dữ liệu cũ (Tuỳ chọn: Nếu bạn muốn chạy file này nhiều lần để reset dữ liệu)
--- TRUNCATE audit_logs, stocktake_details, stocktakes, receipt_details, receipts, inventories, products, users, customers, suppliers, categories, branches RESTART IDENTITY CASCADE;
+TRUNCATE audit_logs, stocktake_details, stocktakes, receipt_details, receipts, inventories, products, users, customers, categories, branches RESTART IDENTITY CASCADE;
 
 -- ==============================================================================
 -- 2. DỮ LIỆU DANH MỤC
@@ -22,11 +21,6 @@ INSERT INTO categories (name) VALUES
 ('Máy tính xách tay'),
 ('Phụ kiện công nghệ'),
 ('Thực phẩm đóng gói');
-
--- Thêm Nhà cung cấp (Suppliers)
-INSERT INTO suppliers (name, contact_info, address) VALUES
-('Công ty TNHH Công Nghệ ABC', '0901234567 - lienhe@abc.com', 'Khu CNC Hoà Lạc, Hà Nội'),
-('Nhà Phân Phối Thực Phẩm Vàng', '0987654321', 'KCN Tân Bình, TP.HCM');
 
 -- Thêm Khách hàng (Customers)
 INSERT INTO customers (name, contact_info, address, debt) VALUES
@@ -54,18 +48,19 @@ INSERT INTO users (username, password, full_name, role, branch_id, status) VALUE
 -- ==============================================================================
 
 -- Thêm Sản phẩm (Products)
-INSERT INTO products (code, name, unit, price, category_id, has_expiry, mfg_date, exp_date, quantity) VALUES
-('IP15', 'iPhone 15 Pro Max 256GB', 'Chiếc', 29900000, 1, FALSE, '1970-01-01', '1970-01-01', 62),
-('MACM2', 'MacBook Air M2 8GB/256GB', 'Chiếc', 25500000, 2, FALSE, '1970-01-01', '1970-01-01', 20),
-('AIRPODS', 'AirPods Pro 2', 'Hộp', 5500000, 3, FALSE, '1970-01-01', '1970-01-01', 1),
-('MILK_OLD', 'Sữa tươi tiệt trùng 1L (Lô cũ)', 'Hộp', 35000, 4, TRUE, '2024-01-01', '2024-07-01', 100),
-('MILK_NEW', 'Sữa tươi tiệt trùng 1L (Lô mới)', 'Hộp', 35000, 4, TRUE, '2024-05-01', '2024-11-01', 200);
+INSERT INTO products (code, name, unit, price, category_id, has_expiry, mfg_date, exp_date) VALUES
+('IP15', 'iPhone 15 Pro Max 256GB', 'Chiếc', 29900000, 1, FALSE, '1970-01-01', '1970-01-01'),
+('MACM2', 'MacBook Air M2 8GB/256GB', 'Chiếc', 25500000, 2, FALSE, '1970-01-01', '1970-01-01'),
+('AIRPODS', 'AirPods Pro 2', 'Hộp', 5500000, 3, FALSE, '1970-01-01', '1970-01-01'),
+('MILK_OLD', 'Sữa tươi tiệt trùng 1L (Lô cũ)', 'Hộp', 35000, 4, TRUE, '2024-01-01', '2024-07-01'),
+('MILK_NEW', 'Sữa tươi tiệt trùng 1L (Lô mới)', 'Hộp', 35000, 4, TRUE, '2024-05-01', '2024-11-01');
 
 -- Thêm Tồn kho (Inventories)
 INSERT INTO inventories (branch_id, product_id, mfg_date, exp_date, quantity) VALUES
 -- Tồn tại Chi nhánh Hà Nội
 (1, 1, '1970-01-01', '1970-01-01', 50), -- 50 iPhone
 (1, 2, '1970-01-01', '1970-01-01', 20), -- 20 Macbook
+(1, 3, '1970-01-01', '1970-01-01', 1),  -- 1 Airpods (tạo mặc định 0, sau kiểm kê tăng 1)
 (1, 4, '2024-01-01', '2024-07-01', 100), -- 100 hộp sữa lô cũ
 (1, 5, '2024-05-01', '2024-11-01', 200), -- 200 hộp sữa lô mới
 -- Tồn tại Chi nhánh HCM (iPhone sắp hết, dưới ngưỡng 15)
@@ -77,11 +72,11 @@ INSERT INTO inventories (branch_id, product_id, mfg_date, exp_date, quantity) VA
 -- ==============================================================================
 
 -- Thêm Phiếu kho (Receipts)
-INSERT INTO receipts (code, type, status, source_branch_id, dest_branch_id, created_by, supplier_id, customer_id, description) VALUES
-('IM12345678', 'IMPORT', 'COMPLETED', NULL, 1, 2, 1, NULL, 'Nhập hàng đầu tháng từ Công ty ABC'),
-('EX87654321', 'EXPORT', 'COMPLETED', 1, NULL, 3, NULL, 1, 'Xuất bán hàng cho anh A'),
-('TR11223344', 'TRANSFER', 'DRAFT', 1, 2, 2, NULL, NULL, 'Điều chuyển gấp vào HCM do thiếu tồn kho (Chưa duyệt)'),
-('AD99999999', 'ADJUST_IN', 'COMPLETED', NULL, 1, 2, NULL, NULL, 'Cân bằng kho sau khi kiểm đếm thực tế đợt 1');
+INSERT INTO receipts (code, type, status, source_branch_id, dest_branch_id, created_by, customer_id, description) VALUES
+('IM12345678', 'IMPORT', 'COMPLETED', NULL, 1, 2, NULL, 'Nhập hàng đầu tháng'),
+('EX87654321', 'EXPORT', 'COMPLETED', 1, NULL, 3, 1, 'Xuất bán hàng cho anh A'),
+('TR11223344', 'TRANSFER', 'DRAFT', 1, 2, 2, NULL, 'Điều chuyển gấp vào HCM do thiếu tồn kho (Chưa duyệt)'),
+('AD99999999', 'ADJUST_IN', 'COMPLETED', NULL, 1, 2, NULL, 'Cân bằng kho sau khi kiểm đếm thực tế đợt 1');
 
 -- Thêm Chi tiết phiếu kho (Receipt Details)
 -- Chi tiết cho phiếu Nhập (IM12345678)

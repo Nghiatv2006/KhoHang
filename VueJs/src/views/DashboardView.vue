@@ -8,7 +8,7 @@ const router = useRouter()
 const products = ref<any[]>([])
 const categories = ref<any[]>([])
 const customers = ref<any[]>([])
-const suppliers = ref<any[]>([])
+
 const branches = ref<any[]>([])
 
 const loading = ref(true)
@@ -26,11 +26,10 @@ let barChartInst: echarts.ECharts | null = null
 
 onMounted(async () => {
   try {
-    const [pRes, cRes, cuRes, sRes, bRes] = await Promise.allSettled([
+    const [pRes, cRes, cuRes, bRes] = await Promise.allSettled([
       api.get('/api/products'),
       api.get('/api/categories'),
       api.get('/api/customers'),
-      api.get('/api/suppliers'),
       api.get('/api/branches'),
     ])
     
@@ -43,9 +42,7 @@ onMounted(async () => {
     if (cuRes.status === 'fulfilled' && cuRes.value.ok) customers.value = await cuRes.value.json()
     else errorMsg.value += 'Lỗi API Khách hàng. '
     
-    if (sRes.status === 'fulfilled' && sRes.value.ok) suppliers.value = await sRes.value.json()
-    else errorMsg.value += 'Lỗi API Nhà cung cấp. '
-    
+
     if (bRes.status === 'fulfilled' && bRes.value.ok) branches.value = await bRes.value.json()
     else errorMsg.value += 'Lỗi API Chi nhánh. '
     

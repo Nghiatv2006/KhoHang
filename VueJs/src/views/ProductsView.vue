@@ -233,7 +233,7 @@ function formatDate(val: any) {
           </select>
         </div>
         <button
-          v-if="isAdmin"
+          v-if="isManager"
           class="bg-[#4361ee] text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-sm flex items-center gap-2"
           @click="openAddProduct"
         >
@@ -260,7 +260,7 @@ function formatDate(val: any) {
               <th class="p-4 text-right text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Số lượng</th>
               <th class="p-4 text-right text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Đơn giá</th>
               <th class="p-4 text-right text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Hạn sử dụng</th>
-              <th v-if="isAdmin" class="p-4 border-b border-[#f1f5f9] w-[100px]"></th>
+              <th v-if="isManager" class="p-4 border-b border-[#f1f5f9] w-[100px]"></th>
             </tr>
           </thead>
           <tbody>
@@ -268,7 +268,7 @@ function formatDate(val: any) {
               v-for="p in filteredProducts"
               :key="p.id"
               class="border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer group hover:-translate-y-[1px]"
-              @dblclick="isAdmin ? openEditProduct(p) : null"
+              @dblclick="isManager ? openEditProduct(p) : null"
             >
               <td class="p-4 first:rounded-l-xl last:rounded-r-xl">
                 <div class="font-bold text-[#364a63]">{{ p.name }}</div>
@@ -283,7 +283,7 @@ function formatDate(val: any) {
               </td>
               <td class="p-4 text-right font-mono font-bold text-[#364a63] first:rounded-l-xl last:rounded-r-xl">{{ formatCurrency(p.price) }}</td>
               <td class="p-4 text-right font-mono text-[#8094ae] text-xs first:rounded-l-xl last:rounded-r-xl">{{ formatDate(p.expirationDate) }}</td>
-              <td v-if="isAdmin" class="p-4 first:rounded-l-xl last:rounded-r-xl">
+              <td v-if="isManager" class="p-4 first:rounded-l-xl last:rounded-r-xl">
                 <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                   <button class="w-8 h-8 rounded-lg text-[#0ea5e9] bg-white hover:bg-[#e0f2fe] flex items-center justify-center transition-colors cursor-pointer shadow-sm border border-[#e2e8f0]/50" @click.stop="openEditProduct(p)" title="Sửa">
                     <i class="fas fa-pen text-sm"></i>
@@ -335,7 +335,7 @@ function formatDate(val: any) {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="c in categories" :key="c.id" class="border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer group hover:-translate-y-[1px]" @dblclick="isAdmin ? openEditCat(c) : null">
+            <tr v-for="c in categories" :key="c.id" class="border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer group hover:-translate-y-[1px]" @dblclick="isManager ? openEditCat(c) : null">
               <td class="p-4 first:rounded-l-xl last:rounded-r-xl">
                 <div class="flex items-center gap-3">
                   <div class="w-8 h-8 rounded-lg bg-[#eef2ff] flex items-center justify-center">
