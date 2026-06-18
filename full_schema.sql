@@ -3,6 +3,10 @@
 -- (Không chứa lệnh INSERT - Dùng để xem cấu trúc hoặc dán vào dbdiagram.io)
 -- ==============================================================================
 
+-- DROP TABLE & TYPE (Dùng để reset nhanh database)
+DROP TABLE IF EXISTS audit_logs, stocktake_details, stocktakes, receipt_details, receipts, inventories, products, users, customers, categories, branches CASCADE;
+DROP TYPE IF EXISTS user_role, user_status, receipt_type, receipt_status, stocktake_status CASCADE;
+
 -- 1. ENUM TYPES
 CREATE TYPE user_role AS ENUM ('ADMIN', 'MANAGER', 'STAFF');
 CREATE TYPE user_status AS ENUM ('ACTIVE', 'LOCKED');
@@ -16,7 +20,9 @@ CREATE TABLE branches (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE,
     address TEXT NOT NULL,
-    low_stock_threshold INT NOT NULL DEFAULT 5
+    low_stock_threshold INT NOT NULL DEFAULT 5,
+    is_head BOOLEAN NOT NULL DEFAULT FALSE,
+    tax_code VARCHAR(50)
 );
 
 -- Bảng Danh mục sản phẩm (Categories)
@@ -46,7 +52,9 @@ CREATE TABLE users (
     role user_role NOT NULL,
     branch_id INT,
     status user_status NOT NULL DEFAULT 'ACTIVE',
+    phone VARCHAR(20),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_user_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE RESTRICT,
     CONSTRAINT chk_user_branch CHECK (role = 'ADMIN' OR branch_id IS NOT NULL)
 );
@@ -56,6 +64,7 @@ CREATE TABLE products (
     id SERIAL PRIMARY KEY,
     code VARCHAR(50) NOT NULL UNIQUE CHECK (code = UPPER(code)),
     name VARCHAR(255) NOT NULL,
+    description TEXT,
     unit VARCHAR(50) NOT NULL,
     price NUMERIC(15, 2) NOT NULL CHECK (price >= 0),
     category_id INT NOT NULL,

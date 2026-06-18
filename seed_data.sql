@@ -10,10 +10,10 @@ TRUNCATE audit_logs, stocktake_details, stocktakes, receipt_details, receipts, i
 -- ==============================================================================
 
 -- Thêm Chi nhánh (Branches)
-INSERT INTO branches (name, address, low_stock_threshold) VALUES
-('Chi nhánh Hà Nội', '123 Đường Cầu Giấy, Quận Cầu Giấy, Hà Nội', 10),
-('Chi nhánh TP.HCM', '456 Đường Lê Lợi, Quận 1, TP.HCM', 15),
-('Chi nhánh Đà Nẵng', '789 Đường Nguyễn Văn Linh, Đà Nẵng', 5);
+INSERT INTO branches (name, address, low_stock_threshold, is_head, tax_code) VALUES
+('Chi nhánh Hà Nội', '123 Đường Cầu Giấy, Quận Cầu Giấy, Hà Nội', 10, TRUE, '0100000000'),
+('Chi nhánh TP.HCM', '456 Đường Lê Lợi, Quận 1, TP.HCM', 15, FALSE, '0200000000'),
+('Chi nhánh Đà Nẵng', '789 Đường Nguyễn Văn Linh, Đà Nẵng', 5, FALSE, '0300000000');
 
 -- Thêm Danh mục (Categories)
 INSERT INTO categories (name) VALUES
@@ -35,12 +35,12 @@ INSERT INTO customers (name, contact_info, address, debt) VALUES
 -- Thêm Người dùng (Users)
 -- Mật khẩu mặc định cho TẤT CẢ các user bên dưới là '123456' 
 -- (Hash BCrypt tương ứng: $2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu)
-INSERT INTO users (username, password, full_name, role, branch_id, status) VALUES
-('admin', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Quản trị viên Hệ thống', 'ADMIN', NULL, 'ACTIVE'),
-('manager_hn', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Lê Cường (QL Hà Nội)', 'MANAGER', 1, 'ACTIVE'),
-('staff_hn_1', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Nhân viên HN 01', 'STAFF', 1, 'ACTIVE'),
-('manager_hcm', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Phạm My (QL HCM)', 'MANAGER', 2, 'ACTIVE'),
-('staff_locked', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Nhân viên đã nghỉ việc', 'STAFF', 2, 'LOCKED');
+INSERT INTO users (username, password, full_name, role, branch_id, status, phone, email) VALUES
+('admin', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Quản trị viên Hệ thống', 'ADMIN', NULL, 'ACTIVE', '0912345678', 'admin@example.com'),
+('manager_hn', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Lê Cường (QL Hà Nội)', 'MANAGER', 1, 'ACTIVE', '0923456789', 'manager_hn@example.com'),
+('staff_hn_1', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Nhân viên HN 01', 'STAFF', 1, 'ACTIVE', '0934567890', 'staff_hn_1@example.com'),
+('manager_hcm', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Phạm My (QL HCM)', 'MANAGER', 2, 'ACTIVE', '0945678901', 'manager_hcm@example.com'),
+('staff_locked', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Nhân viên đã nghỉ việc', 'STAFF', 2, 'LOCKED', '0956789012', 'staff_locked@example.com');
 
 
 -- ==============================================================================
