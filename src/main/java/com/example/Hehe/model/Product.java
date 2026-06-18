@@ -41,6 +41,9 @@ public class Product {
     @Column(name = "has_expiry", nullable = false)
     private Boolean hasExpiry;
 
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
+
     // Ngày sản xuất - Không bắt buộc
     @Column(name = "mfg_date")
     private LocalDate manufacturingDate;
@@ -129,5 +132,13 @@ public class Product {
 
     public void setHasExpiry(Boolean hasExpiry) {
         this.hasExpiry = hasExpiry;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
     }
 }

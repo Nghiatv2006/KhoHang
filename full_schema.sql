@@ -60,6 +60,7 @@ CREATE TABLE products (
     price NUMERIC(15, 2) NOT NULL CHECK (price >= 0),
     category_id INT NOT NULL,
     has_expiry BOOLEAN NOT NULL DEFAULT FALSE,
+    image_url VARCHAR(500),
     mfg_date DATE DEFAULT '1970-01-01',
     exp_date DATE DEFAULT '1970-01-01',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

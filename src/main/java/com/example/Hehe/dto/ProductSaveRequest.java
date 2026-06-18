@@ -13,12 +13,15 @@ public class ProductSaveRequest {
     private BigDecimal price;
 
     private String description;
+    private String imageUrl;
+    private String unit;
     
     // ID của danh mục mà người dùng chọn
     private Integer categoryId;
 
     private LocalDate manufacturingDate;
     private LocalDate expirationDate;
+    private Boolean hasExpiry;
 
     // Getters and Setters
 
@@ -46,6 +49,22 @@ public class ProductSaveRequest {
         this.description = description;
     }
 
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
+    }
+
+    public String getUnit() {
+        return unit;
+    }
+
+    public void setUnit(String unit) {
+        this.unit = unit;
+    }
+
     public Integer getCategoryId() {
         return categoryId;
     }
@@ -68,5 +87,13 @@ public class ProductSaveRequest {
 
     public void setExpirationDate(LocalDate expirationDate) {
         this.expirationDate = expirationDate;
+    }
+
+    public Boolean getHasExpiry() {
+        return hasExpiry;
+    }
+
+    public void setHasExpiry(Boolean hasExpiry) {
+        this.hasExpiry = hasExpiry;
     }
 }

@@ -10,7 +10,6 @@ import com.example.Hehe.repository.CategoryRepository;
 import com.example.Hehe.repository.ProductRepository;
 import com.example.Hehe.repository.BranchRepository;
 import com.example.Hehe.repository.InventoryRepository;
-import com.example.Hehe.model.Branch;
 import com.example.Hehe.model.Inventory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
@@ -24,6 +23,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 /**
  * Class thực thi các nghiệp vụ của ProductService.
@@ -45,11 +47,16 @@ public class ProductServiceImpl implements ProductService {
 
     /**
      * Hàm dùng chung để kiểm tra quyền truy cập.
-     * Chỉ STAFF mới bị chặn, ADMIN và MANAGER được phép thay đổi sản phẩm.
+     * Chỉ ADMIN và MANAGER của Chi nhánh Hà Nội (branchId = 1) mới được phép thay đổi sản phẩm.
      */
     private void checkPermission(User currentUser) {
-        if (currentUser.getRole() == UserRole.STAFF) {
-            throw new RuntimeException("Bạn không có quyền thực hiện thao tác này. Yêu cầu quyền ADMIN hoặc MANAGER.");
+        boolean isAdmin = currentUser.getRole() == UserRole.ADMIN;
+        boolean isMainBranchManager = currentUser.getRole() == UserRole.MANAGER 
+                                      && currentUser.getBranch() != null 
+                                      && currentUser.getBranch().getId() == 1;
+
+        if (!isAdmin && !isMainBranchManager) {
+            throw new RuntimeException("Bạn không có quyền thực hiện thao tác này. Yêu cầu quyền ADMIN hoặc MANAGER Chi nhánh Hà Nội.");
         }
     }
 
@@ -136,13 +143,14 @@ public class ProductServiceImpl implements ProductService {
         product.setName(request.getName());
         product.setPrice(request.getPrice());
         product.setDescription(request.getDescription());
+        product.setImageUrl(request.getImageUrl());
         product.setCategory(category);
         product.setManufacturingDate(request.getManufacturingDate());
         product.setExpirationDate(request.getExpirationDate());
         
         // Mặc định cho các trường bắt buộc của schema cũ
-        product.setUnit("Chiếc"); 
-        product.setHasExpiry(request.getExpirationDate() != null);
+        product.setUnit(request.getUnit() != null && !request.getUnit().trim().isEmpty() ? request.getUnit().trim() : "Chiếc"); 
+        product.setHasExpiry(request.getHasExpiry() != null ? request.getHasExpiry() : false);
 
         // Lưu vào DB
         Product savedProduct = productRepository.save(product);
@@ -187,16 +195,22 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
+        // Delete old image if it has changed and is not null
+        String oldImageUrl = product.getImageUrl();
+        String newImageUrl = request.getImageUrl();
+        if (oldImageUrl != null && !oldImageUrl.equals(newImageUrl)) {
+            deletePhysicalImage(oldImageUrl);
+        }
+
         // Cập nhật thông tin (Bỏ qua SKU)
         product.setName(request.getName());
         product.setPrice(request.getPrice());
         product.setDescription(request.getDescription());
+        product.setImageUrl(newImageUrl);
         product.setCategory(category);
         product.setManufacturingDate(request.getManufacturingDate());
         product.setExpirationDate(request.getExpirationDate());
-        if (request.getExpirationDate() != null) {
-            product.setHasExpiry(true);
-        }
+        product.setHasExpiry(request.getHasExpiry() != null ? request.getHasExpiry() : false);
 
         Product updatedProduct = productRepository.save(product);
 
@@ -215,7 +229,25 @@ public class ProductServiceImpl implements ProductService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với ID: " + id));
 
         if (product != null) {
+            String imageUrl = product.getImageUrl();
             productRepository.delete(product);
+            
+            // Xóa file ảnh vật lý nếu có
+            if (imageUrl != null) {
+                deletePhysicalImage(imageUrl);
+            }
+        }
+    }
+
+    private void deletePhysicalImage(String imageUrl) {
+        if (imageUrl != null && imageUrl.contains("/uploads/images/")) {
+            try {
+                String filename = imageUrl.substring(imageUrl.lastIndexOf("/") + 1);
+                Path filePath = Paths.get("uploads/images", filename);
+                Files.deleteIfExists(filePath);
+            } catch (Exception e) {
+                System.err.println("Could not delete image file: " + imageUrl);
+            }
         }
     }
 }

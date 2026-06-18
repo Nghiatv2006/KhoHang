@@ -30,6 +30,14 @@ export const api = {
     });
   },
 
+  async upload(url: string, data: FormData, options: RequestInit = {}) {
+    return this.fetch(url, {
+      ...options,
+      method: 'POST',
+      body: data, // Browser automatically sets Content-Type to multipart/form-data with boundary
+    });
+  },
+
   async put(url: string, data: any, options: RequestInit = {}) {
     return this.fetch(url, {
       ...options,

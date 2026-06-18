@@ -25,4 +25,8 @@ public class InventoryController {
         List<InventoryResponse> res = inventoryService.getInventories(branchId, currentUser);
         return ResponseEntity.ok(res);
     }
+    @GetMapping("/global")
+    public ResponseEntity<List<InventoryResponse>> getGlobalInventories() {
+        return ResponseEntity.ok(inventoryService.getGlobalInventories());
+    }
 }

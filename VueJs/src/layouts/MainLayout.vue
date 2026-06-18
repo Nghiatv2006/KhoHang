@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
 
@@ -23,9 +23,24 @@ onMounted(() => {
   }
 })
 
-const navItems = [
-  { label: 'Tổng quan', to: '/dashboard', icon: 'fas fa-chart-pie' },
-  { label: 'Sản phẩm', to: '/products', icon: 'fas fa-box-open' },
+const hasCrudPermission = computed(() => {
+  if (!user.value) return false
+  // @ts-ignore
+  return user.value.role === 'ADMIN' || (user.value.role === 'MANAGER' && user.value.branchId === 1)
+})
+
+const mainNavItems = computed(() => {
+  const items = [
+    { label: 'Tổng quan', to: '/dashboard', icon: 'fas fa-chart-pie' },
+  ]
+  if (hasCrudPermission.value) {
+    items.push({ label: 'Sản phẩm', to: '/products', icon: 'fas fa-box-open' })
+  }
+  items.push({ label: 'Tồn kho HT', to: '/global-inventory', icon: 'fas fa-globe' })
+  return items
+})
+
+const adminNavItems = [
   { label: 'Đối tác', to: '/partners', icon: 'fas fa-handshake' },
   { label: 'Nhân viên', to: '/users', icon: 'fas fa-users' },
   { label: 'Chi nhánh', to: '/branches', icon: 'fas fa-building' },
@@ -81,11 +96,11 @@ onUnmounted(() => {
 
           <div class="text-[0.75rem] font-extrabold uppercase tracking-widest text-[#8094ae] px-7 mt-6 mb-2">Menu Chính</div>
           <RouterLink
-            v-for="item in navItems.slice(0, 1)"
+            v-for="item in mainNavItems"
             :key="item.to"
             :to="item.to"
             class="flex items-center font-semibold px-6 py-[0.9rem] mx-4 my-1 rounded-xl transition-all duration-300 group"
-            :class="route.path.startsWith(item.to) ? 'bg-gradient-to-br from-[#4361ee] to-[#4cc9f0] text-white shadow-[0_6px_15px_rgba(67,97,238,0.35)]' : 'text-[#364a63] hover:translate-x-1 hover:shadow-[-4px_4px_10px_rgba(67,97,238,0.05)] hover:text-[#4361ee]'"
+            :class="route.path.startsWith(item.to) && item.to !== '/' ? 'bg-gradient-to-br from-[#4361ee] to-[#4cc9f0] text-white shadow-[0_6px_15px_rgba(67,97,238,0.35)]' : 'text-[#364a63] hover:translate-x-1 hover:shadow-[-4px_4px_10px_rgba(67,97,238,0.05)] hover:text-[#4361ee]'"
           >
             <i :class="item.icon" class="w-6 text-[1.2rem] mr-3 text-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6"></i>
             <span>{{ item.label }}</span>
@@ -93,7 +108,7 @@ onUnmounted(() => {
 
           <div class="text-[0.75rem] font-extrabold uppercase tracking-widest text-[#8094ae] px-7 mt-6 mb-2">Quản lý</div>
           <RouterLink
-            v-for="item in navItems.slice(1)"
+            v-for="item in adminNavItems"
             :key="item.to"
             :to="item.to"
             class="flex items-center font-semibold px-6 py-[0.9rem] mx-4 my-1 rounded-xl transition-all duration-300 group"

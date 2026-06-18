@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface InventoryService {
     List<InventoryResponse> getInventories(Integer branchId, User currentUser);
+    List<InventoryResponse> getGlobalInventories();
 }

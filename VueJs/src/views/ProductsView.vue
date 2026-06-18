@@ -39,22 +39,48 @@ const showProductModal = ref(false)
 const editingProduct = ref<any>(null)
 const productForm = reactive({
   name: '', categoryId: '' as number | '',
-  price: '' as any, quantity: '' as any, description: '',
-  manufacturingDate: '', expirationDate: ''
+  price: '' as any, unit: 'Chiếc', imageUrl: ''
 })
 const pSaving = ref(false)
+const uploadingImage = ref(false)
+
+async function handleImageUpload(event: Event) {
+  const target = event.target as HTMLInputElement
+  if (!target.files || target.files.length === 0) return
+  
+  const file = target.files[0]
+  const formData = new FormData()
+  formData.append('file', file)
+  
+  uploadingImage.value = true
+  try {
+    const res = await api.upload('/api/upload', formData)
+    const data = await res.json()
+    if (res.ok) {
+      productForm.imageUrl = data.url
+      toast.success('Tải ảnh lên thành công!')
+    } else {
+      toast.error(data.error || 'Lỗi tải ảnh')
+    }
+  } catch (error) {
+    toast.error('Không thể kết nối máy chủ khi tải ảnh.')
+  } finally {
+    uploadingImage.value = false
+    // Reset file input so user can select the same file again if needed
+    target.value = ''
+  }
+}
 
 function openAddProduct() {
   editingProduct.value = null
-  Object.assign(productForm, { name: '', categoryId: '', price: '', quantity: '', description: '', manufacturingDate: '', expirationDate: '' })
+  Object.assign(productForm, { name: '', categoryId: '', price: '', unit: 'Chiếc', imageUrl: '' })
   showProductModal.value = true
 }
 function openEditProduct(p: any) {
   editingProduct.value = p
   Object.assign(productForm, {
     name: p.name, categoryId: p.categoryId || '',
-    price: p.price, quantity: p.quantity, description: p.description || '',
-    manufacturingDate: p.manufacturingDate || '', expirationDate: p.expirationDate || ''
+    price: p.price, unit: p.unit || 'Chiếc', imageUrl: p.imageUrl || ''
   })
   showProductModal.value = true
 }
@@ -69,10 +95,8 @@ async function saveProduct() {
       name: productForm.name.trim(),
       categoryId: productForm.categoryId || null,
       price: productForm.price || 0,
-      quantity: productForm.quantity || 0,
-      description: productForm.description,
-      manufacturingDate: productForm.manufacturingDate || null,
-      expirationDate: productForm.expirationDate || null
+      unit: productForm.unit || 'Chiếc',
+      imageUrl: productForm.imageUrl
     }
     const res = editingProduct.value
       ? await api.put(`/api/products/${editingProduct.value.id}`, payload)
@@ -256,9 +280,8 @@ function formatDate(val: any) {
             <tr>
               <th class="p-4 text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Sản phẩm</th>
               <th class="p-4 text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Danh mục</th>
-              <th class="p-4 text-right text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Số lượng</th>
+              <th class="p-4 text-center text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Đơn vị tính</th>
               <th class="p-4 text-right text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Đơn giá</th>
-              <th class="p-4 text-right text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Hạn sử dụng</th>
               <th v-if="isManager" class="p-4 border-b border-[#f1f5f9] w-[100px]"></th>
             </tr>
           </thead>
@@ -270,18 +293,25 @@ function formatDate(val: any) {
               @dblclick="isManager ? openEditProduct(p) : null"
             >
               <td class="p-4 first:rounded-l-xl last:rounded-r-xl">
-                <div class="font-bold text-[#364a63]">{{ p.name }}</div>
-                <div class="text-xs text-[#8094ae] font-mono mt-0.5">{{ p.sku }}</div>
+                <div class="flex items-center gap-3">
+                  <img v-if="p.imageUrl" :src="p.imageUrl" class="w-10 h-10 rounded-lg object-cover border border-[#e2e8f0]" />
+                  <div v-else class="w-10 h-10 rounded-lg bg-[#f1f5f9] flex items-center justify-center text-[#8094ae] border border-[#e2e8f0]">
+                    <i class="fas fa-box"></i>
+                  </div>
+                  <div>
+                    <div class="font-bold text-[#364a63]">{{ p.name }}</div>
+                    <div class="text-xs text-[#8094ae] font-mono mt-0.5">{{ p.sku }}</div>
+                  </div>
+                </div>
               </td>
               <td class="p-4 first:rounded-l-xl last:rounded-r-xl">
                 <span v-if="p.categoryName" class="px-3 py-1 bg-[#eef2ff] text-[#4361ee] rounded-full text-xs font-bold">{{ p.categoryName }}</span>
                 <span v-else class="text-[#8094ae]">—</span>
               </td>
-              <td class="p-4 text-right font-mono font-medium first:rounded-l-xl last:rounded-r-xl">
-                <span :class="p.quantity > 0 ? 'text-[#05b171]' : 'text-[#ea4f52]'">{{ p.quantity || 0 }}</span>
+              <td class="p-4 text-center font-medium text-[#364a63] first:rounded-l-xl last:rounded-r-xl">
+                <span class="px-3 py-1 bg-[#f1f5f9] rounded-full text-xs font-bold">{{ p.unit || 'Chiếc' }}</span>
               </td>
               <td class="p-4 text-right font-mono font-bold text-[#364a63] first:rounded-l-xl last:rounded-r-xl">{{ formatCurrency(p.price) }}</td>
-              <td class="p-4 text-right font-mono text-[#8094ae] text-xs first:rounded-l-xl last:rounded-r-xl">{{ formatDate(p.expirationDate) }}</td>
               <td v-if="isManager" class="p-4 first:rounded-l-xl last:rounded-r-xl">
                 <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                   <button class="w-8 h-8 rounded-lg text-[#0ea5e9] bg-white hover:bg-[#e0f2fe] flex items-center justify-center transition-colors cursor-pointer shadow-sm border border-[#e2e8f0]/50" @click.stop="openEditProduct(p)" title="Sửa">
@@ -400,16 +430,29 @@ function formatDate(val: any) {
                 <input v-model="productForm.price" type="number" min="0" placeholder="0" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
               </div>
               <div>
-                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số lượng <span class="text-[#ea4f52]">*</span></label>
-                <input v-model="productForm.quantity" type="number" min="0" placeholder="0" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
+                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Đơn vị tính <span class="text-[#ea4f52]">*</span></label>
+                <input v-model="productForm.unit" type="text" placeholder="Chiếc, Hộp..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
               </div>
-              <div>
-                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Ngày sản xuất</label>
-                <input v-model="productForm.manufacturingDate" type="date" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Hạn sử dụng</label>
-                <input v-model="productForm.expirationDate" type="date" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Ảnh sản phẩm</label>
+              <div class="flex items-center gap-4">
+                <!-- Nút chọn file -->
+                <div class="relative overflow-hidden rounded-xl bg-white border border-[#e2e8f0] hover:border-[#4361ee] transition-colors cursor-pointer group flex-1">
+                  <input type="file" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" @change="handleImageUpload" :disabled="uploadingImage" />
+                  <div class="flex items-center justify-center gap-2 h-11 px-4 text-sm font-bold text-[#4361ee] group-hover:text-[#3a0ca3]">
+                    <i v-if="uploadingImage" class="fas fa-spinner fa-spin"></i>
+                    <i v-else class="fas fa-cloud-upload-alt"></i>
+                    <span>{{ uploadingImage ? 'Đang tải lên...' : 'Chọn ảnh tải lên' }}</span>
+                  </div>
+                </div>
+                <!-- Xem trước ảnh -->
+                <div v-if="productForm.imageUrl" class="relative w-11 h-11 rounded-lg border border-[#e2e8f0] overflow-hidden shrink-0">
+                  <img :src="productForm.imageUrl" class="w-full h-full object-cover" />
+                  <button @click.prevent="productForm.imageUrl = ''" class="absolute top-0 right-0 bg-red-500 text-white w-4 h-4 flex items-center justify-center rounded-bl text-[10px] hover:bg-red-600 transition-colors z-20">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
               </div>
             </div>
             <div>

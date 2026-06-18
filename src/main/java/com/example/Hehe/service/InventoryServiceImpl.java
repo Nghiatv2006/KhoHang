@@ -46,4 +46,11 @@ public class InventoryServiceImpl implements InventoryService {
                 .map(InventoryResponse::new)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public List<InventoryResponse> getGlobalInventories() {
+        return inventoryRepository.findAll().stream()
+                .map(InventoryResponse::new)
+                .collect(Collectors.toList());
+    }
 }

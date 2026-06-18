@@ -11,6 +11,8 @@ public class InventoryResponse {
     private Integer productId;
     private String productName;
     private String productSku;
+    private java.math.BigDecimal price;
+    private String unit;
     private Integer quantity;
     private LocalDate manufacturingDate;
     private LocalDate expirationDate;
@@ -32,6 +34,8 @@ public class InventoryResponse {
             this.productId = inventory.getProduct().getId();
             this.productName = inventory.getProduct().getName();
             this.productSku = inventory.getProduct().getSku();
+            this.price = inventory.getProduct().getPrice();
+            this.unit = inventory.getProduct().getUnit();
         }
     }
 
@@ -41,6 +45,8 @@ public class InventoryResponse {
     public Integer getProductId() { return productId; }
     public String getProductName() { return productName; }
     public String getProductSku() { return productSku; }
+    public java.math.BigDecimal getPrice() { return price; }
+    public String getUnit() { return unit; }
     public Integer getQuantity() { return quantity; }
     public LocalDate getManufacturingDate() { return manufacturingDate; }
     public LocalDate getExpirationDate() { return expirationDate; }

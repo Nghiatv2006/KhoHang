@@ -17,12 +17,15 @@ public class ProductResponse {
     private BigDecimal price;
 
     private String description;
+    private String imageUrl;
+    private String unit;
     
     private Integer categoryId;
     private String categoryName;
 
     private LocalDate manufacturingDate;
     private LocalDate expirationDate;
+    private Boolean hasExpiry;
 
     public ProductResponse(Product product) {
         this.id = product.getId();
@@ -31,6 +34,8 @@ public class ProductResponse {
         this.price = product.getPrice();
 
         this.description = product.getDescription();
+        this.imageUrl = product.getImageUrl();
+        this.unit = product.getUnit();
         
         // Trích xuất ID và Tên của Category thay vì trả toàn bộ object Category
         if (product.getCategory() != null) {
@@ -40,6 +45,7 @@ public class ProductResponse {
 
         this.manufacturingDate = product.getManufacturingDate();
         this.expirationDate = product.getExpirationDate();
+        this.hasExpiry = product.getHasExpiry();
     }
 
     // Getters
@@ -65,6 +71,14 @@ public class ProductResponse {
         return description;
     }
 
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
+    public String getUnit() {
+        return unit;
+    }
+
     public Integer getCategoryId() {
         return categoryId;
     }
@@ -79,5 +93,9 @@ public class ProductResponse {
 
     public LocalDate getExpirationDate() {
         return expirationDate;
+    }
+
+    public Boolean getHasExpiry() {
+        return hasExpiry;
     }
 }
