@@ -1,15 +1,14 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { api } from '../api'
 import { useToast } from '../utils/toast'
-import AppModal from '../components/AppModal.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 
 const toast = useToast()
 const currentUser = ref<any>(JSON.parse(localStorage.getItem('wh_user') || '{}'))
 const isAdmin = computed(() => currentUser.value?.role === 'ADMIN')
-const isManager = computed(() => ['ADMIN', 'MANAGER'].includes(currentUser.value?.role))
+const isManager = computed(() => currentUser.value?.role === 'MANAGER')
 
 
 // ── USERS ──────────────────────────────────────────────────────────────────
@@ -20,32 +19,140 @@ const uSearch = ref('')
 const uRoleFilter = ref('')
 const uStatusFilter = ref('')
 
+const lastActiveUserId = ref<number | null>(null)
+
 const filteredUsers = computed(() => {
-  let list = users.value
+  let list = [...users.value]
   if (uSearch.value.trim()) {
     const kw = uSearch.value.toLowerCase()
-    list = list.filter(u => u.fullName?.toLowerCase().includes(kw) || u.username?.toLowerCase().includes(kw))
+    list = list.filter(u => 
+      u.fullName?.toLowerCase().includes(kw) || 
+      u.username?.toLowerCase().includes(kw) ||
+      u.phone?.toLowerCase().includes(kw) ||
+      u.email?.toLowerCase().includes(kw)
+    )
   }
   if (uRoleFilter.value) list = list.filter(u => u.role === uRoleFilter.value)
   if (uStatusFilter.value) list = list.filter(u => u.status === uStatusFilter.value)
+
+  // Sắp xếp tùy chỉnh: 
+  // - Tài khoản 'admin' (username === 'admin') luôn đứng đầu
+  // - Các tài khoản khác sắp xếp theo thời gian cập nhật mới nhất (updatedAt DESC)
+  list.sort((a, b) => {
+    const aIsAdmin = a.username === 'admin'
+    const bIsAdmin = b.username === 'admin'
+    if (aIsAdmin && !bIsAdmin) return -1
+    if (!aIsAdmin && bIsAdmin) return 1
+
+    const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
+    const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
+    return timeB - timeA
+  })
+
   return list
 })
 
 const showUserModal = ref(false)
 const editingUser = ref<any>(null)
-const userForm = reactive({ username: '', fullName: '', password: '', role: 'STAFF', branchId: '' as any, status: 'ACTIVE' })
+const userForm = reactive({ username: '', fullName: '', password: '', role: 'STAFF', branchId: '' as any, status: 'ACTIVE', phone: '', email: '' })
 const uSaving = ref(false)
 const showDeleteUser = ref(false)
 const deletingUser = ref<any>(null)
 
+// Chống tự động điền bằng readonly tạm thời
+const usernameReadonly = ref(true)
+const fullNameReadonly = ref(true)
+const passwordReadonly = ref(true)
+const emailReadonly = ref(true)
+const phoneReadonly = ref(true)
+
+// Xác định chi nhánh tổng động
+const headBranch = computed(() => {
+  const hb = branches.value.find((b: any) => b.isHead)
+  if (hb) return hb
+  return branches.value[0] || null
+})
+
+// Các vai trò được chọn dựa trên chi nhánh và vai trò đăng nhập
+const selectableRoles = computed(() => {
+  if (isManager.value) {
+    return [{ value: 'STAFF', label: 'Nhân viên' }]
+  }
+
+  // Đối với ADMIN:
+  const hb = headBranch.value
+  if (!hb || !userForm.branchId) {
+    return [{ value: 'ADMIN', label: 'Admin' }]
+  }
+
+  const selectedBranchId = Number(userForm.branchId)
+  if (selectedBranchId === hb.id) {
+    return [
+      { value: 'ADMIN', label: 'Admin' },
+      { value: 'STAFF', label: 'Nhân viên' }
+    ]
+  } else {
+    return [{ value: 'MANAGER', label: 'Manager' }]
+  }
+})
+
+// Theo dõi chi nhánh đổi để nhảy vai trò đối với ADMIN
+watch(() => userForm.branchId, (newBranchId) => {
+  if (!isAdmin.value) return
+  const hb = headBranch.value
+  if (!hb) return
+
+  if (!newBranchId) {
+    userForm.role = 'ADMIN'
+  } else {
+    const selectedBranchId = Number(newBranchId)
+    if (selectedBranchId === hb.id) {
+      if (userForm.role === 'MANAGER') {
+        userForm.role = 'STAFF'
+      }
+    } else {
+      userForm.role = 'MANAGER'
+    }
+  }
+})
+
 function openAddUser() {
   editingUser.value = null
-  Object.assign(userForm, { username: '', fullName: '', password: '', role: 'STAFF', branchId: '', status: 'ACTIVE' })
+  Object.assign(userForm, { 
+    username: '', 
+    fullName: '', 
+    password: '', 
+    role: isManager.value ? 'STAFF' : 'ADMIN', 
+    branchId: isManager.value ? currentUser.value.branchId : '', 
+    status: 'ACTIVE',
+    phone: '',
+    email: ''
+  })
+  usernameReadonly.value = true
+  fullNameReadonly.value = true
+  passwordReadonly.value = true
+  emailReadonly.value = true
+  phoneReadonly.value = true
   showUserModal.value = true
 }
+
 function openEditUser(u: any) {
   editingUser.value = u
-  Object.assign(userForm, { username: u.username, fullName: u.fullName, password: '', role: u.role, branchId: u.branchId || '', status: u.status })
+  Object.assign(userForm, { 
+    username: u.username, 
+    fullName: u.fullName, 
+    password: '', 
+    role: u.role, 
+    branchId: u.branchId || '', 
+    status: u.status,
+    phone: u.phone || '',
+    email: u.email || ''
+  })
+  usernameReadonly.value = false
+  fullNameReadonly.value = false
+  passwordReadonly.value = false
+  emailReadonly.value = false
+  phoneReadonly.value = false
   showUserModal.value = true
 }
 function confirmDeleteUser(u: any) { deletingUser.value = u; showDeleteUser.value = true }
@@ -53,6 +160,20 @@ function confirmDeleteUser(u: any) { deletingUser.value = u; showDeleteUser.valu
 async function saveUser() {
   if (!userForm.fullName?.trim()) { toast.error('Họ tên là bắt buộc.'); return }
   if (!editingUser.value && !userForm.password) { toast.error('Mật khẩu là bắt buộc khi tạo mới.'); return }
+  
+  if (userForm.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userForm.email.trim())) {
+    toast.error('Định dạng email không hợp lệ.')
+    return
+  }
+  let cleanPhone = null
+  if (userForm.phone?.trim()) {
+    cleanPhone = userForm.phone.trim().replace(/[-. ]/g, '')
+    if (!/^(0|\+84|84)[0-9]{9,11}$/.test(cleanPhone)) {
+      toast.error('Số điện thoại không hợp lệ (phải bắt đầu bằng 0, 84 hoặc +84 và gồm 10-12 chữ số).')
+      return
+    }
+  }
+  
   uSaving.value = true
   try {
     const payload: any = {
@@ -61,13 +182,22 @@ async function saveUser() {
       role: userForm.role,
       branchId: userForm.branchId || null,
       status: userForm.status,
+      phone: cleanPhone,
+      email: userForm.email?.trim() || null,
     }
     if (userForm.password) payload.password = userForm.password
     const res = editingUser.value
       ? await api.put(`/api/users/${editingUser.value.id}`, payload)
       : await api.post('/api/users', payload)
     const data = await res.json()
-    if (res.ok) { toast.success(editingUser.value ? 'Cập nhật thành công!' : 'Tạo tài khoản thành công!'); showUserModal.value = false; await loadUsers() }
+    if (res.ok) { 
+      toast.success(editingUser.value ? 'Cập nhật thành công!' : 'Tạo tài khoản thành công!')
+      showUserModal.value = false
+      if (data && data.id) {
+        lastActiveUserId.value = data.id
+      }
+      await loadUsers() 
+    }
     else toast.error(data.message || 'Có lỗi xảy ra.')
   } catch { toast.error('Không thể kết nối.') }
   finally { uSaving.value = false }
@@ -108,10 +238,6 @@ onMounted(async () => {
 
 
 
-function formatDate(dt: string) {
-  if (!dt) return '—'
-  return new Date(dt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
 </script>
 
 <template>
@@ -134,7 +260,7 @@ function formatDate(dt: string) {
             <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae]"></i>
             <input v-model="uSearch" type="text" placeholder="Tìm theo tên, username..." class="w-full h-[42px] pl-11 pr-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
           </div>
-          <select v-model="uRoleFilter" class="h-[42px] px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] cursor-pointer">
+          <select v-if="isAdmin" v-model="uRoleFilter" class="h-[42px] px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] cursor-pointer">
             <option value="">Tất cả vai trò</option>
             <option value="ADMIN">Admin</option>
             <option value="MANAGER">Manager</option>
@@ -146,7 +272,7 @@ function formatDate(dt: string) {
             <option value="INACTIVE">Ngừng HĐ</option>
           </select>
         </div>
-        <button v-if="isAdmin" class="bg-[#4361ee] text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-sm flex items-center gap-2" @click="openAddUser">
+        <button v-if="isAdmin || isManager" class="bg-[#4361ee] text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-sm flex items-center gap-2" @click="openAddUser">
           <i class="fas fa-user-plus"></i> Thêm nhân viên
         </button>
       </div>
@@ -165,11 +291,11 @@ function formatDate(dt: string) {
               <th class="p-4 text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Vai trò</th>
               <th class="p-4 text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Chi nhánh</th>
               <th class="p-4 text-center text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Trạng thái</th>
-              <th v-if="isAdmin" class="p-4 border-b border-[#f1f5f9] w-[140px]"></th>
+              <th v-if="isAdmin || isManager" class="p-4 border-b border-[#f1f5f9] w-[140px]"></th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="u in filteredUsers" :key="u.id" class="border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer group hover:-translate-y-[1px]" @dblclick="isAdmin ? openEditUser(u) : null">
+            <tr v-for="u in filteredUsers" :key="u.id" :class="['border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer group hover:-translate-y-[1px]', u.id === lastActiveUserId ? 'bg-[#4361ee]/5 font-semibold border-l-4 border-l-[#4361ee]' : '']" @dblclick="isAdmin || isManager ? openEditUser(u) : null">
               <td class="p-4 first:rounded-l-xl last:rounded-r-xl">
                 <div class="flex items-center gap-3">
                   <div class="w-10 h-10 rounded-full bg-[#eef2ff] border border-[#dbeafe] flex items-center justify-center text-[#4361ee] font-bold text-sm flex-shrink-0 group-hover:bg-white group-hover:border-[#4361ee]/30 transition-colors">
@@ -177,7 +303,13 @@ function formatDate(dt: string) {
                   </div>
                   <div>
                     <div class="font-bold text-[#364a63]">{{ u.fullName }}</div>
-                    <div class="text-xs text-[#8094ae] font-mono mt-0.5">@{{ u.username }}</div>
+                    <div class="flex items-center gap-2 flex-wrap text-xs text-[#8094ae] mt-0.5 font-mono">
+                      <span>@{{ u.username }}</span>
+                      <span v-if="u.phone" class="text-slate-300">•</span>
+                      <span v-if="u.phone" class="flex items-center gap-1"><i class="fas fa-phone-alt text-[10px]"></i>{{ u.phone }}</span>
+                      <span v-if="u.email" class="text-slate-300">•</span>
+                      <span v-if="u.email" class="flex items-center gap-1"><i class="far fa-envelope text-[10px]"></i>{{ u.email }}</span>
+                    </div>
                   </div>
                 </div>
               </td>
@@ -187,8 +319,8 @@ function formatDate(dt: string) {
                 <span v-else class="text-[#8094ae] text-sm italic">Chưa phân công</span>
               </td>
               <td class="p-4 text-center first:rounded-l-xl last:rounded-r-xl"><StatusBadge :value="u.status" type="status" /></td>
-              <td v-if="isAdmin" class="p-4 first:rounded-l-xl last:rounded-r-xl">
-                <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              <td v-if="isAdmin || isManager" class="p-4 first:rounded-l-xl last:rounded-r-xl">
+                <div v-if="u.id !== currentUser.id" class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                   <button class="w-8 h-8 rounded-lg text-[#8094ae] bg-white hover:bg-[#e2e8f0] flex items-center justify-center transition-colors cursor-pointer shadow-sm border border-[#e2e8f0]/50" @click.stop="toggleUser(u)" :title="u.status === 'ACTIVE' ? 'Vô hiệu hóa' : 'Kích hoạt'">
                     <i :class="['fas text-sm', u.status === 'ACTIVE' ? 'fa-toggle-on text-[#05b171]' : 'fa-toggle-off text-[#8094ae]']"></i>
                   </button>
@@ -205,10 +337,6 @@ function formatDate(dt: string) {
         </table>
         <div v-if="!uLoading && filteredUsers.length > 0" class="px-6 py-4 bg-[#f8f9fa] border-t border-[#f1f5f9] text-xs font-bold text-[#8094ae]">
           Tổng cộng: {{ filteredUsers.length }} nhân viên
-        </div>
-      </div>
-    </div>
-
         </div>
       </div>
     </div>
@@ -236,32 +364,46 @@ function formatDate(dt: string) {
           
           <!-- Body -->
           <div class="p-6 flex-1 overflow-y-auto space-y-5 custom-scrollbar">
+            <!-- Fake inputs to prevent browser autofill -->
+            <div style="position: absolute; left: -9999px; top: -9999px;">
+              <input type="text" name="fake_username_prevent_autofill" />
+              <input type="password" name="fake_password_prevent_autofill" />
+              <input type="email" name="fake_email_prevent_autofill" />
+              <input type="tel" name="fake_phone_prevent_autofill" />
+            </div>
+
             <div class="grid grid-cols-2 gap-5">
               <div>
                 <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Tên đăng nhập <span class="text-[#ea4f52]">*</span></label>
-                <input v-model="userForm.username" type="text" :disabled="!!editingUser" placeholder="username" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] font-mono disabled:opacity-60 disabled:cursor-not-allowed text-[#364a63]" />
+                <input v-model="userForm.username" type="text" :disabled="!!editingUser" :readonly="usernameReadonly && !editingUser" @focus="usernameReadonly = false" autocomplete="off" placeholder="username" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] font-mono disabled:opacity-60 disabled:cursor-not-allowed text-[#364a63]" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Họ và tên <span class="text-[#ea4f52]">*</span></label>
-                <input v-model="userForm.fullName" type="text" placeholder="Họ tên đầy đủ" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63]" />
+                <input v-model="userForm.fullName" type="text" :readonly="fullNameReadonly" @focus="fullNameReadonly = false" autocomplete="off" placeholder="Họ tên đầy đủ" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63]" />
               </div>
               <div class="col-span-2">
                 <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Mật khẩu <span v-if="!editingUser" class="text-[#ea4f52]">*</span></label>
-                <input v-model="userForm.password" type="password" :placeholder="editingUser ? 'Để trống nếu không đổi' : 'Nhập mật khẩu'" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63]" />
+                <input v-model="userForm.password" type="password" :readonly="passwordReadonly" @focus="passwordReadonly = false" autocomplete="new-password" :placeholder="editingUser ? 'Để trống nếu không đổi' : 'Nhập mật khẩu'" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63]" />
               </div>
               <div>
-                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Vai trò</label>
-                <select v-model="userForm.role" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] cursor-pointer">
-                  <option value="ADMIN">Admin</option>
-                  <option value="MANAGER">Manager</option>
-                  <option value="STAFF">Nhân viên</option>
-                </select>
+                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số điện thoại</label>
+                <input v-model="userForm.phone" type="text" :readonly="phoneReadonly" @focus="phoneReadonly = false" autocomplete="off" placeholder="Số điện thoại" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63]" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Email</label>
+                <input v-model="userForm.email" type="email" :readonly="emailReadonly" @focus="emailReadonly = false" autocomplete="off" placeholder="Email" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63]" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Chi nhánh</label>
-                <select v-model="userForm.branchId" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] cursor-pointer">
-                  <option value="">-- Chưa phân công --</option>
+                <select v-model="userForm.branchId" :disabled="isManager" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
+                  <option value="">-- Chọn chi nhánh --</option>
                   <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Vai trò</label>
+                <select v-model="userForm.role" :disabled="selectableRoles.length <= 1" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
+                  <option v-for="r in selectableRoles" :key="r.value" :value="r.value">{{ r.label }}</option>
                 </select>
               </div>
               <div class="col-span-2">

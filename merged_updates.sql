@@ -52,3 +52,17 @@ CREATE TABLE branch_transfer_requests (
 CREATE INDEX idx_transfer_requests_status ON branch_transfer_requests (status);
 CREATE INDEX idx_transfer_requests_staff ON branch_transfer_requests (staff_id);
 CREATE INDEX idx_transfer_requests_manager ON branch_transfer_requests (created_by);
+
+
+-- ==============================================================================
+-- 4. BỔ SUNG CỘT XÁC ĐỊNH CHI NHÁNH TỔNG (is_head) VÀO BẢNG BRANCHES
+-- ==============================================================================
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS is_head BOOLEAN NOT NULL DEFAULT FALSE;
+UPDATE branches SET is_head = TRUE WHERE id = 1;
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255) UNIQUE;
+
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS tax_code VARCHAR(50);
+UPDATE branches SET tax_code = '0100000000' WHERE tax_code IS NULL;

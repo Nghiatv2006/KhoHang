@@ -12,10 +12,12 @@ public class UserResponse {
     private String branchName;
     private String status;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private String phone;
 
     public UserResponse() {}
 
-    public UserResponse(Integer id, String username, String email, String fullName, String role, Integer branchId, String branchName, String status, LocalDateTime createdAt) {
+    public UserResponse(Integer id, String username, String email, String fullName, String role, Integer branchId, String branchName, String status, LocalDateTime createdAt, LocalDateTime updatedAt, String phone) {
         this.id = id;
         this.username = username;
         this.email = email;
@@ -25,6 +27,24 @@ public class UserResponse {
         this.branchName = branchName;
         this.status = status;
         this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+        this.phone = phone;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 
     // Getters and Setters

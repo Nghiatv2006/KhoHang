@@ -16,25 +16,40 @@ const bSearch = ref('')
 const filteredBranches = computed(() => {
   if (!bSearch.value.trim()) return branches.value
   const kw = bSearch.value.toLowerCase()
-  return branches.value.filter(b => b.name?.toLowerCase().includes(kw) || b.address?.toLowerCase().includes(kw))
+  return branches.value.filter(b => 
+    b.name?.toLowerCase().includes(kw) || 
+    b.address?.toLowerCase().includes(kw) ||
+    b.taxCode?.toLowerCase().includes(kw) ||
+    b.managerName?.toLowerCase().includes(kw)
+  )
 })
 
 const showModal = ref(false)
 const editingB = ref<any>(null)
-const form = reactive({ name: '', address: '', lowStockThreshold: 5 })
+const form = reactive({ name: '', address: '', lowStockThreshold: 5, taxCode: '' })
 const saving = ref(false)
 const showDelete = ref(false)
 const deletingB = ref<any>(null)
 
-function openAdd() { editingB.value = null; Object.assign(form, { name: '', address: '', lowStockThreshold: 5 }); showModal.value = true }
-function openEdit(b: any) { editingB.value = b; Object.assign(form, { name: b.name, address: b.address, lowStockThreshold: b.lowStockThreshold }); showModal.value = true }
+function openAdd() { editingB.value = null; Object.assign(form, { name: '', address: '', lowStockThreshold: 5, taxCode: '' }); showModal.value = true }
+function openEdit(b: any) { editingB.value = b; Object.assign(form, { name: b.name, address: b.address, lowStockThreshold: b.lowStockThreshold, taxCode: b.taxCode || '' }); showModal.value = true }
 function confirmDelete(b: any) { deletingB.value = b; showDelete.value = true }
 
 async function saveBranch() {
   if (!form.name?.trim() || !form.address?.trim()) { toast.error('Tên và địa chỉ là bắt buộc.'); return }
+  if (!form.taxCode?.trim()) { toast.error('Mã số thuế là bắt buộc.'); return }
+  if (!/^[0-9A-Za-z-]{10,13}$/.test(form.taxCode.trim())) {
+    toast.error('Mã số thuế không hợp lệ (phải từ 10 đến 13 ký tự).')
+    return
+  }
   saving.value = true
   try {
-    const payload = { name: form.name.trim(), address: form.address.trim(), lowStockThreshold: Number(form.lowStockThreshold) }
+    const payload = { 
+      name: form.name.trim(), 
+      address: form.address.trim(), 
+      lowStockThreshold: Number(form.lowStockThreshold),
+      taxCode: form.taxCode.trim()
+    }
     const res = editingB.value
       ? await api.put(`/api/branches/${editingB.value.id}`, payload)
       : await api.post('/api/branches', payload)
@@ -99,11 +114,17 @@ onMounted(loadBranches)
       <div
         v-for="b in filteredBranches"
         :key="b.id"
-        class="bg-white rounded-[16px] shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-[#f1f5f9] p-6 hover:-translate-y-1 hover:shadow-lg hover:border-[#e2e8f0] transition-all duration-300 group relative overflow-hidden flex flex-col"
+        class="bg-white rounded-[16px] shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-[#f1f5f9] p-6 hover:-translate-y-1 hover:shadow-lg hover:border-[#e2e8f0] transition-all duration-300 group relative overflow-hidden flex flex-col cursor-pointer select-none"
+        @dblclick="isAdmin ? openEdit(b) : null"
       >
         <!-- Decorative top bar -->
-        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#4361ee] to-[#3a0ca3] opacity-0 group-hover:opacity-100 transition-opacity"></div>
+        <div :class="['absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#4361ee] to-[#3a0ca3] transition-opacity', b.isHead ? 'opacity-100' : 'opacity-0 group-hover:opacity-100']"></div>
         
+        <!-- Head branch badge -->
+        <div v-if="b.isHead" class="absolute top-4 right-4 bg-[#eef2ff] text-[#4361ee] text-[10px] font-bold px-2 py-1 rounded-md border border-[#dbeafe] flex items-center gap-1 shadow-sm">
+          <i class="fas fa-crown text-[9px] text-[#f59e0b]"></i> CHI NHÁNH TỔNG
+        </div>
+
         <!-- Header -->
         <div class="flex items-start justify-between mb-5 relative z-10">
           <div class="flex items-center gap-3">
@@ -116,23 +137,41 @@ onMounted(loadBranches)
             </div>
           </div>
           <div v-if="isAdmin" class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur rounded-lg p-1">
-            <button class="w-8 h-8 rounded-lg text-[#0ea5e9] hover:bg-[#e0f2fe] flex items-center justify-center transition-colors cursor-pointer" @click="openEdit(b)" title="Sửa">
+            <button class="w-8 h-8 rounded-lg text-[#0ea5e9] hover:bg-[#e0f2fe] flex items-center justify-center transition-colors cursor-pointer" @click.stop="openEdit(b)" title="Sửa">
               <i class="fas fa-pen text-sm"></i>
             </button>
-            <button class="w-8 h-8 rounded-lg text-[#ea4f52] hover:bg-[#ffe4e6] flex items-center justify-center transition-colors cursor-pointer" @click="confirmDelete(b)" title="Xóa">
+            <button v-if="!b.isHead" class="w-8 h-8 rounded-lg text-[#ea4f52] hover:bg-[#ffe4e6] flex items-center justify-center transition-colors cursor-pointer" @click.stop="confirmDelete(b)" title="Xóa">
               <i class="fas fa-trash text-sm"></i>
             </button>
           </div>
         </div>
 
         <!-- Info -->
-        <div class="space-y-4 flex-1 flex flex-col justify-between">
-          <div class="flex items-start gap-3 bg-[#f8f9fa] p-3 rounded-xl border border-[#f1f5f9]">
-            <i class="fas fa-map-marker-alt text-[#8094ae] mt-1 flex-shrink-0"></i>
-            <span class="text-sm text-[#526484] leading-relaxed">{{ b.address || 'Chưa cập nhật địa chỉ' }}</span>
+        <div class="space-y-3 flex-1 flex flex-col justify-between">
+          <div class="space-y-2">
+            <div class="flex items-start gap-3 bg-[#f8f9fa] p-2.5 rounded-xl border border-[#f1f5f9]">
+              <i class="fas fa-map-marker-alt text-[#8094ae] mt-1 flex-shrink-0"></i>
+              <span class="text-sm text-[#526484] leading-relaxed line-clamp-2 w-full" :title="b.address">{{ b.address || 'Chưa cập nhật địa chỉ' }}</span>
+            </div>
+
+            <div class="flex items-start gap-3 bg-[#f8f9fa] p-2.5 rounded-xl border border-[#f1f5f9]">
+              <i class="fas fa-file-invoice-dollar text-[#8094ae] mt-1 flex-shrink-0"></i>
+              <div>
+                <div class="text-[10px] text-[#8094ae] font-bold uppercase tracking-wider">Mã số thuế</div>
+                <span class="text-xs text-[#364a63] font-mono leading-relaxed font-semibold">{{ b.taxCode || 'Chưa cập nhật' }}</span>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-3 bg-[#f8f9fa] p-2.5 rounded-xl border border-[#f1f5f9]">
+              <i class="fas fa-user-shield text-[#8094ae] mt-1 flex-shrink-0"></i>
+              <div>
+                <div class="text-[10px] text-[#8094ae] font-bold uppercase tracking-wider">Người phụ trách</div>
+                <span class="text-xs text-[#364a63] font-semibold leading-relaxed">{{ b.managerName || 'Chưa phân công' }}</span>
+              </div>
+            </div>
           </div>
           
-          <div class="flex items-center justify-between border-t border-[#f1f5f9] pt-4 mt-auto">
+          <div class="flex items-center justify-between border-t border-[#f1f5f9] pt-3 mt-auto">
             <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wider">Ngưỡng cảnh báo</div>
             <div class="flex items-center gap-1.5 bg-[#fff8e6] px-2.5 py-1 rounded-md border border-[#ffecb3]">
               <i class="fas fa-exclamation-triangle text-[#f59e0b] text-[10px]"></i>
@@ -149,6 +188,10 @@ onMounted(loadBranches)
         <div>
           <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Tên chi nhánh <span class="text-[#ea4f52]">*</span></label>
           <input v-model="form.name" type="text" placeholder="VD: Chi nhánh Hà Nội" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] transition-all" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Mã số thuế <span class="text-[#ea4f52]">*</span></label>
+          <input v-model="form.taxCode" type="text" placeholder="Mã số thuế (10 - 13 chữ số)" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] transition-all" />
         </div>
         <div>
           <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Địa chỉ <span class="text-[#ea4f52]">*</span></label>
@@ -171,6 +214,7 @@ onMounted(loadBranches)
         </div>
       </div>
     </AppModal>
+
 
     <ConfirmDialog :show="showDelete" title="Xóa chi nhánh" :message="`Bạn có chắc muốn xóa chi nhánh '${deletingB?.name}'? Thao tác không thể hoàn tác và sẽ thất bại nếu còn dữ liệu liên kết (nhân viên, sản phẩm).`" confirm-text="Xóa" :danger="true" @confirm="doDelete" @cancel="showDelete = false" />
   </div>

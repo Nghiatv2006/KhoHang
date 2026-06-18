@@ -19,7 +19,27 @@ public class Branch {
     @Column(name = "low_stock_threshold", nullable = false)
     private Integer lowStockThreshold = 5;
 
+    @Column(name = "is_head", nullable = false)
+    private Boolean isHead = false;
+
+    @Column(name = "tax_code", length = 50)
+    private String taxCode;
+
     // Getters and Setters
+    public String getTaxCode() {
+        return taxCode;
+    }
+
+    public void setTaxCode(String taxCode) {
+        this.taxCode = taxCode;
+    }
+    public Boolean getIsHead() {
+        return isHead;
+    }
+
+    public void setIsHead(Boolean isHead) {
+        this.isHead = isHead;
+    }
     public Integer getId() {
         return id;
     }
