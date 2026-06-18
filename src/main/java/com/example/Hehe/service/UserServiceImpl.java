@@ -50,8 +50,28 @@ public class UserServiceImpl implements UserService {
             branchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
         }
 
-        return userRepository.searchUsers(pattern, filterRole, branchId, filterStatus)
-                .stream()
+        List<User> users = userRepository.searchUsers(pattern, filterRole, branchId, filterStatus);
+
+        if (currentUser.getRole() == UserRole.ADMIN) {
+            // Xác định chi nhánh tổng:
+            // 1. Tìm branch có isHead = true
+            // 2. Fallback về branch có ID nhỏ nhất nếu chưa cấu hình isHead
+            Branch headBranch = branchRepository.findByIsHeadTrue().stream()
+                    .findFirst()
+                    .orElseGet(() -> branchRepository.findAll().stream()
+                            .min(java.util.Comparator.comparing(Branch::getId))
+                            .orElse(null));
+
+            final Integer headBranchId = headBranch != null ? headBranch.getId() : null;
+
+            users = users.stream()
+                    .filter(u -> u.getRole() == UserRole.ADMIN 
+                              || (u.getBranch() != null && u.getBranch().getId().equals(headBranchId)) 
+                              || (u.getRole() == UserRole.MANAGER && u.getBranch() != null && !u.getBranch().getId().equals(headBranchId)))
+                    .collect(Collectors.toList());
+        }
+
+        return users.stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
@@ -81,8 +101,21 @@ public class UserServiceImpl implements UserService {
 
         // Kiểm tra trùng email (nếu gửi lên)
         if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
-            if (userRepository.existsByEmail(request.getEmail().trim())) {
-                throw new RuntimeException("Email '" + request.getEmail().trim() + "' đã được sử dụng.");
+            String email = request.getEmail().trim();
+            if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+                throw new RuntimeException("Định dạng email không hợp lệ.");
+            }
+            if (userRepository.existsByEmail(email)) {
+                throw new RuntimeException("Email '" + email + "' đã được sử dụng.");
+            }
+        }
+
+        // Kiểm tra định dạng số điện thoại (nếu gửi lên)
+        String cleanPhone = null;
+        if (request.getPhone() != null && !request.getPhone().trim().isEmpty()) {
+            cleanPhone = request.getPhone().trim().replaceAll("[-. ]", "");
+            if (!cleanPhone.matches("^(0|\\+84|84)[0-9]{9,11}$")) {
+                throw new RuntimeException("Số điện thoại không hợp lệ (phải bắt đầu bằng 0, 84 hoặc +84 và gồm 10-12 chữ số).");
             }
         }
 
@@ -91,6 +124,7 @@ public class UserServiceImpl implements UserService {
         user.setFullName(request.getFullName().trim());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setEmail(request.getEmail() != null ? request.getEmail().trim() : null);
+        user.setPhone(cleanPhone);
         user.setStatus(UserStatus.ACTIVE);
 
         // Phân quyền tạo mới
@@ -99,20 +133,49 @@ public class UserServiceImpl implements UserService {
             user.setRole(UserRole.STAFF);
             user.setBranch(currentUser.getBranch());
         } else {
-            // ADMIN tạo thoải mái
+            // ADMIN tạo theo quy định nghiệp vụ
             UserRole targetRole = UserRole.valueOf(request.getRole().toUpperCase());
-            user.setRole(targetRole);
 
-            if (targetRole != UserRole.ADMIN) {
-                if (request.getBranchId() == null) {
+            Branch branch = null;
+            if (request.getBranchId() != null) {
+                branch = branchRepository.findById(request.getBranchId())
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh với ID: " + request.getBranchId()));
+            }
+
+            // Tìm chi nhánh tổng
+            Branch headBranch = branchRepository.findByIsHeadTrue().stream()
+                    .findFirst()
+                    .orElseGet(() -> branchRepository.findAll().stream()
+                            .min(java.util.Comparator.comparing(Branch::getId))
+                            .orElse(null));
+
+            final Integer headBranchId = headBranch != null ? headBranch.getId() : null;
+
+            // Ràng buộc vai trò theo chi nhánh:
+            if (branch != null) {
+                if (branch.getId().equals(headBranchId)) {
+                    // Chi nhánh tổng: chỉ cho phép ADMIN hoặc STAFF
+                    if (targetRole == UserRole.MANAGER) {
+                        throw new RuntimeException("Chi nhánh tổng không có vai trò MANAGER. Vui lòng chọn ADMIN hoặc STAFF.");
+                    }
+                } else {
+                    // Chi nhánh con: chỉ cho phép MANAGER
+                    if (targetRole != UserRole.MANAGER) {
+                        throw new RuntimeException("Tại chi nhánh con, bạn chỉ được phép tạo tài khoản quản lý (MANAGER).");
+                    }
+                }
+            } else {
+                // Không chọn chi nhánh -> Bắt buộc là ADMIN
+                if (targetRole != UserRole.ADMIN) {
                     throw new RuntimeException("Vui lòng chọn chi nhánh cho người dùng này.");
                 }
-                Branch branch = branchRepository.findById(request.getBranchId())
-                        .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh với ID: " + request.getBranchId()));
-                user.setBranch(branch);
             }
+
+            user.setRole(targetRole);
+            user.setBranch(branch);
         }
 
+        user.setUpdatedAt(java.time.LocalDateTime.now());
         User savedUser = userRepository.save(user);
         return convertToResponse(savedUser);
     }
@@ -144,16 +207,31 @@ public class UserServiceImpl implements UserService {
 
         // Sửa Email: kiểm tra trùng lặp
         if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
-            if (userRepository.existsByEmailAndIdNot(request.getEmail().trim(), id)) {
-                throw new RuntimeException("Email '" + request.getEmail().trim() + "' đã được sử dụng.");
+            String email = request.getEmail().trim();
+            if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+                throw new RuntimeException("Định dạng email không hợp lệ.");
             }
-            user.setEmail(request.getEmail().trim());
+            if (userRepository.existsByEmailAndIdNot(email, id)) {
+                throw new RuntimeException("Email '" + email + "' đã được sử dụng.");
+            }
+            user.setEmail(email);
         } else {
             user.setEmail(null);
         }
 
         if (request.getFullName() != null && !request.getFullName().trim().isEmpty()) {
             user.setFullName(request.getFullName().trim());
+        }
+
+        // Sửa Số điện thoại: kiểm tra định dạng
+        if (request.getPhone() != null && !request.getPhone().trim().isEmpty()) {
+            String phone = request.getPhone().trim().replaceAll("[-. ]", "");
+            if (!phone.matches("^(0|\\+84|84)[0-9]{9,11}$")) {
+                throw new RuntimeException("Số điện thoại không hợp lệ (phải bắt đầu bằng 0, 84 hoặc +84 và gồm 10-12 chữ số).");
+            }
+            user.setPhone(phone);
+        } else {
+            user.setPhone(null);
         }
 
         // Cập nhật Mật khẩu (nếu nhập mới)
@@ -169,20 +247,44 @@ public class UserServiceImpl implements UserService {
             }
 
             UserRole targetRole = UserRole.valueOf(request.getRole().toUpperCase());
-            user.setRole(targetRole);
+            
+            Branch branch = null;
+            if (request.getBranchId() != null) {
+                branch = branchRepository.findById(request.getBranchId())
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh với ID: " + request.getBranchId()));
+            }
 
-            if (targetRole == UserRole.ADMIN) {
-                user.setBranch(null);
+            // Tìm chi nhánh tổng
+            Branch headBranch = branchRepository.findByIsHeadTrue().stream()
+                    .findFirst()
+                    .orElseGet(() -> branchRepository.findAll().stream()
+                            .min(java.util.Comparator.comparing(Branch::getId))
+                            .orElse(null));
+
+            final Integer headBranchId = headBranch != null ? headBranch.getId() : null;
+
+            // Ràng buộc vai trò theo chi nhánh:
+            if (branch != null) {
+                if (branch.getId().equals(headBranchId)) {
+                    if (targetRole == UserRole.MANAGER) {
+                        throw new RuntimeException("Chi nhánh tổng không có vai trò MANAGER. Vui lòng chọn ADMIN hoặc STAFF.");
+                    }
+                } else {
+                    if (targetRole != UserRole.MANAGER) {
+                        throw new RuntimeException("Tại chi nhánh con, bạn chỉ được phép thiết lập vai trò quản lý (MANAGER).");
+                    }
+                }
             } else {
-                if (request.getBranchId() == null) {
+                if (targetRole != UserRole.ADMIN) {
                     throw new RuntimeException("Vui lòng chọn chi nhánh.");
                 }
-                Branch branch = branchRepository.findById(request.getBranchId())
-                        .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh với ID: " + request.getBranchId()));
-                user.setBranch(branch);
             }
+
+            user.setRole(targetRole);
+            user.setBranch(branch);
         }
 
+        user.setUpdatedAt(java.time.LocalDateTime.now());
         User updatedUser = userRepository.save(user);
         return convertToResponse(updatedUser);
     }
@@ -245,6 +347,7 @@ public class UserServiceImpl implements UserService {
             user.setStatus(UserStatus.ACTIVE);
         }
 
+        user.setUpdatedAt(java.time.LocalDateTime.now());
         User updatedUser = userRepository.save(user);
         return convertToResponse(updatedUser);
     }
@@ -290,7 +393,9 @@ public class UserServiceImpl implements UserService {
                 branchId,
                 branchName,
                 user.getStatus().name(),
-                user.getCreatedAt()
+                user.getCreatedAt(),
+                user.getUpdatedAt(),
+                user.getPhone()
         );
     }
 }

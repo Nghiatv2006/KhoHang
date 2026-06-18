@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
 import { api } from '../api'
 import * as echarts from 'echarts'
 
-const router = useRouter()
 const products = ref<any[]>([])
 const categories = ref<any[]>([])
 const customers = ref<any[]>([])
@@ -59,7 +57,6 @@ onMounted(async () => {
 
 // SAFELY PARSE DATA
 const totalValue = computed(() => products.value.reduce((s, p) => s + (Number(p.price) || 0) * (Number(p.quantity) || 0), 0))
-const totalQty = computed(() => products.value.reduce((s, p) => s + (Number(p.quantity) || 0), 0))
 const totalDebt = computed(() => customers.value.reduce((s, c) => s + (Number(c.debt) || 0), 0))
 const topProducts = computed(() => [...products.value].sort((a, b) => (Number(b.quantity) || 0) - (Number(a.quantity) || 0)).slice(0, 5))
 const topCustomers = computed(() => [...customers.value].sort((a, b) => (Number(b.debt) || 0) - (Number(a.debt) || 0)).slice(0, 5))

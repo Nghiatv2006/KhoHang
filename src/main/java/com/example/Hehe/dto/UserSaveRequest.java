@@ -8,8 +8,17 @@ public class UserSaveRequest {
     private String role;
     private Integer branchId;
     private String status;
+    private String phone;
 
     public UserSaveRequest() {}
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
 
     // Getters and Setters
     public String getUsername() {

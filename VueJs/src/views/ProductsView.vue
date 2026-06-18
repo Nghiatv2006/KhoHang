@@ -7,7 +7,6 @@ import ConfirmDialog from '../components/ConfirmDialog.vue'
 
 const toast = useToast()
 const user = ref<any>(JSON.parse(localStorage.getItem('wh_user') || '{}'))
-const isAdmin = computed(() => user.value?.role === 'ADMIN')
 const isManager = computed(() => ['ADMIN', 'MANAGER'].includes(user.value?.role))
 
 // ─── Tabs ───────────────────────────────────────────────────────────────────
