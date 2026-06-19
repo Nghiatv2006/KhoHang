@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Repository xử lý các thao tác tương tác với bảng categories trong DB.
@@ -25,4 +26,11 @@ public interface CategoryRepository extends JpaRepository<Category, Integer> {
      * @return Danh sách các danh mục khớp
      */
     List<Category> findByNameContainingIgnoreCase(String name);
+
+    /**
+     * Tìm danh mục chính xác theo tên
+     * @param name Tên danh mục
+     * @return Optional Category
+     */
+    Optional<Category> findByName(String name);
 }

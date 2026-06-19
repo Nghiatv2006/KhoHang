@@ -57,7 +57,8 @@ CREATE TABLE products (
     code VARCHAR(50) NOT NULL UNIQUE CHECK (code = UPPER(code)),
     name VARCHAR(255) NOT NULL,
     unit VARCHAR(50) NOT NULL,
-    price NUMERIC(15, 2) NOT NULL CHECK (price >= 0),
+    import_price NUMERIC(15, 2) NOT NULL DEFAULT 0.00,
+    price NUMERIC(15, 2) NOT NULL CHECK (price >= 0), -- Giá bán
     category_id INT NOT NULL,
     has_expiry BOOLEAN NOT NULL DEFAULT FALSE,
     image_url VARCHAR(500),

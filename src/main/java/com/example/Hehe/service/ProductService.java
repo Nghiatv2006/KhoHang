@@ -7,6 +7,8 @@ import org.springframework.lang.NonNull;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Interface định nghĩa các nghiệp vụ liên quan đến quản lý Sản phẩm (Product).
@@ -53,4 +55,18 @@ public interface ProductService {
      * @param currentUser Người dùng đang thực hiện thao tác
      */
     void deleteProduct(@NonNull Integer id, User currentUser);
+
+    /**
+     * Nhập hàng loạt sản phẩm từ file Excel.
+     * @param file File Excel chứa dữ liệu
+     * @param currentUser Người dùng thực hiện
+     * @return Map chứa successCount và danh sách errors
+     */
+    Map<String, Object> importProductsFromExcel(MultipartFile file, User currentUser);
+
+    /**
+     * Tạo file Excel mẫu (template) để người dùng tải về.
+     * @return mảng byte nội dung file Excel
+     */
+    byte[] generateExcelTemplate();
 }

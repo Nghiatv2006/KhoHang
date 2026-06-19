@@ -11,6 +11,9 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * REST Controller cung cấp các API (Endpoints) cho nghiệp vụ Product.
@@ -109,6 +112,44 @@ public class ProductController {
             if (id == null) throw new RuntimeException("ID sản phẩm không được để trống.");
             productService.deleteProduct(id, currentUser);
             return ResponseEntity.ok(Map.of("message", "Xóa sản phẩm thành công."));
+        } catch (RuntimeException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+    }
+
+    /**
+     * API Tải file Excel mẫu.
+     * Method: GET
+     * Path: /api/products/template
+     */
+    @GetMapping("/template")
+    public ResponseEntity<byte[]> getExcelTemplate() {
+        try {
+            byte[] data = productService.generateExcelTemplate();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+            headers.setContentDispositionFormData("attachment", "Product_Import_Template.xlsx");
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(data);
+        } catch (RuntimeException ex) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    /**
+     * API Nhập sản phẩm từ file Excel. (Yêu cầu quyền ADMIN).
+     * Method: POST
+     * Path: /api/products/import
+     */
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> importProducts(
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal User currentUser) {
+        try {
+            if (file.isEmpty()) throw new RuntimeException("File tải lên trống.");
+            Map<String, Object> result = productService.importProductsFromExcel(file, currentUser);
+            return ResponseEntity.ok(result);
         } catch (RuntimeException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }

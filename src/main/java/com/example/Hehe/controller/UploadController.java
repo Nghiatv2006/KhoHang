@@ -29,7 +29,11 @@ public class UploadController {
 
         try {
             // Lấy tên file gốc và tạo tên file mới tránh trùng lặp
-            String originalFilename = StringUtils.cleanPath(file.getOriginalFilename());
+            String originalName = file.getOriginalFilename();
+            if (originalName == null) {
+                originalName = "unknown";
+            }
+            String originalFilename = StringUtils.cleanPath(originalName);
             String fileExtension = "";
             int dotIndex = originalFilename.lastIndexOf('.');
             if(dotIndex > 0) {

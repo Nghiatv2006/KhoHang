@@ -14,6 +14,7 @@ public class ProductResponse {
     private Integer id;
     private String sku;
     private String name;
+    private BigDecimal importPrice;
     private BigDecimal price;
 
     private String description;
@@ -31,6 +32,7 @@ public class ProductResponse {
         this.id = product.getId();
         this.sku = product.getSku();
         this.name = product.getName();
+        this.importPrice = product.getImportPrice();
         this.price = product.getPrice();
 
         this.description = product.getDescription();
@@ -60,6 +62,10 @@ public class ProductResponse {
 
     public String getName() {
         return name;
+    }
+
+    public BigDecimal getImportPrice() {
+        return importPrice;
     }
 
     public BigDecimal getPrice() {

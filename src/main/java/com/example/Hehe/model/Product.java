@@ -23,6 +23,9 @@ public class Product {
     @Column(name = "name", nullable = false)
     private String name;
 
+    @Column(name = "import_price")
+    private BigDecimal importPrice = BigDecimal.ZERO;
+
     @Column(name = "price")
     private BigDecimal price;
 
@@ -76,6 +79,14 @@ public class Product {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public BigDecimal getImportPrice() {
+        return importPrice;
+    }
+
+    public void setImportPrice(BigDecimal importPrice) {
+        this.importPrice = importPrice;
     }
 
     public BigDecimal getPrice() {

@@ -10,6 +10,7 @@ import java.time.LocalDate;
 public class ProductSaveRequest {
 
     private String name;
+    private BigDecimal importPrice;
     private BigDecimal price;
 
     private String description;
@@ -31,6 +32,14 @@ public class ProductSaveRequest {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public BigDecimal getImportPrice() {
+        return importPrice;
+    }
+
+    public void setImportPrice(BigDecimal importPrice) {
+        this.importPrice = importPrice;
     }
 
     public BigDecimal getPrice() {
