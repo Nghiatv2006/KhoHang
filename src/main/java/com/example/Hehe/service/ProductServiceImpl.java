@@ -269,7 +269,7 @@ public class ProductServiceImpl implements ProductService {
 
             // Tạo header row
             Row headerRow = sheet.createRow(0);
-            String[] columns = {"Tên sản phẩm", "Mã SKU", "Tên Danh mục", "Giá nhập", "Giá bán", "Đơn vị tính", "Ngày SX (YYYY-MM-DD)", "Hạn SD (YYYY-MM-DD)", "Mô tả"};
+            String[] columns = {"Tên sản phẩm", "Mã SKU", "Tên Danh mục", "Giá nhập", "Giá bán", "Đơn vị tính", "Đường dẫn ảnh (URL)"};
             
             CellStyle headerStyle = workbook.createCellStyle();
             Font headerFont = workbook.createFont();
@@ -327,7 +327,7 @@ public class ProductServiceImpl implements ProductService {
                     String categoryName = getCellValueAsString(row.getCell(headerMap.get("Tên Danh mục")));
                     if (categoryName.isEmpty()) throw new RuntimeException("Tên Danh mục không được để trống.");
 
-                    Category category = categoryRepository.findByName(categoryName)
+                    Category category = categoryRepository.findFirstByNameIgnoreCase(categoryName)
                             .orElseThrow(() -> new RuntimeException("Danh mục '" + categoryName + "' không tồn tại trong hệ thống."));
 
                     String sku = "";
@@ -360,31 +360,9 @@ public class ProductServiceImpl implements ProductService {
                         if (!u.isEmpty()) unit = u;
                     }
 
-                    LocalDate mfgDate = null;
-                    if (headerMap.containsKey("Ngày SX (YYYY-MM-DD)")) {
-                        String mfgStr = getCellValueAsString(row.getCell(headerMap.get("Ngày SX (YYYY-MM-DD)")));
-                        if (!mfgStr.isEmpty()) {
-                            try { mfgDate = LocalDate.parse(mfgStr, DateTimeFormatter.ISO_LOCAL_DATE); }
-                            catch (Exception e) { throw new RuntimeException("Ngày SX sai định dạng YYYY-MM-DD."); }
-                        }
-                    }
-
-                    LocalDate expDate = null;
-                    if (headerMap.containsKey("Hạn SD (YYYY-MM-DD)")) {
-                        String expStr = getCellValueAsString(row.getCell(headerMap.get("Hạn SD (YYYY-MM-DD)")));
-                        if (!expStr.isEmpty()) {
-                            try { expDate = LocalDate.parse(expStr, DateTimeFormatter.ISO_LOCAL_DATE); }
-                            catch (Exception e) { throw new RuntimeException("Hạn SD sai định dạng YYYY-MM-DD."); }
-                        }
-                    }
-
-                    if (mfgDate != null && expDate != null && mfgDate.isAfter(expDate)) {
-                        throw new RuntimeException("Ngày SX không thể sau Hạn SD.");
-                    }
-
-                    String description = "";
-                    if (headerMap.containsKey("Mô tả")) {
-                        description = getCellValueAsString(row.getCell(headerMap.get("Mô tả")));
+                    String imageUrl = "";
+                    if (headerMap.containsKey("Đường dẫn ảnh (URL)")) {
+                        imageUrl = getCellValueAsString(row.getCell(headerMap.get("Đường dẫn ảnh (URL)")));
                     }
 
                     // Lưu vào DB
@@ -399,10 +377,11 @@ public class ProductServiceImpl implements ProductService {
                     product.setImportPrice(importPrice);
                     product.setPrice(price);
                     product.setUnit(unit);
-                    product.setManufacturingDate(mfgDate);
-                    product.setExpirationDate(expDate);
-                    product.setHasExpiry(mfgDate != null || expDate != null);
-                    product.setDescription(description);
+                    product.setImageUrl(imageUrl.isEmpty() ? null : imageUrl);
+                    product.setHasExpiry(false);
+                    product.setManufacturingDate(null);
+                    product.setExpirationDate(null);
+                    product.setDescription("");
 
                     Product savedProduct = productRepository.save(product);
 

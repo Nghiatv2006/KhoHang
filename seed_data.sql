@@ -49,11 +49,11 @@ INSERT INTO users (username, password, full_name, role, branch_id, status) VALUE
 
 -- Thêm Sản phẩm (Products)
 INSERT INTO products (code, name, unit, price, category_id, has_expiry, image_url, mfg_date, exp_date) VALUES
-('IP15', 'iPhone 15 Pro Max 256GB', 'Chiếc', 29900000, 1, FALSE, 'http://localhost:8080/uploads/images/iphone_15.png', '1970-01-01', '1970-01-01'),
-('MACM2', 'MacBook Air M2 8GB/256GB', 'Chiếc', 25500000, 2, FALSE, 'http://localhost:8080/uploads/images/macbook_air.png', '1970-01-01', '1970-01-01'),
-('AIRPODS', 'AirPods Pro 2', 'Hộp', 5500000, 3, FALSE, 'http://localhost:8080/uploads/images/airpods_pro.png', '1970-01-01', '1970-01-01'),
-('MILK_OLD', 'Sữa tươi tiệt trùng 1L (Lô cũ)', 'Hộp', 35000, 4, TRUE, 'http://localhost:8080/uploads/images/milk_old.png', '2024-01-01', '2024-07-01'),
-('MILK_NEW', 'Sữa tươi tiệt trùng 1L (Lô mới)', 'Hộp', 35000, 4, TRUE, 'http://localhost:8080/uploads/images/milk_new.png', '2024-05-01', '2024-11-01');
+('IP15', 'iPhone 15 Pro Max 256GB', 'Chiếc', 29900000, 1, FALSE, '/uploads/images/iphone_15.png', '1970-01-01', '1970-01-01'),
+('MACM2', 'MacBook Air M2 8GB/256GB', 'Chiếc', 25500000, 2, FALSE, '/uploads/images/macbook_air.png', '1970-01-01', '1970-01-01'),
+('AIRPODS', 'AirPods Pro 2', 'Hộp', 5500000, 3, FALSE, '/uploads/images/airpods_pro.png', '1970-01-01', '1970-01-01'),
+('MILK_OLD', 'Sữa tươi tiệt trùng 1L (Lô cũ)', 'Hộp', 35000, 4, TRUE, '/uploads/images/milk_old.png', '2024-01-01', '2024-07-01'),
+('MILK_NEW', 'Sữa tươi tiệt trùng 1L (Lô mới)', 'Hộp', 35000, 4, TRUE, '/uploads/images/milk_new.png', '2024-05-01', '2024-11-01');
 
 -- Thêm Tồn kho (Inventories)
 INSERT INTO inventories (branch_id, product_id, mfg_date, exp_date, quantity) VALUES

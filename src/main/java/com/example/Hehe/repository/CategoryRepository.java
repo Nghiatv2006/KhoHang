@@ -28,9 +28,9 @@ public interface CategoryRepository extends JpaRepository<Category, Integer> {
     List<Category> findByNameContainingIgnoreCase(String name);
 
     /**
-     * Tìm danh mục chính xác theo tên
+     * Tìm danh mục chính xác theo tên (không phân biệt chữ hoa/thường)
      * @param name Tên danh mục
      * @return Optional Category
      */
-    Optional<Category> findByName(String name);
+    Optional<Category> findFirstByNameIgnoreCase(String name);
 }

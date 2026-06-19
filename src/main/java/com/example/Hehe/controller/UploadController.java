@@ -52,9 +52,9 @@ public class UploadController {
             Path filePath = uploadPath.resolve(newFilename);
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
             
-            // Trả về đường dẫn để client có thể truy cập (dựa trên WebConfig)
-            // Ví dụ: http://localhost:8080/uploads/images/abc-xyz.png
-            String fileUrl = "http://localhost:8080/uploads/images/" + newFilename;
+            // Trả về đường dẫn tương đối để client có thể truy cập
+            // Ví dụ: /uploads/images/abc-xyz.png
+            String fileUrl = "/uploads/images/" + newFilename;
             response.put("url", fileUrl);
             
             return ResponseEntity.ok(response);
