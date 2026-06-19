@@ -128,7 +128,7 @@ public class ProductController {
             byte[] data = productService.generateExcelTemplate();
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
-            headers.setContentDispositionFormData("attachment", "Product_Import_Template.xlsx");
+            headers.setContentDispositionFormData("attachment", "Mau_Nhap_San_Pham.xlsx");
             return ResponseEntity.ok()
                     .headers(headers)
                     .body(data);
