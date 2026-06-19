@@ -34,6 +34,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/ProductsView.vue'),
       },
       {
+        path: '/global-inventory',
+        name: 'GlobalInventory',
+        component: () => import('../views/GlobalInventoryView.vue'),
+      },
+      {
         path: '/partners',
         name: 'Partners',
         component: () => import('../views/PartnersView.vue'),
@@ -70,11 +75,22 @@ const router = createRouter({
 
 // Navigation guard
 router.beforeEach((to, _from, next) => {
-  const isLoggedIn = localStorage.getItem('wh_user')
+  const userStr = localStorage.getItem('wh_user')
+  const user = userStr ? JSON.parse(userStr) : null
+  const isLoggedIn = !!user
+  
   if (to.meta.requiresAuth && !isLoggedIn) {
     next('/login')
   } else if (to.path === '/login' && isLoggedIn) {
     next('/dashboard')
+  } else if (to.path === '/products') {
+    // Chỉ ADMIN và MANAGER nhánh 1 mới được vào Products
+    const hasCrud = user && (user.role === 'ADMIN' || (user.role === 'MANAGER' && user.branchId === 1))
+    if (!hasCrud) {
+      next('/global-inventory')
+    } else {
+      next()
+    }
   } else {
     next()
   }

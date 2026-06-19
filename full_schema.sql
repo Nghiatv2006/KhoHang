@@ -66,9 +66,11 @@ CREATE TABLE products (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     unit VARCHAR(50) NOT NULL,
-    price NUMERIC(15, 2) NOT NULL CHECK (price >= 0),
+    import_price NUMERIC(15, 2) NOT NULL DEFAULT 0.00,
+    price NUMERIC(15, 2) NOT NULL CHECK (price >= 0), -- Giá bán
     category_id INT NOT NULL,
     has_expiry BOOLEAN NOT NULL DEFAULT FALSE,
+    image_url VARCHAR(500),
     mfg_date DATE DEFAULT '1970-01-01',
     exp_date DATE DEFAULT '1970-01-01',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

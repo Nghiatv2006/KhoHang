@@ -26,12 +26,17 @@ public class CategoryServiceImpl implements CategoryService {
 
     /**
      * Hàm dùng chung để kiểm tra quyền truy cập.
-     * Chỉ STAFF mới bị chặn, ADMIN và MANAGER được phép thay đổi danh mục.
+     * Chỉ ADMIN và MANAGER của Chi nhánh Hà Nội (branchId = 1) mới được phép thay đổi danh mục.
      * @param currentUser User đang gọi thao tác
      */
     private void checkPermission(User currentUser) {
-        if (currentUser.getRole() == UserRole.STAFF) {
-            throw new RuntimeException("Bạn không có quyền thực hiện thao tác này.");
+        boolean isAdmin = currentUser.getRole() == UserRole.ADMIN;
+        boolean isMainBranchManager = currentUser.getRole() == UserRole.MANAGER 
+                                      && currentUser.getBranch() != null 
+                                      && currentUser.getBranch().getId() == 1;
+
+        if (!isAdmin && !isMainBranchManager) {
+            throw new RuntimeException("Bạn không có quyền thực hiện thao tác này. Yêu cầu quyền ADMIN hoặc MANAGER Chi nhánh Hà Nội.");
         }
     }
 

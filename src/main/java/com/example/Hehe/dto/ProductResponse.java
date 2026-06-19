@@ -14,28 +14,32 @@ public class ProductResponse {
     private Integer id;
     private String sku;
     private String name;
+    private BigDecimal importPrice;
     private BigDecimal price;
 
     private String description;
+    private String imageUrl;
+    private String unit;
     
     private Integer categoryId;
     private String categoryName;
 
     private LocalDate manufacturingDate;
     private LocalDate expirationDate;
-    private String unit;
+
     private Boolean hasExpiry;
 
     public ProductResponse(Product product) {
         this.id = product.getId();
         this.sku = product.getSku();
         this.name = product.getName();
+        this.importPrice = product.getImportPrice();
         this.price = product.getPrice();
         this.unit = product.getUnit();
         this.hasExpiry = product.getHasExpiry();
 
         this.description = product.getDescription();
-
+        this.imageUrl = product.getImageUrl();
         
         // Trích xuất ID và Tên của Category thay vì trả toàn bộ object Category
         if (product.getCategory() != null) {
@@ -45,6 +49,7 @@ public class ProductResponse {
 
         this.manufacturingDate = product.getManufacturingDate();
         this.expirationDate = product.getExpirationDate();
+        this.hasExpiry = product.getHasExpiry();
     }
 
     // Getters
@@ -61,6 +66,10 @@ public class ProductResponse {
         return name;
     }
 
+    public BigDecimal getImportPrice() {
+        return importPrice;
+    }
+
     public BigDecimal getPrice() {
         return price;
     }
@@ -68,6 +77,14 @@ public class ProductResponse {
 
     public String getDescription() {
         return description;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
+    public String getUnit() {
+        return unit;
     }
 
     public Integer getCategoryId() {
@@ -86,9 +103,6 @@ public class ProductResponse {
         return expirationDate;
     }
 
-    public String getUnit() {
-        return unit;
-    }
 
     public Boolean getHasExpiry() {
         return hasExpiry;

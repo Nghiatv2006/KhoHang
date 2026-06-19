@@ -39,22 +39,48 @@ const showProductModal = ref(false)
 const editingProduct = ref<any>(null)
 const productForm = reactive({
   name: '', categoryId: '' as number | '',
-  price: '' as any, quantity: '' as any, description: '',
-  manufacturingDate: '', expirationDate: ''
+  importPrice: '' as any, price: '' as any, unit: 'Chiếc', imageUrl: ''
 })
 const pSaving = ref(false)
+const uploadingImage = ref(false)
+
+async function handleImageUpload(event: Event) {
+  const target = event.target as HTMLInputElement
+  if (!target.files || target.files.length === 0) return
+  
+  const file = target.files[0]
+  const formData = new FormData()
+  formData.append('file', file)
+  
+  uploadingImage.value = true
+  try {
+    const res = await api.upload('/api/upload', formData)
+    const data = await res.json()
+    if (res.ok) {
+      productForm.imageUrl = data.url
+      toast.success('Tải ảnh lên thành công!')
+    } else {
+      toast.error(data.error || 'Lỗi tải ảnh')
+    }
+  } catch (error) {
+    toast.error('Không thể kết nối máy chủ khi tải ảnh.')
+  } finally {
+    uploadingImage.value = false
+    // Reset file input so user can select the same file again if needed
+    target.value = ''
+  }
+}
 
 function openAddProduct() {
   editingProduct.value = null
-  Object.assign(productForm, { name: '', categoryId: '', price: '', quantity: '', description: '', manufacturingDate: '', expirationDate: '' })
+  Object.assign(productForm, { name: '', categoryId: '', importPrice: '', price: '', unit: 'Chiếc', imageUrl: '' })
   showProductModal.value = true
 }
 function openEditProduct(p: any) {
   editingProduct.value = p
   Object.assign(productForm, {
     name: p.name, categoryId: p.categoryId || '',
-    price: p.price, quantity: p.quantity, description: p.description || '',
-    manufacturingDate: p.manufacturingDate || '', expirationDate: p.expirationDate || ''
+    importPrice: p.importPrice, price: p.price, unit: p.unit || 'Chiếc', imageUrl: p.imageUrl || ''
   })
   showProductModal.value = true
 }
@@ -68,11 +94,10 @@ async function saveProduct() {
     const payload = {
       name: productForm.name.trim(),
       categoryId: productForm.categoryId || null,
+      importPrice: productForm.importPrice || 0,
       price: productForm.price || 0,
-      quantity: productForm.quantity || 0,
-      description: productForm.description,
-      manufacturingDate: productForm.manufacturingDate || null,
-      expirationDate: productForm.expirationDate || null
+      unit: productForm.unit || 'Chiếc',
+      imageUrl: productForm.imageUrl
     }
     const res = editingProduct.value
       ? await api.put(`/api/products/${editingProduct.value.id}`, payload)
@@ -106,6 +131,45 @@ async function doDeleteProduct() {
     else toast.error((data as any).message || 'Không thể xóa sản phẩm.')
   } catch { toast.error('Có lỗi xảy ra.') }
   finally { showDeleteProduct.value = false }
+}
+
+// Import Excel
+const importingExcel = ref(false)
+const importResult = ref<{ successCount: number; errors: string[] } | null>(null)
+
+function downloadTemplate() {
+  window.open('/api/products/template', '_blank')
+}
+
+async function handleExcelImport(event: Event) {
+  const target = event.target as HTMLInputElement
+  if (!target.files || target.files.length === 0) return
+  
+  const file = target.files[0]
+  const formData = new FormData()
+  formData.append('file', file)
+  
+  importingExcel.value = true
+  try {
+    const res = await api.upload('/api/products/import', formData)
+    const data = await res.json()
+    if (res.ok) {
+      importResult.value = data
+      if (data.errors && data.errors.length > 0) {
+        toast.warning(`Nhập thành công ${data.successCount} sản phẩm. Có ${data.errors.length} lỗi.`)
+      } else {
+        toast.success(`Nhập thành công ${data.successCount} sản phẩm!`)
+      }
+      await loadProducts()
+    } else {
+      toast.error(data.message || 'Lỗi nhập file Excel')
+    }
+  } catch (error) {
+    toast.error('Không thể kết nối máy chủ.')
+  } finally {
+    importingExcel.value = false
+    target.value = ''
+  }
 }
 
 // ─── Categories ─────────────────────────────────────────────────────────────
@@ -231,14 +295,30 @@ function formatDate(val: any) {
             <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
         </div>
-        <button
-          v-if="isManager"
-          class="bg-[#4361ee] text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-sm flex items-center gap-2"
-          @click="openAddProduct"
-        >
-          <i class="fas fa-plus"></i>
-          Thêm sản phẩm
-        </button>
+        <div v-if="isManager" class="flex items-center gap-2">
+          <button
+            class="bg-white border border-[#e2e8f0] text-[#364a63] px-4 py-2.5 rounded-xl font-semibold shadow-sm hover:bg-[#f8f9fa] transition-all text-sm flex items-center gap-2"
+            @click="downloadTemplate"
+          >
+            <i class="fas fa-download text-[#10b981]"></i>
+            Tải mẫu Excel
+          </button>
+          
+          <label class="bg-white border border-[#e2e8f0] text-[#364a63] px-4 py-2.5 rounded-xl font-semibold shadow-sm hover:bg-[#f8f9fa] transition-all text-sm flex items-center gap-2 cursor-pointer" :class="{'opacity-50 cursor-not-allowed': importingExcel}">
+            <i v-if="importingExcel" class="fas fa-spinner fa-spin text-[#10b981]"></i>
+            <i v-else class="fas fa-file-excel text-[#10b981]"></i>
+            {{ importingExcel ? 'Đang nhập...' : 'Nhập từ Excel' }}
+            <input type="file" accept=".xlsx, .xls" class="hidden" @change="handleExcelImport" :disabled="importingExcel" />
+          </label>
+          
+          <button
+            class="bg-[#4361ee] text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-sm flex items-center gap-2"
+            @click="openAddProduct"
+          >
+            <i class="fas fa-plus"></i>
+            Thêm sản phẩm
+          </button>
+        </div>
       </div>
 
       <!-- Table -->
@@ -256,9 +336,9 @@ function formatDate(val: any) {
             <tr>
               <th class="p-4 text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Sản phẩm</th>
               <th class="p-4 text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Danh mục</th>
-              <th class="p-4 text-right text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Số lượng</th>
-              <th class="p-4 text-right text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Đơn giá</th>
-              <th class="p-4 text-right text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Hạn sử dụng</th>
+              <th class="p-4 text-center text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Đơn vị tính</th>
+              <th class="p-4 text-right text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Giá nhập</th>
+              <th class="p-4 text-right text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Giá bán</th>
               <th v-if="isManager" class="p-4 border-b border-[#f1f5f9] w-[100px]"></th>
             </tr>
           </thead>
@@ -270,18 +350,26 @@ function formatDate(val: any) {
               @dblclick="isManager ? openEditProduct(p) : null"
             >
               <td class="p-4 first:rounded-l-xl last:rounded-r-xl">
-                <div class="font-bold text-[#364a63]">{{ p.name }}</div>
-                <div class="text-xs text-[#8094ae] font-mono mt-0.5">{{ p.sku }}</div>
+                <div class="flex items-center gap-3">
+                  <img v-if="p.imageUrl" :src="p.imageUrl" class="w-10 h-10 rounded-lg object-cover border border-[#e2e8f0]" />
+                  <div v-else class="w-10 h-10 rounded-lg bg-[#f1f5f9] flex items-center justify-center text-[#8094ae] border border-[#e2e8f0]">
+                    <i class="fas fa-box"></i>
+                  </div>
+                  <div>
+                    <div class="font-bold text-[#364a63]">{{ p.name }}</div>
+                    <div class="text-xs text-[#8094ae] font-mono mt-0.5">{{ p.sku }}</div>
+                  </div>
+                </div>
               </td>
               <td class="p-4 first:rounded-l-xl last:rounded-r-xl">
-                <span v-if="p.categoryName" class="px-3 py-1 bg-[#eef2ff] text-[#4361ee] rounded-full text-xs font-bold">{{ p.categoryName }}</span>
+                <span v-if="p.categoryId || p.categoryName" class="px-3 py-1 bg-[#eef2ff] text-[#4361ee] rounded-full text-xs font-bold">{{ p.categoryName || categories.find(c => c.id === p.categoryId)?.name || 'Không xác định' }}</span>
                 <span v-else class="text-[#8094ae]">—</span>
               </td>
-              <td class="p-4 text-right font-mono font-medium first:rounded-l-xl last:rounded-r-xl">
-                <span :class="p.quantity > 0 ? 'text-[#05b171]' : 'text-[#ea4f52]'">{{ p.quantity || 0 }}</span>
+              <td class="p-4 text-center font-medium text-[#364a63] first:rounded-l-xl last:rounded-r-xl">
+                <span class="px-3 py-1 bg-[#f1f5f9] rounded-full text-xs font-bold">{{ p.unit || 'Chiếc' }}</span>
               </td>
-              <td class="p-4 text-right font-mono font-bold text-[#364a63] first:rounded-l-xl last:rounded-r-xl">{{ formatCurrency(p.price) }}</td>
-              <td class="p-4 text-right font-mono text-[#8094ae] text-xs first:rounded-l-xl last:rounded-r-xl">{{ formatDate(p.expirationDate) }}</td>
+              <td class="p-4 text-right font-mono font-bold text-[#8094ae] first:rounded-l-xl last:rounded-r-xl">{{ formatCurrency(p.importPrice) }}</td>
+              <td class="p-4 text-right font-mono font-bold text-[#4361ee] first:rounded-l-xl last:rounded-r-xl">{{ formatCurrency(p.price) }}</td>
               <td v-if="isManager" class="p-4 first:rounded-l-xl last:rounded-r-xl">
                 <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                   <button class="w-8 h-8 rounded-lg text-[#0ea5e9] bg-white hover:bg-[#e0f2fe] flex items-center justify-center transition-colors cursor-pointer shadow-sm border border-[#e2e8f0]/50" @click.stop="openEditProduct(p)" title="Sửa">
@@ -396,26 +484,40 @@ function formatDate(val: any) {
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Đơn giá (VNĐ) <span class="text-[#ea4f52]">*</span></label>
+                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Giá nhập (VNĐ)</label>
+                <input v-model="productForm.importPrice" type="number" min="0" placeholder="0" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Giá bán (VNĐ) <span class="text-[#ea4f52]">*</span></label>
                 <input v-model="productForm.price" type="number" min="0" placeholder="0" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
               </div>
               <div>
-                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số lượng <span class="text-[#ea4f52]">*</span></label>
-                <input v-model="productForm.quantity" type="number" min="0" placeholder="0" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Ngày sản xuất</label>
-                <input v-model="productForm.manufacturingDate" type="date" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Hạn sử dụng</label>
-                <input v-model="productForm.expirationDate" type="date" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
+                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Đơn vị tính <span class="text-[#ea4f52]">*</span></label>
+                <input v-model="productForm.unit" type="text" placeholder="Chiếc, Hộp..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
               </div>
             </div>
             <div>
-              <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Mô tả chi tiết</label>
-              <textarea v-model="productForm.description" rows="4" placeholder="Mô tả sản phẩm..." class="w-full px-4 py-3 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all resize-none text-[#364a63]"></textarea>
+              <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Ảnh sản phẩm</label>
+              <div class="flex items-center gap-4">
+                <!-- Nút chọn file -->
+                <div class="relative overflow-hidden rounded-xl bg-white border border-[#e2e8f0] hover:border-[#4361ee] transition-colors cursor-pointer group flex-1">
+                  <input type="file" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" @change="handleImageUpload" :disabled="uploadingImage" />
+                  <div class="flex items-center justify-center gap-2 h-11 px-4 text-sm font-bold text-[#4361ee] group-hover:text-[#3a0ca3]">
+                    <i v-if="uploadingImage" class="fas fa-spinner fa-spin"></i>
+                    <i v-else class="fas fa-cloud-upload-alt"></i>
+                    <span>{{ uploadingImage ? 'Đang tải lên...' : 'Chọn ảnh tải lên' }}</span>
+                  </div>
+                </div>
+                <!-- Xem trước ảnh -->
+                <div v-if="productForm.imageUrl" class="relative w-11 h-11 rounded-lg border border-[#e2e8f0] overflow-hidden shrink-0">
+                  <img :src="productForm.imageUrl" class="w-full h-full object-cover" />
+                  <button @click.prevent="productForm.imageUrl = ''" class="absolute top-0 right-0 bg-red-500 text-white w-4 h-4 flex items-center justify-center rounded-bl text-[10px] hover:bg-red-600 transition-colors z-20">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
+              </div>
             </div>
+
           </div>
           
           <!-- Footer -->
@@ -454,6 +556,41 @@ function formatDate(val: any) {
     <!-- Confirm dialogs -->
     <ConfirmDialog :show="showDeleteProduct" title="Xóa sản phẩm" :message="`Bạn có chắc muốn xóa sản phẩm '${deletingProduct?.name}'? Thao tác này không thể hoàn tác.`" confirm-text="Xóa" :danger="true" @confirm="doDeleteProduct" @cancel="showDeleteProduct = false" />
     <ConfirmDialog :show="showDeleteCat" title="Xóa danh mục" :message="`Bạn có chắc muốn xóa danh mục '${deletingCat?.name}'?`" confirm-text="Xóa" :danger="true" @confirm="doDeleteCat" @cancel="showDeleteCat = false" />
+
+    <!-- Import Result Modal -->
+    <AppModal :show="!!importResult" title="Kết quả Nhập Excel" size="md" @close="importResult = null">
+      <div class="p-6">
+        <div v-if="importResult?.errors && importResult.errors.length === 0" class="flex flex-col items-center justify-center py-6 text-[#10b981]">
+          <i class="fas fa-check-circle text-5xl mb-4"></i>
+          <h4 class="text-lg font-bold text-[#364a63]">Thành công!</h4>
+          <p class="text-[#8094ae]">Đã nhập thành công {{ importResult?.successCount }} sản phẩm.</p>
+        </div>
+        <div v-else class="space-y-4">
+          <div class="flex items-center gap-3 p-4 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100">
+            <i class="fas fa-check-circle text-xl"></i>
+            <div>
+              <div class="font-bold">Nhập thành công: {{ importResult?.successCount }} sản phẩm</div>
+            </div>
+          </div>
+          
+          <div class="flex items-start gap-3 p-4 bg-red-50 text-red-700 rounded-xl border border-red-100">
+            <i class="fas fa-exclamation-triangle text-xl mt-0.5"></i>
+            <div class="flex-1">
+              <div class="font-bold mb-2">Bỏ qua {{ importResult?.errors.length }} dòng bị lỗi:</div>
+              <ul class="list-disc pl-5 space-y-1 text-sm max-h-[200px] overflow-y-auto custom-scrollbar">
+                <li v-for="(err, idx) in importResult?.errors" :key="idx">{{ err }}</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        
+        <div class="mt-6 flex justify-end">
+          <button class="bg-[#4361ee] text-white px-6 py-2.5 rounded-xl font-bold shadow-sm hover:bg-[#3a0ca3] transition-colors" @click="importResult = null">
+            Đóng
+          </button>
+        </div>
+      </div>
+    </AppModal>
   </div>
 </template>
 

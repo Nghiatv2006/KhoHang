@@ -326,4 +326,10 @@ public class InventoryServiceImpl implements InventoryService {
             System.err.println("Audit Log insertion failed: " + e.getMessage());
         }
     }
+
+    public List<InventoryResponse> getGlobalInventories() {
+        return inventoryRepository.findAll().stream()
+                .map(InventoryResponse::new)
+                .collect(Collectors.toList());
+    }
 }

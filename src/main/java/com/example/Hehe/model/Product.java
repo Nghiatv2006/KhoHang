@@ -23,6 +23,9 @@ public class Product {
     @Column(name = "name", nullable = false)
     private String name;
 
+    @Column(name = "import_price")
+    private BigDecimal importPrice = BigDecimal.ZERO;
+
     @Column(name = "price")
     private BigDecimal price;
 
@@ -40,6 +43,9 @@ public class Product {
 
     @Column(name = "has_expiry", nullable = false)
     private Boolean hasExpiry;
+
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
 
     // Ngày sản xuất - Không bắt buộc
     @Column(name = "mfg_date")
@@ -73,6 +79,14 @@ public class Product {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public BigDecimal getImportPrice() {
+        return importPrice;
+    }
+
+    public void setImportPrice(BigDecimal importPrice) {
+        this.importPrice = importPrice;
     }
 
     public BigDecimal getPrice() {
@@ -129,5 +143,13 @@ public class Product {
 
     public void setHasExpiry(Boolean hasExpiry) {
         this.hasExpiry = hasExpiry;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
     }
 }

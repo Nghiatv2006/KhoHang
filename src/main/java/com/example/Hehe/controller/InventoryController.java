@@ -25,7 +25,6 @@ public class InventoryController {
         List<InventoryResponse> res = inventoryService.getInventories(branchId, currentUser);
         return ResponseEntity.ok(res);
     }
-
     @PatchMapping("/{id}/add-stock")
     public ResponseEntity<InventoryResponse> addStock(
             @PathVariable Integer id,
@@ -58,5 +57,10 @@ public class InventoryController {
             @org.springframework.security.core.annotation.AuthenticationPrincipal User currentUser) {
         InventoryResponse res = inventoryService.createProductWithInventory(request, currentUser);
         return ResponseEntity.ok(res);
+    }
+
+    @GetMapping("/global")
+    public ResponseEntity<List<InventoryResponse>> getGlobalInventories() {
+        return ResponseEntity.ok(inventoryService.getGlobalInventories());
     }
 }
