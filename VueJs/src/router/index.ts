@@ -78,8 +78,8 @@ router.beforeEach((to, _from, next) => {
   } else if (to.path === '/login' && isLoggedIn) {
     next('/dashboard')
   } else if (to.path === '/products') {
-    // Chỉ ADMIN và MANAGER nhánh 1 mới được vào Products
-    const hasCrud = user && (user.role === 'ADMIN' || (user.role === 'MANAGER' && user.branchId === 1))
+    // Chỉ ADMIN mới được vào Products
+    const hasCrud = user && user.role === 'ADMIN'
     if (!hasCrud) {
       next('/global-inventory')
     } else {

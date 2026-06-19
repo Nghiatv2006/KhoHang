@@ -37,7 +37,7 @@ INSERT INTO customers (name, contact_info, address, debt) VALUES
 -- (Hash BCrypt tương ứng: $2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu)
 INSERT INTO users (username, password, full_name, role, branch_id, status) VALUES
 ('admin', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Quản trị viên Hệ thống', 'ADMIN', NULL, 'ACTIVE'),
-('manager_hn', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Lê Cường (QL Hà Nội)', 'MANAGER', 1, 'ACTIVE'),
+('manager_dn', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Lê Cường (QL Đà Nẵng)', 'MANAGER', 3, 'ACTIVE'),
 ('staff_hn_1', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Nhân viên HN 01', 'STAFF', 1, 'ACTIVE'),
 ('manager_hcm', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Phạm My (QL HCM)', 'MANAGER', 2, 'ACTIVE'),
 ('staff_locked', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Nhân viên đã nghỉ việc', 'STAFF', 2, 'LOCKED');
