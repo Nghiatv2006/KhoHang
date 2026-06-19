@@ -38,6 +38,7 @@ INSERT INTO customers (name, contact_info, address, debt) VALUES
 INSERT INTO users (username, password, full_name, role, branch_id, status, phone, email) VALUES
 ('admin', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Quản trị viên Hệ thống', 'ADMIN', NULL, 'ACTIVE', '0912345678', 'admin@example.com'),
 ('manager_hn', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Lê Cường (QL Hà Nội)', 'MANAGER', 1, 'ACTIVE', '0923456789', 'manager_hn@example.com'),
+('manager_dn', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Lê Cường (QL Đà Nẵng)', 'MANAGER', 3, 'ACTIVE', '0923456787', 'manager_dn@example.com'),
 ('staff_hn_1', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Nhân viên HN 01', 'STAFF', 1, 'ACTIVE', '0934567890', 'staff_hn_1@example.com'),
 ('manager_hcm', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Phạm My (QL HCM)', 'MANAGER', 2, 'ACTIVE', '0945678901', 'manager_hcm@example.com'),
 ('staff_locked', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Nhân viên đã nghỉ việc', 'STAFF', 2, 'LOCKED', '0956789012', 'staff_locked@example.com');

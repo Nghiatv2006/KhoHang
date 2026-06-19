@@ -26,7 +26,7 @@ onMounted(() => {
 const hasCrudPermission = computed(() => {
   if (!user.value) return false
   // @ts-ignore
-  return user.value.role === 'ADMIN' || (user.value.role === 'MANAGER' && user.value.branchId === 1)
+  return user.value.role === 'ADMIN'
 })
 
 const mainNavItems = computed(() => {

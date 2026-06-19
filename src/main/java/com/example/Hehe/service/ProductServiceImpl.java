@@ -61,12 +61,9 @@ public class ProductServiceImpl implements ProductService {
      */
     private void checkPermission(User currentUser) {
         boolean isAdmin = currentUser.getRole() == UserRole.ADMIN;
-        boolean isMainBranchManager = currentUser.getRole() == UserRole.MANAGER 
-                                      && currentUser.getBranch() != null 
-                                      && currentUser.getBranch().getId() == 1;
 
-        if (!isAdmin && !isMainBranchManager) {
-            throw new RuntimeException("Bạn không có quyền thực hiện thao tác này. Yêu cầu quyền ADMIN hoặc MANAGER Chi nhánh Hà Nội.");
+        if (!isAdmin) {
+            throw new RuntimeException("Bạn không có quyền thực hiện thao tác này. Yêu cầu quyền ADMIN.");
         }
     }
 
@@ -166,6 +163,8 @@ public class ProductServiceImpl implements ProductService {
         // Lưu vào DB
         Product savedProduct = productRepository.save(product);
 
+        // Khởi tạo dòng tồn kho cho Kho Tổng đã bị vô hiệu hóa theo yêu cầu.
+        // Tồn kho sẽ chỉ được tạo ra khi có phiếu nhập kho hoặc phiếu kiểm kê.
 
         return new ProductResponse(savedProduct);
     }
@@ -250,11 +249,15 @@ public class ProductServiceImpl implements ProductService {
 
         if (product != null) {
             String imageUrl = product.getImageUrl();
-            productRepository.delete(product);
-            
-            // Xóa file ảnh vật lý nếu có
-            if (imageUrl != null) {
-                deletePhysicalImage(imageUrl);
+            try {
+                productRepository.delete(product);
+                productRepository.flush();
+                // Xóa file ảnh vật lý nếu có
+                if (imageUrl != null) {
+                    deletePhysicalImage(imageUrl);
+                }
+            } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                throw new RuntimeException("Không thể xóa sản phẩm này vì đã phát sinh dữ liệu liên quan trong Tồn kho hoặc Phiếu kho.");
             }
         }
     }
@@ -394,17 +397,8 @@ public class ProductServiceImpl implements ProductService {
 
                     Product savedProduct = productRepository.save(product);
 
-                    // Khởi tạo tồn kho
-                    branchRepository.findById(1).ifPresent(mainBranch -> {
-                        Inventory inventory = new Inventory();
-                        inventory.setBranch(mainBranch);
-                        inventory.setProduct(savedProduct);
-                        inventory.setQuantity(0);
-                        inventory.setManufacturingDate(savedProduct.getHasExpiry() && savedProduct.getManufacturingDate() != null ? savedProduct.getManufacturingDate() : LocalDate.of(1970, 1, 1));
-                        inventory.setExpirationDate(savedProduct.getHasExpiry() && savedProduct.getExpirationDate() != null ? savedProduct.getExpirationDate() : LocalDate.of(1970, 1, 1));
-                        inventory.setLastUpdated(LocalDateTime.now());
-                        inventoryRepository.save(inventory);
-                    });
+                    // Khởi tạo tồn kho đã bị vô hiệu hóa theo yêu cầu.
+                    // Tồn kho sẽ chỉ được tạo ra khi có phiếu nhập kho hoặc phiếu kiểm kê.
 
                     successCount++;
                 } catch (Exception e) {
