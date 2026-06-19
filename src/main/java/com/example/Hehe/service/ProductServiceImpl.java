@@ -2,15 +2,11 @@ package com.example.Hehe.service;
 
 import com.example.Hehe.dto.ProductResponse;
 import com.example.Hehe.dto.ProductSaveRequest;
-import com.example.Hehe.model.Category;
-import com.example.Hehe.model.Product;
-import com.example.Hehe.model.User;
-import com.example.Hehe.model.UserRole;
+import com.example.Hehe.model.*;
 import com.example.Hehe.repository.CategoryRepository;
 import com.example.Hehe.repository.ProductRepository;
 import com.example.Hehe.repository.BranchRepository;
 import com.example.Hehe.repository.InventoryRepository;
-import com.example.Hehe.model.Inventory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.data.jpa.domain.Specification;
@@ -169,21 +165,6 @@ public class ProductServiceImpl implements ProductService {
 
         // Lưu vào DB
         Product savedProduct = productRepository.save(product);
-
-        // Khởi tạo dòng tồn kho cho Chi nhánh tổng (isHead = true)
-        Branch mainBranch = branchRepository.findByIsHeadTrue().stream().findFirst()
-                .orElseGet(() -> branchRepository.findById(1)
-                        .orElseGet(() -> branchRepository.findAll().stream().findFirst().orElse(null)));
-        if (mainBranch != null) {
-            Inventory inventory = new Inventory();
-            inventory.setBranch(mainBranch);
-            inventory.setProduct(savedProduct);
-            inventory.setQuantity(0);
-            inventory.setManufacturingDate(savedProduct.getHasExpiry() ? savedProduct.getManufacturingDate() : LocalDate.of(1970, 1, 1));
-            inventory.setExpirationDate(savedProduct.getHasExpiry() ? savedProduct.getExpirationDate() : LocalDate.of(1970, 1, 1));
-            inventory.setLastUpdated(LocalDateTime.now());
-            inventoryRepository.save(inventory);
-        }
 
 
         return new ProductResponse(savedProduct);

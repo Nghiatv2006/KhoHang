@@ -365,6 +365,36 @@ async function submitAddStock() {
   }
 }
 
+async function deleteInventory() {
+  if (!selectedInv.value) return;
+  if (!confirm('Bạn có chắc chắn muốn xoá dòng tồn kho này không? Dữ liệu bị xoá sẽ không thể khôi phục.')) return;
+  
+  if (selectedInv.value.quantity > 0) {
+    if (!confirm(`Cảnh báo: Dòng tồn kho này vẫn còn số lượng tồn là ${selectedInv.value.quantity} ${selectedInv.value.unit}. Bạn có thực sự chắc chắn muốn xoá không?`)) return;
+  }
+  
+  try {
+    const res = await api.delete(`/api/inventories/${selectedInv.value.id}`);
+    if (res.ok) {
+      toast.success('Xoá tồn kho thành công!');
+      showDetailPanel.value = false;
+      await loadData();
+    } else {
+      const text = await res.text();
+      let errMessage = 'Lỗi khi xoá tồn kho';
+      if (text) {
+        try {
+          const err = JSON.parse(text);
+          errMessage = err.message || errMessage;
+        } catch(e) {}
+      }
+      toast.error(errMessage);
+    }
+  } catch (err: any) {
+    toast.error('Lỗi kết nối: ' + err.message);
+  }
+}
+
 function openCreateInventoryModal() {
   createForm.value = {
     categoryId: '',
@@ -1196,6 +1226,13 @@ function formatDateTime(dateTimeStr: string) {
           <!-- Footer -->
           <div class="p-6 border-t border-[#f1f5f9] bg-[#f8fafc] flex gap-3">
             <button 
+              class="h-11 px-4 bg-white border border-[#ea4f52] hover:bg-[#ea4f52] text-[#ea4f52] hover:text-white rounded-xl text-sm font-bold transition-all shadow-sm group" 
+              title="Xoá dòng tồn kho này"
+              @click="deleteInventory"
+            >
+              <i class="fas fa-trash"></i>
+            </button>
+            <button 
               class="flex-1 h-11 bg-white border border-[#e2e8f0] hover:bg-[#f8f9fa] text-[#364a63] rounded-xl text-sm font-bold transition-colors shadow-sm" 
               @click="showDetailPanel = false"
             >
@@ -1205,7 +1242,7 @@ function formatDateTime(dateTimeStr: string) {
               class="flex-1 h-11 bg-[#05b171] hover:bg-[#04965f] text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2"
               @click="openAddStockModal"
             >
-              <i class="fas fa-plus"></i> Nhập thêm hàng
+              <i class="fas fa-plus"></i> Nhập thêm
             </button>
           </div>
         </div>

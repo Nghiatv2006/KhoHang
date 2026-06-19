@@ -1,1 +1,1 @@
--- Các câu lệnh cập nhật DB phát sinh tiếp theo sẽ được ghi nhận vào đây.
+-- Tổng hợp các file migration thành 1 file duy nhất cho dễ theo dõi

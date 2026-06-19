@@ -63,4 +63,12 @@ public class InventoryController {
     public ResponseEntity<List<InventoryResponse>> getGlobalInventories() {
         return ResponseEntity.ok(inventoryService.getGlobalInventories());
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteInventory(
+            @PathVariable Integer id,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal User currentUser) {
+        inventoryService.deleteInventory(id, currentUser);
+        return ResponseEntity.noContent().build();
+    }
 }

@@ -327,9 +327,25 @@ public class InventoryServiceImpl implements InventoryService {
         }
     }
 
+    @Override
     public List<InventoryResponse> getGlobalInventories() {
         return inventoryRepository.findAll().stream()
                 .map(InventoryResponse::new)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public void deleteInventory(Integer id, User currentUser) {
+        Inventory inventory = inventoryRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy dòng tồn kho với ID: " + id));
+
+        // Kiểm tra quyền (chỉ ADMIN hoặc Quản lý của chi nhánh đó mới được xoá)
+        if (currentUser.getRole() != com.example.Hehe.model.UserRole.ADMIN) {
+            if (currentUser.getBranch() == null || !currentUser.getBranch().getId().equals(inventory.getBranch().getId())) {
+                throw new RuntimeException("Bạn không có quyền xoá dữ liệu tồn kho của chi nhánh này.");
+            }
+        }
+
+        inventoryRepository.delete(inventory);
     }
 }
