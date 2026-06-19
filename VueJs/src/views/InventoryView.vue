@@ -507,7 +507,6 @@ async function updateExpiryWarning(inv: any) {
       toast.success('Cập nhật số ngày cảnh báo thành công!');
       await loadData();
       // Update local selectedInv reference to reflect changes without closing modal
-      const updatedList = inventories.value;
       const updatedInv = computedInventories.value.find(i => i.id === inv.id);
       if (updatedInv) {
         selectedInv.value = updatedInv;
@@ -1190,7 +1189,7 @@ function formatDateTime(dateTimeStr: string) {
                     type="number" 
                     min="1"
                     @blur="updateExpiryWarning(selectedInv)"
-                    @keyup.enter="$event.target.blur()"
+                    @keyup.enter="($event.target as any).blur()"
                     class="w-14 h-7 px-1 text-right border border-[#e2e8f0] bg-[#f8f9fa] hover:bg-white focus:bg-white rounded text-sm font-bold text-[#4361ee] focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all shadow-sm"
                   />
                   <span class="text-xs font-bold text-[#364a63]">ngày</span>

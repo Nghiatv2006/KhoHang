@@ -240,10 +240,6 @@ function formatCurrency(val: any) {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(val)
 }
 
-function formatDate(val: any) {
-  if (!val) return '—'
-  return new Date(val).toLocaleDateString('vi-VN')
-}
 </script>
 
 <template>
