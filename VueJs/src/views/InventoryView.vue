@@ -168,6 +168,7 @@ const computedInventories = computed(() => {
   return inventories.value.map(inv => {
     const prod = products.value.find(p => p.id === inv.productId)
     const price = prod ? Number(prod.price) : 0
+    const importPrice = prod ? Number(prod.importPrice) : 0
     const unit = prod ? prod.unit : 'Chiếc'
     const categoryId = prod ? prod.categoryId : null
     const categoryName = prod ? prod.categoryName : 'Mặc định'
@@ -188,10 +189,12 @@ const computedInventories = computed(() => {
     return {
       ...inv,
       price,
+      importPrice,
       unit,
       categoryId,
       categoryName,
       totalValue: price * inv.quantity,
+      totalImportValue: importPrice * inv.quantity,
       isWarning: inv.quantity <= threshold,
       isExpired,
       isExpiryWarning,
@@ -428,9 +431,23 @@ async function submitCreateInventory() {
     return
   }
 
+  if (!form.manufacturingDate) {
+    toast.error('Vui lòng nhập Ngày sản xuất (NSX).')
+    return
+  }
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const mfgDate = new Date(form.manufacturingDate)
+  mfgDate.setHours(0, 0, 0, 0)
+  if (mfgDate > today) {
+    toast.error('Ngày sản xuất (NSX) không được lớn hơn ngày hiện tại.')
+    return
+  }
+
   if (form.hasExpiry) {
-    if (!form.manufacturingDate || !form.expirationDate) {
-      toast.error('Vui lòng nhập đầy đủ NSX và HSD.')
+    if (!form.expirationDate) {
+      toast.error('Vui lòng nhập Hạn sử dụng (HSD).')
       return
     }
     if (new Date(form.expirationDate) < new Date(form.manufacturingDate)) {
@@ -452,7 +469,7 @@ async function submitCreateInventory() {
       quantity: form.quantity,
       hasExpiry: form.hasExpiry,
       expiryWarningDays: form.hasExpiry ? Number(form.expiryWarningDays) : 30,
-      manufacturingDate: form.hasExpiry ? form.manufacturingDate : null,
+      manufacturingDate: form.manufacturingDate,
       expirationDate: form.hasExpiry ? form.expirationDate : null
     }
 
@@ -970,8 +987,8 @@ function formatDateTime(dateTimeStr: string) {
           </select>
         </div>
 
-        <!-- Dòng 3: Đơn vị tính & Đơn giá (Read-only) -->
-        <div class="grid grid-cols-2 gap-4">
+        <!-- Dòng 3: Đơn vị tính, Giá nhập & Giá bán (Read-only) -->
+        <div class="grid grid-cols-3 gap-4">
           <div>
             <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Đơn vị tính</label>
             <input 
@@ -979,6 +996,15 @@ function formatDateTime(dateTimeStr: string) {
               type="text" 
               disabled 
               class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#eef2ff] text-[#4361ee] rounded-xl text-sm outline-none font-extrabold transition-all" 
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Giá nhập</label>
+            <input 
+              :value="selectedProductInCreateForm ? formatVND(selectedProductInCreateForm.importPrice) : '-'" 
+              type="text" 
+              disabled 
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none text-slate-500 font-semibold transition-all" 
             />
           </div>
           <div>
@@ -1014,6 +1040,16 @@ function formatDateTime(dateTimeStr: string) {
           </div>
         </div>
 
+        <!-- Ngày sản xuất (NSX) - Bắt buộc -->
+        <div>
+          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Ngày sản xuất (NSX)</label>
+          <input 
+            v-model="createForm.manufacturingDate" 
+            type="date" 
+            class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
+          />
+        </div>
+
         <!-- Checkbox quản lý theo hạn dùng -->
         <div class="flex items-center gap-2 py-1">
           <input 
@@ -1032,14 +1068,6 @@ function formatDateTime(dateTimeStr: string) {
           <div v-if="createForm.hasExpiry" class="space-y-4">
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Ngày sản xuất (NSX)</label>
-                <input 
-                  v-model="createForm.manufacturingDate" 
-                  type="date" 
-                  class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
-                />
-              </div>
-              <div>
                 <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Hạn sử dụng (HSD)</label>
                 <input 
                   v-model="createForm.expirationDate" 
@@ -1047,16 +1075,16 @@ function formatDateTime(dateTimeStr: string) {
                   class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
                 />
               </div>
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số ngày cảnh báo hạn dùng</label>
-              <input 
-                v-model="createForm.expiryWarningDays" 
-                type="number" 
-                min="1"
-                placeholder="Mặc định: 30" 
-                class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
-              />
+              <div>
+                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số ngày cảnh báo hạn dùng</label>
+                <input 
+                  v-model="createForm.expiryWarningDays" 
+                  type="number" 
+                  min="1"
+                  placeholder="Mặc định: 30" 
+                  class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
+                />
+              </div>
             </div>
           </div>
         </Transition>
@@ -1205,13 +1233,25 @@ function formatDateTime(dateTimeStr: string) {
               <!-- Expiration Date -->
               <div class="flex justify-between py-1">
                 <span class="text-[#8094ae] font-semibold">Hạn sử dụng (HSD)</span>
-                <span class="font-bold text-[#364a63]">{{ formatDate(selectedInv.expirationDate) }}</span>
+                <span class="font-bold text-[#364a63]">{{ selectedInv.hasExpiry ? formatDate(selectedInv.expirationDate) : '-' }}</span>
               </div>
 
               <!-- Unit Price -->
               <div class="flex justify-between py-1">
-                <span class="text-[#8094ae] font-semibold">Đơn giá sản phẩm</span>
+                <span class="text-[#8094ae] font-semibold">Đơn giá bán</span>
                 <span class="font-bold text-[#364a63]">{{ formatVND(selectedInv.price) }}</span>
+              </div>
+
+              <!-- Unit Import Price -->
+              <div class="flex justify-between py-1">
+                <span class="text-[#8094ae] font-semibold">Đơn giá nhập</span>
+                <span class="font-bold text-[#364a63]">{{ formatVND(selectedInv.importPrice) }}</span>
+              </div>
+
+              <!-- Total Import Value -->
+              <div class="flex justify-between py-1 border-t border-dashed border-slate-100 pt-2">
+                <span class="text-[#8094ae] font-semibold">Tổng giá trị nhập</span>
+                <span class="font-bold text-amber-600">{{ formatVND(selectedInv.totalImportValue) }}</span>
               </div>
 
               <!-- Last Updated -->

@@ -135,19 +135,23 @@ public class InventoryServiceImpl implements InventoryService {
         Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với ID: " + request.getProductId()));
 
-        // Xác định NSX & HSD dựa trên hasExpiry của request
-        java.time.LocalDate mfg = java.time.LocalDate.of(1970, 1, 1);
-        java.time.LocalDate exp = java.time.LocalDate.of(1970, 1, 1);
+        if (request.getManufacturingDate() == null) {
+            throw new RuntimeException("Ngày sản xuất (NSX) không được để trống.");
+        }
+        java.time.LocalDate mfg = request.getManufacturingDate();
+        if (mfg.isAfter(java.time.LocalDate.now())) {
+            throw new RuntimeException("Ngày sản xuất (NSX) không được lớn hơn ngày hiện tại.");
+        }
+        java.time.LocalDate exp = mfg; // Mặc định exp = mfg để thỏa mãn CHECK constraint exp_date >= mfg_date khi không có HSD
         boolean isExpiry = Boolean.TRUE.equals(request.getHasExpiry());
 
         if (isExpiry) {
-            if (request.getManufacturingDate() == null || request.getExpirationDate() == null) {
-                throw new RuntimeException("Sản phẩm quản lý theo hạn dùng bắt buộc phải điền NSX và HSD.");
+            if (request.getExpirationDate() == null) {
+                throw new RuntimeException("Sản phẩm quản lý theo hạn dùng bắt buộc phải điền HSD.");
             }
-            if (request.getExpirationDate().isBefore(request.getManufacturingDate())) {
+            if (request.getExpirationDate().isBefore(mfg)) {
                 throw new RuntimeException("Hạn sử dụng không được nhỏ hơn Ngày sản xuất.");
             }
-            mfg = request.getManufacturingDate();
             exp = request.getExpirationDate();
         }
 
@@ -239,17 +243,22 @@ public class InventoryServiceImpl implements InventoryService {
         product.setCategory(category);
         product.setHasExpiry(Boolean.TRUE.equals(request.getHasExpiry()));
 
-        java.time.LocalDate mfg = java.time.LocalDate.of(1970, 1, 1);
-        java.time.LocalDate exp = java.time.LocalDate.of(1970, 1, 1);
+        if (request.getManufacturingDate() == null) {
+            throw new RuntimeException("Ngày sản xuất (NSX) không được để trống.");
+        }
+        java.time.LocalDate mfg = request.getManufacturingDate();
+        if (mfg.isAfter(java.time.LocalDate.now())) {
+            throw new RuntimeException("Ngày sản xuất (NSX) không được lớn hơn ngày hiện tại.");
+        }
+        java.time.LocalDate exp = mfg; // Mặc định exp = mfg để thỏa mãn CHECK constraint exp_date >= mfg_date khi không có HSD
 
         if (Boolean.TRUE.equals(request.getHasExpiry())) {
-            if (request.getManufacturingDate() == null || request.getExpirationDate() == null) {
-                throw new RuntimeException("Sản phẩm quản lý theo hạn dùng bắt buộc phải nhập NSX và HSD.");
+            if (request.getExpirationDate() == null) {
+                throw new RuntimeException("Sản phẩm quản lý theo hạn dùng bắt buộc phải nhập HSD.");
             }
-            if (request.getExpirationDate().isBefore(request.getManufacturingDate())) {
+            if (request.getExpirationDate().isBefore(mfg)) {
                 throw new RuntimeException("Hạn sử dụng không được nhỏ hơn Ngày sản xuất.");
             }
-            mfg = request.getManufacturingDate();
             exp = request.getExpirationDate();
         }
         
