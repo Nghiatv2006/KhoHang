@@ -56,15 +56,15 @@ INSERT INTO products (code, name, unit, price, category_id, has_expiry, mfg_date
 ('MILK_NEW', 'Sữa tươi tiệt trùng 1L (Lô mới)', 'Hộp', 35000, 4, TRUE, '2024-05-01', '2024-11-01');
 
 -- Thêm Tồn kho (Inventories)
-INSERT INTO inventories (branch_id, product_id, mfg_date, exp_date, quantity) VALUES
+INSERT INTO inventories (branch_id, product_id, mfg_date, exp_date, batch_code, quantity) VALUES
 -- Tồn tại Chi nhánh Hà Nội
-(1, 1, '1970-01-01', '1970-01-01', 50), -- 50 iPhone
-(1, 2, '1970-01-01', '1970-01-01', 20), -- 20 Macbook
-(1, 3, '1970-01-01', '1970-01-01', 1),  -- 1 Airpods (tạo mặc định 0, sau kiểm kê tăng 1)
-(1, 4, '2024-01-01', '2024-07-01', 100), -- 100 hộp sữa lô cũ
-(1, 5, '2024-05-01', '2024-11-01', 200), -- 200 hộp sữa lô mới
+(1, 1, '1970-01-01', '1970-01-01', 'IP15-HN-001', 50), -- 50 iPhone
+(1, 2, '1970-01-01', '1970-01-01', 'MACM2-HN-001', 20), -- 20 Macbook
+(1, 3, '1970-01-01', '1970-01-01', 'AIR-HN-001', 1),  -- 1 Airpods
+(1, 4, '2024-01-01', '2024-07-01', 'MILK-2024A', 100), -- 100 hộp sữa lô cũ
+(1, 5, '2024-05-01', '2024-11-01', 'MILK-2024B', 200), -- 200 hộp sữa lô mới
 -- Tồn tại Chi nhánh HCM (iPhone sắp hết, dưới ngưỡng 15)
-(2, 1, '1970-01-01', '1970-01-01', 12); 
+(2, 1, '1970-01-01', '1970-01-01', 'IP15-HCM-001', 12); 
 
 
 -- ==============================================================================
@@ -80,18 +80,18 @@ INSERT INTO receipts (code, type, status, source_branch_id, dest_branch_id, crea
 
 -- Thêm Chi tiết phiếu kho (Receipt Details)
 -- Chi tiết cho phiếu Nhập (IM12345678)
-INSERT INTO receipt_details (receipt_id, product_id, mfg_date, exp_date, quantity, price) VALUES
-(1, 1, '1970-01-01', '1970-01-01', 50, 29000000), -- Nhập iPhone giá vốn
-(1, 2, '1970-01-01', '1970-01-01', 20, 24000000);
+INSERT INTO receipt_details (receipt_id, product_id, mfg_date, exp_date, batch_code, quantity, price) VALUES
+(1, 1, '1970-01-01', '1970-01-01', 'IP15-HN-001', 50, 29000000), -- Nhập iPhone giá vốn
+(1, 2, '1970-01-01', '1970-01-01', 'MACM2-HN-001', 20, 24000000);
 -- Chi tiết cho phiếu Xuất (EX87654321)
-INSERT INTO receipt_details (receipt_id, product_id, mfg_date, exp_date, quantity, price) VALUES
-(2, 1, '1970-01-01', '1970-01-01', 2, 29900000);
+INSERT INTO receipt_details (receipt_id, product_id, mfg_date, exp_date, batch_code, quantity, price) VALUES
+(2, 1, '1970-01-01', '1970-01-01', 'IP15-HN-001', 2, 29900000);
 -- Chi tiết cho phiếu Điều chuyển (TR11223344)
-INSERT INTO receipt_details (receipt_id, product_id, mfg_date, exp_date, quantity, price) VALUES
-(3, 1, '1970-01-01', '1970-01-01', 10, 29000000);
+INSERT INTO receipt_details (receipt_id, product_id, mfg_date, exp_date, batch_code, quantity, price) VALUES
+(3, 1, '1970-01-01', '1970-01-01', 'IP15-HN-001', 10, 29000000);
 -- Chi tiết phiếu Điều chỉnh tăng từ việc dư kho đợt kiểm kê
-INSERT INTO receipt_details (receipt_id, product_id, mfg_date, exp_date, quantity, price) VALUES
-(4, 3, '1970-01-01', '1970-01-01', 1, 5500000);
+INSERT INTO receipt_details (receipt_id, product_id, mfg_date, exp_date, batch_code, quantity, price) VALUES
+(4, 3, '1970-01-01', '1970-01-01', 'AIR-HN-001', 1, 5500000);
 
 -- Thêm Phiên kiểm kê (Stocktakes)
 INSERT INTO stocktakes (code, branch_id, created_by, status, notes) VALUES
@@ -100,9 +100,9 @@ INSERT INTO stocktakes (code, branch_id, created_by, status, notes) VALUES
 
 -- Thêm Chi tiết kiểm kê (Stocktake Details)
 -- Trong đợt kiểm kê HN, sổ sách báo 0 Airpods, thực tế phát hiện 1 (lệnh ADJUST_IN số 4 đã xử lý)
-INSERT INTO stocktake_details (stocktake_id, product_id, mfg_date, exp_date, expected_quantity, actual_quantity, adjustment_receipt_id) VALUES
-(1, 1, '1970-01-01', '1970-01-01', 50, 50, NULL),
-(1, 3, '1970-01-01', '1970-01-01', 0, 1, 4);
+INSERT INTO stocktake_details (stocktake_id, product_id, mfg_date, exp_date, batch_code, expected_quantity, actual_quantity, adjustment_receipt_id) VALUES
+(1, 1, '1970-01-01', '1970-01-01', 'IP15-HN-001', 50, 50, NULL),
+(1, 3, '1970-01-01', '1970-01-01', 'AIR-HN-001', 0, 1, 4);
 
 -- ==============================================================================
 -- 6. DỮ LIỆU NHẬT KÝ (AUDIT)

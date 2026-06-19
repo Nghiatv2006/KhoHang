@@ -9,4 +9,6 @@ import java.util.List;
 @Repository
 public interface ReceiptDetailRepository extends JpaRepository<ReceiptDetail, Integer> {
     List<ReceiptDetail> findByReceiptId(Integer receiptId);
+    boolean existsByProductId(Integer productId);
 }
+

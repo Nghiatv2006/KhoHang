@@ -35,13 +35,20 @@ public class ProductServiceImpl implements ProductService {
     private final CategoryRepository categoryRepository;
     private final BranchRepository branchRepository;
     private final InventoryRepository inventoryRepository;
+    private final com.example.Hehe.repository.ReceiptDetailRepository receiptDetailRepository;
 
-    public ProductServiceImpl(ProductRepository productRepository, CategoryRepository categoryRepository, BranchRepository branchRepository, InventoryRepository inventoryRepository) {
+    public ProductServiceImpl(ProductRepository productRepository,
+                              CategoryRepository categoryRepository,
+                              BranchRepository branchRepository,
+                              InventoryRepository inventoryRepository,
+                              com.example.Hehe.repository.ReceiptDetailRepository receiptDetailRepository) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.branchRepository = branchRepository;
         this.inventoryRepository = inventoryRepository;
+        this.receiptDetailRepository = receiptDetailRepository;
     }
+
 
     /**
      * Hàm dùng chung để kiểm tra quyền truy cập.
@@ -147,8 +154,11 @@ public class ProductServiceImpl implements ProductService {
         // Lưu vào DB
         Product savedProduct = productRepository.save(product);
 
-        // Khởi tạo dòng tồn kho cho Kho Tổng (id = 1)
-        branchRepository.findById(1).ifPresent(mainBranch -> {
+        // Khởi tạo dòng tồn kho cho Chi nhánh tổng (isHead = true)
+        Branch mainBranch = branchRepository.findByIsHeadTrue().stream().findFirst()
+                .orElseGet(() -> branchRepository.findById(1)
+                        .orElseGet(() -> branchRepository.findAll().stream().findFirst().orElse(null)));
+        if (mainBranch != null) {
             Inventory inventory = new Inventory();
             inventory.setBranch(mainBranch);
             inventory.setProduct(savedProduct);
@@ -157,7 +167,8 @@ public class ProductServiceImpl implements ProductService {
             inventory.setExpirationDate(savedProduct.getHasExpiry() ? savedProduct.getExpirationDate() : LocalDate.of(1970, 1, 1));
             inventory.setLastUpdated(LocalDateTime.now());
             inventoryRepository.save(inventory);
-        });
+        }
+
 
         return new ProductResponse(savedProduct);
     }
@@ -187,16 +198,31 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
+        // Kiểm tra thay đổi cài đặt Hạn sử dụng (hasExpiry)
+        boolean oldHasExpiry = product.getHasExpiry() != null && product.getHasExpiry();
+        boolean newHasExpiry = request.getExpirationDate() != null;
+        if (oldHasExpiry != newHasExpiry) {
+            boolean hasStock = inventoryRepository.existsByProductIdAndQuantityGreaterThan(product.getId(), 0);
+            boolean hasTransactions = receiptDetailRepository.existsByProductId(product.getId());
+            if (hasStock || hasTransactions) {
+                throw new RuntimeException("Không được phép thay đổi cài đặt Hạn sử dụng (hasExpiry) của sản phẩm đã phát sinh tồn kho hoặc giao dịch.");
+            }
+            product.setHasExpiry(newHasExpiry);
+        }
+
         // Cập nhật thông tin (Bỏ qua SKU)
         product.setName(request.getName());
         product.setPrice(request.getPrice());
         product.setDescription(request.getDescription());
         product.setCategory(category);
-        product.setManufacturingDate(request.getManufacturingDate());
-        product.setExpirationDate(request.getExpirationDate());
-        if (request.getExpirationDate() != null) {
-            product.setHasExpiry(true);
+        if (newHasExpiry) {
+            product.setManufacturingDate(request.getManufacturingDate());
+            product.setExpirationDate(request.getExpirationDate());
+        } else {
+            product.setManufacturingDate(LocalDate.of(1970, 1, 1));
+            product.setExpirationDate(LocalDate.of(1970, 1, 1));
         }
+
 
         Product updatedProduct = productRepository.save(product);
 

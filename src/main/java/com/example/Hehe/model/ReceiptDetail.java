@@ -32,8 +32,14 @@ public class ReceiptDetail {
     @Column(name = "price", nullable = false)
     private BigDecimal price;
 
+    @Column(name = "batch_code", nullable = false)
+    private String batchCode = "DEFAULT_BATCH";
+
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
+
+    public String getBatchCode() { return batchCode; }
+    public void setBatchCode(String batchCode) { this.batchCode = batchCode; }
 
     public Receipt getReceipt() { return receipt; }
     public void setReceipt(Receipt receipt) { this.receipt = receipt; }

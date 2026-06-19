@@ -32,7 +32,7 @@ public class AuthController {
                     .secure(false)             // Set true nếu chạy HTTPS (chạy local http tạm thời để false)
                     .path("/")                 // Có hiệu lực cho toàn bộ API
                     .maxAge(86400)             // Hết hạn sau 24h (tính bằng giây)
-                    .sameSite("Strict")        // Ngăn chặn tấn công CSRF
+                    .sameSite("Lax")           // Đổi sang Lax để tránh lỗi mất cookie khi chuyển trang SPA
                     .build();
 
             // 2. Trả về thông tin user (không kèm token trong Body nữa) và đính kèm Cookie vào Header
@@ -61,7 +61,7 @@ public class AuthController {
                 .secure(false)
                 .path("/")
                 .maxAge(0)
-                .sameSite("Strict")
+                .sameSite("Lax")
                 .build();
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, deleteCookie.toString())

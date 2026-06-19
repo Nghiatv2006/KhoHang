@@ -26,6 +26,7 @@ onMounted(() => {
 const navItems = [
   { label: 'Tổng quan', to: '/dashboard', icon: 'fas fa-chart-pie' },
   { label: 'Sản phẩm', to: '/products', icon: 'fas fa-box-open' },
+  { label: 'Tồn kho', to: '/inventory', icon: 'fas fa-warehouse' },
   { label: 'Đối tác', to: '/partners', icon: 'fas fa-handshake' },
   { label: 'Nhân viên', to: '/users', icon: 'fas fa-users' },
   { label: 'Chi nhánh', to: '/branches', icon: 'fas fa-building' },

@@ -82,6 +82,7 @@ public class ReceiptServiceImpl implements ReceiptService {
             r.setDestBranch(branchRepository.findById(request.getDestBranchId()).orElseThrow(() -> new RuntimeException("Dest branch not found")));
         }
 
+
         if (request.getDetails() == null || request.getDetails().isEmpty()) {
             throw new RuntimeException("Receipt must have details.");
         }
