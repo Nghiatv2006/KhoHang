@@ -43,11 +43,24 @@ const mainNavItems = computed(() => {
   return items
 })
 
-const adminNavItems = [
-  { label: 'Đối tác', to: '/partners', icon: 'fas fa-handshake' },
-  { label: 'Nhân viên', to: '/users', icon: 'fas fa-users' },
-  { label: 'Chi nhánh', to: '/branches', icon: 'fas fa-building' },
-]
+const isManagerOrAdmin = computed(() => {
+  if (!user.value) return false
+  // @ts-ignore
+  return ['ADMIN', 'MANAGER'].includes(user.value.role)
+})
+
+const adminNavItems = computed(() => {
+  const items: { label: string; to: string; icon: string }[] = [
+    { label: 'Đối tác', to: '/partners', icon: 'fas fa-handshake' },
+    { label: 'Nhân viên', to: '/users', icon: 'fas fa-users' },
+    { label: 'Chi nhánh', to: '/branches', icon: 'fas fa-building' },
+  ]
+  if (isManagerOrAdmin.value) {
+    items.push({ label: 'Nhật ký hoạt động', to: '/audit-logs', icon: 'fas fa-history' })
+  }
+  return items
+})
+
 
 async function logout() {
   try {

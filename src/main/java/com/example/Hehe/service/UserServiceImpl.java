@@ -24,11 +24,14 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final BranchRepository branchRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuditLogService auditLogService;
 
-    public UserServiceImpl(UserRepository userRepository, BranchRepository branchRepository, PasswordEncoder passwordEncoder) {
+    public UserServiceImpl(UserRepository userRepository, BranchRepository branchRepository,
+                            PasswordEncoder passwordEncoder, AuditLogService auditLogService) {
         this.userRepository = userRepository;
         this.branchRepository = branchRepository;
         this.passwordEncoder = passwordEncoder;
+        this.auditLogService = auditLogService;
     }
 
     @Override
@@ -44,32 +47,27 @@ public class UserServiceImpl implements UserService {
         UserStatus filterStatus = (status != null && !status.trim().isEmpty()) ? UserStatus.valueOf(status.toUpperCase()) : null;
         String pattern = (keyword != null && !keyword.trim().isEmpty()) ? "%" + keyword.trim().toLowerCase() + "%" : null;
 
-        // MANAGER chỉ thấy STAFF cùng chi nhánh
-        if (currentUser.getRole() == UserRole.MANAGER) {
-            filterRole = UserRole.STAFF;
-            branchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
-        }
+        // Tìm chi nhánh tổng (dùng làm fallback nếu tài khoản chưa có chi nhánh)
+        Branch headBranch = branchRepository.findByIsHeadTrue().stream()
+                .findFirst()
+                .orElseGet(() -> branchRepository.findAll().stream()
+                        .min(java.util.Comparator.comparing(Branch::getId))
+                        .orElse(null));
+        final Integer headBranchId = headBranch != null ? headBranch.getId() : null;
 
-        List<User> users = userRepository.searchUsers(pattern, filterRole, branchId, filterStatus);
+        // Xác định chi nhánh của người đang đăng nhập
+        final Integer isolatedBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : headBranchId;
 
-        if (currentUser.getRole() == UserRole.ADMIN) {
-            // Xác định chi nhánh tổng:
-            // 1. Tìm branch có isHead = true
-            // 2. Fallback về branch có ID nhỏ nhất nếu chưa cấu hình isHead
-            Branch headBranch = branchRepository.findByIsHeadTrue().stream()
-                    .findFirst()
-                    .orElseGet(() -> branchRepository.findAll().stream()
-                            .min(java.util.Comparator.comparing(Branch::getId))
-                            .orElse(null));
+        // Lấy tất cả user thoả mãn từ khoá/role/status (bỏ qua branchId từ query UI)
+        List<User> users = userRepository.searchUsers(pattern, filterRole, null, filterStatus);
 
-            final Integer headBranchId = headBranch != null ? headBranch.getId() : null;
-
-            users = users.stream()
-                    .filter(u -> u.getRole() == UserRole.ADMIN 
-                              || (u.getBranch() != null && u.getBranch().getId().equals(headBranchId)) 
-                              || (u.getRole() == UserRole.MANAGER && u.getBranch() != null && !u.getBranch().getId().equals(headBranchId)))
-                    .collect(Collectors.toList());
-        }
+        // Cách ly dữ liệu hoàn toàn bằng Java Stream:
+        // Chỉ giữ lại những người dùng có branchId trùng với isolatedBranchId của người đang đăng nhập.
+        // Những user nào trong DB chưa có branch (như tài khoản admin cũ), ta quy ước họ thuộc chi nhánh tổng.
+        users = users.stream().filter(u -> {
+            Integer targetUserBranchId = u.getBranch() != null ? u.getBranch().getId() : headBranchId;
+            return isolatedBranchId != null && isolatedBranchId.equals(targetUserBranchId);
+        }).collect(Collectors.toList());
 
         return users.stream()
                 .map(this::convertToResponse)
@@ -177,6 +175,12 @@ public class UserServiceImpl implements UserService {
 
         user.setUpdatedAt(java.time.LocalDateTime.now());
         User savedUser = userRepository.save(user);
+
+        // Ghi Nhật ký
+        auditLogService.logAction(currentUser, "CREATE", "users",
+                String.valueOf(savedUser.getId()),
+                "Tạo tài khoản mới: " + savedUser.getFullName() + " (" + savedUser.getUsername() + ") - Vai trò: " + savedUser.getRole().name());
+
         return convertToResponse(savedUser);
     }
 
@@ -286,6 +290,12 @@ public class UserServiceImpl implements UserService {
 
         user.setUpdatedAt(java.time.LocalDateTime.now());
         User updatedUser = userRepository.save(user);
+
+        // Ghi Nhật ký
+        auditLogService.logAction(currentUser, "UPDATE", "users",
+                String.valueOf(updatedUser.getId()),
+                "Cập nhật thông tin tài khoản: " + updatedUser.getFullName() + " (" + updatedUser.getUsername() + ")");
+
         return convertToResponse(updatedUser);
     }
 
@@ -312,7 +322,14 @@ public class UserServiceImpl implements UserService {
         }
 
         try {
+            String fullName = user.getFullName();
+            String username = user.getUsername();
             userRepository.delete(user);
+
+            // Ghi Nhật ký
+            auditLogService.logAction(currentUser, "DELETE", "users",
+                    String.valueOf(id),
+                    "Xóa tài khoản: " + fullName + " (" + username + ")");
         } catch (DataIntegrityViolationException ex) {
             throw new RuntimeException("Tài khoản đã phát sinh dữ liệu giao dịch trong hệ thống, không thể xóa. Vui lòng sử dụng tính năng khóa tài khoản.");
         }
@@ -341,7 +358,8 @@ public class UserServiceImpl implements UserService {
         }
 
         // Thay đổi trạng thái
-        if (user.getStatus() == UserStatus.ACTIVE) {
+        boolean isLocking = user.getStatus() == UserStatus.ACTIVE;
+        if (isLocking) {
             user.setStatus(UserStatus.LOCKED);
         } else {
             user.setStatus(UserStatus.ACTIVE);
@@ -349,6 +367,15 @@ public class UserServiceImpl implements UserService {
 
         user.setUpdatedAt(java.time.LocalDateTime.now());
         User updatedUser = userRepository.save(user);
+
+        // Ghi Nhật ký
+        String actionLabel = isLocking ? "LOCK_ACCOUNT" : "UPDATE";
+        String desc = isLocking
+                ? "Khóa tài khoản: " + updatedUser.getFullName() + " (" + updatedUser.getUsername() + ")"
+                : "Mở khóa tài khoản: " + updatedUser.getFullName() + " (" + updatedUser.getUsername() + ")";
+        auditLogService.logAction(currentUser, actionLabel, "users",
+                String.valueOf(updatedUser.getId()), desc);
+
         return convertToResponse(updatedUser);
     }
 

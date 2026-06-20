@@ -7,6 +7,7 @@ const router = useRouter()
 const form = reactive({ username: '', password: '' })
 const loading = ref(false)
 const errorMsg = ref('')
+const banMsg = ref('') // Thông báo bị phạt spam
 const showPwd = ref(false)
 
 async function handleLogin() {
@@ -16,6 +17,7 @@ async function handleLogin() {
   }
   loading.value = true
   errorMsg.value = ''
+  banMsg.value = ''
   try {
     const res = await api.post('/api/auth/login', {
       username: form.username.trim(),
@@ -25,6 +27,15 @@ async function handleLogin() {
     if (res.ok) {
       localStorage.setItem('wh_user', JSON.stringify(data))
       router.push('/dashboard')
+    } else if (res.status === 429) {
+      // Bị phạt spam
+      const banUntilRaw = data.banUntil
+      if (banUntilRaw) {
+        const dt = new Date(banUntilRaw).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'medium' })
+        banMsg.value = `⚠️ Tài khoản bị tạm khóa do thao tác quá nhanh. Vui lòng thử lại sau: ${dt}`
+      } else {
+        banMsg.value = data.message || 'Thất bại. Vui lòng thử lại sau.'
+      }
     } else {
       errorMsg.value = data.message || 'Tên đăng nhập hoặc mật khẩu không đúng.'
     }
@@ -67,7 +78,11 @@ async function handleLogin() {
         </div>
 
         <!-- Alert Messages -->
-        <div v-if="errorMsg" class="bg-[#f8d7da] text-[#721c24] px-4 py-3 rounded-xl shadow-sm border-0 mb-6 flex items-center gap-3 text-sm font-semibold">
+        <div v-if="banMsg" class="bg-amber-50 border border-amber-300 text-amber-800 px-4 py-3 rounded-xl shadow-sm mb-6 flex items-start gap-3 text-sm font-semibold">
+          <i class="fas fa-ban text-amber-500 text-lg mt-0.5 shrink-0"></i>
+          <span>{{ banMsg }}</span>
+        </div>
+        <div v-else-if="errorMsg" class="bg-[#f8d7da] text-[#721c24] px-4 py-3 rounded-xl shadow-sm border-0 mb-6 flex items-center gap-3 text-sm font-semibold">
           <i class="fas fa-exclamation-triangle text-lg"></i> <span>{{ errorMsg }}</span>
         </div>
 

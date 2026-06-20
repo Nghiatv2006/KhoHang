@@ -43,10 +43,13 @@ CREATE TABLE users (
     password VARCHAR(255) NOT NULL,
     full_name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE,
+    phone VARCHAR(20),
     role user_role NOT NULL,
     branch_id INT,
     status user_status NOT NULL DEFAULT 'ACTIVE',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ban_until TIMESTAMP, -- Thời gian bị phạt SPAM (null = không bị phạt)
     CONSTRAINT fk_user_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE RESTRICT,
     CONSTRAINT chk_user_branch CHECK (role = 'ADMIN' OR branch_id IS NOT NULL)
 );
@@ -148,13 +151,15 @@ CREATE TABLE stocktake_details (
 
 -- Bảng Nhật ký hoạt động (Audit Logs)
 CREATE TABLE audit_logs (
-    id SERIAL PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     user_id INT,
-    action VARCHAR(50) NOT NULL,
-    entity_name VARCHAR(100) NOT NULL,
-    entity_id VARCHAR(50),
-    details TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    branch_id INT,                                          -- Chi nhánh xảy ra hành động (để phân quyền xem)
+    action VARCHAR(50) NOT NULL,                            -- LOGIN, LOGOUT, CREATE, UPDATE, DELETE, APPROVE, CANCEL, SPAM_WARNING, LOCK_ACCOUNT
+    entity_name VARCHAR(100),                               -- Tên thực thể: products, receipts, users...
+    entity_id VARCHAR(100),                                 -- ID thực thể bị tác động
+    details TEXT,                                           -- Mô tả chi tiết bằng Tiếng Việt
+    is_warning BOOLEAN NOT NULL DEFAULT FALSE,              -- TRUE = log cảnh báo, hiển thị màu đỏ
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
@@ -167,3 +172,8 @@ CREATE INDEX idx_receipts_type_status ON receipts (type, status);
 CREATE INDEX idx_stocktakes_branch ON stocktakes (branch_id);
 CREATE INDEX idx_customers_status ON customers (status);
 CREATE INDEX idx_receipts_payment_status ON receipts (payment_status);
+-- Indexes cho Audit Logs (quan trọng cho hiệu năng khi bảng có nhiều dòng)
+CREATE INDEX idx_audit_logs_branch_id  ON audit_logs (branch_id);
+CREATE INDEX idx_audit_logs_user_id    ON audit_logs (user_id);
+CREATE INDEX idx_audit_logs_action     ON audit_logs (action);
+CREATE INDEX idx_audit_logs_created_at ON audit_logs (created_at DESC);

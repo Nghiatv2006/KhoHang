@@ -19,15 +19,18 @@ public class ReceiptServiceImpl implements ReceiptService {
     private final ProductRepository productRepository;
     private final BranchRepository branchRepository;
     private final InventoryRepository inventoryRepository;
+    private final AuditLogService auditLogService;
 
     public ReceiptServiceImpl(ReceiptRepository receiptRepository,
                               ProductRepository productRepository,
                               BranchRepository branchRepository,
-                              InventoryRepository inventoryRepository) {
+                              InventoryRepository inventoryRepository,
+                              AuditLogService auditLogService) {
         this.receiptRepository = receiptRepository;
         this.productRepository = productRepository;
         this.branchRepository = branchRepository;
         this.inventoryRepository = inventoryRepository;
+        this.auditLogService = auditLogService;
     }
 
     @Override
@@ -102,6 +105,13 @@ public class ReceiptServiceImpl implements ReceiptService {
         }
 
         receiptRepository.save(r);
+
+        // Ghi Nhật ký
+        String typeLabel = r.getType() != null ? r.getType().name() : "PHᯪU";
+        auditLogService.logAction(currentUser, "CREATE", "receipts",
+                String.valueOf(r.getId()),
+                "Tạo phiếu " + typeLabel + ": " + r.getCode());
+
         return new ReceiptResponse(r);
     }
 
@@ -128,6 +138,12 @@ public class ReceiptServiceImpl implements ReceiptService {
         }
         
         receiptRepository.save(r);
+
+        // Ghi Nhật ký
+        auditLogService.logAction(currentUser, "CANCEL", "receipts",
+                String.valueOf(r.getId()),
+                "Hủy phiếu: " + r.getCode());
+
         return new ReceiptResponse(r);
     }
 

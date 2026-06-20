@@ -13,7 +13,6 @@ public class ProductSaveRequest {
     private BigDecimal importPrice;
     private BigDecimal price;
 
-    private String description;
     private String imageUrl;
     private String unit;
     
@@ -23,6 +22,9 @@ public class ProductSaveRequest {
     private LocalDate manufacturingDate;
     private LocalDate expirationDate;
     private Boolean hasExpiry;
+    
+    // Đánh dấu người dùng muốn ép tạo mới dù trùng tên sản phẩm đã xóa
+    private Boolean forceCreate;
 
     // Getters and Setters
 
@@ -48,14 +50,6 @@ public class ProductSaveRequest {
 
     public void setPrice(BigDecimal price) {
         this.price = price;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
     }
 
     public String getImageUrl() {
@@ -104,5 +98,13 @@ public class ProductSaveRequest {
 
     public void setHasExpiry(Boolean hasExpiry) {
         this.hasExpiry = hasExpiry;
+    }
+
+    public Boolean getForceCreate() {
+        return forceCreate;
+    }
+
+    public void setForceCreate(Boolean forceCreate) {
+        this.forceCreate = forceCreate;
     }
 }

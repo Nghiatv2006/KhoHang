@@ -58,6 +58,12 @@ const routes: RouteRecordRaw[] = [
         name: 'Profile',
         component: () => import('../views/ProfileView.vue'),
       },
+      {
+        path: '/audit-logs',
+        name: 'AuditLogs',
+        component: () => import('../views/AuditLogView.vue'),
+        meta: { roles: ['ADMIN', 'MANAGER'] },
+      },
     ],
   },
 ]
@@ -82,6 +88,14 @@ router.beforeEach((to, _from, next) => {
     const hasCrud = user && user.role === 'ADMIN'
     if (!hasCrud) {
       next('/global-inventory')
+    } else {
+      next()
+    }
+  } else if (to.path === '/audit-logs') {
+    // Chỉ ADMIN và MANAGER mới được xem Nhật ký
+    const canView = user && ['ADMIN', 'MANAGER'].includes(user.role)
+    if (!canView) {
+      next('/dashboard')
     } else {
       next()
     }

@@ -17,7 +17,6 @@ public class ProductResponse {
     private BigDecimal importPrice;
     private BigDecimal price;
 
-    private String description;
     private String imageUrl;
     private String unit;
     
@@ -35,7 +34,6 @@ public class ProductResponse {
         this.importPrice = product.getImportPrice();
         this.price = product.getPrice();
 
-        this.description = product.getDescription();
         this.imageUrl = product.getImageUrl();
         this.unit = product.getUnit();
         
@@ -72,10 +70,6 @@ public class ProductResponse {
         return price;
     }
 
-
-    public String getDescription() {
-        return description;
-    }
 
     public String getImageUrl() {
         return imageUrl;

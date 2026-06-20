@@ -44,12 +44,16 @@ public class ProductServiceImpl implements ProductService {
     private final CategoryRepository categoryRepository;
     private final BranchRepository branchRepository;
     private final InventoryRepository inventoryRepository;
+    private final AuditLogService auditLogService;
 
-    public ProductServiceImpl(ProductRepository productRepository, CategoryRepository categoryRepository, BranchRepository branchRepository, InventoryRepository inventoryRepository) {
+    public ProductServiceImpl(ProductRepository productRepository, CategoryRepository categoryRepository,
+                               BranchRepository branchRepository, InventoryRepository inventoryRepository,
+                               AuditLogService auditLogService) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.branchRepository = branchRepository;
         this.inventoryRepository = inventoryRepository;
+        this.auditLogService = auditLogService;
     }
 
     /**
@@ -72,6 +76,9 @@ public class ProductServiceImpl implements ProductService {
     public List<ProductResponse> getAllProducts(String keyword, Integer categoryId, BigDecimal minPrice, BigDecimal maxPrice) {
         Specification<Product> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+
+            // Chỉ lấy các sản phẩm chưa bị xóa (Soft Delete)
+            predicates.add(cb.or(cb.isNull(root.get("isDeleted")), cb.equal(root.get("isDeleted"), false)));
 
             // Tìm kiếm theo tên (không phân biệt chữ hoa, chữ thường)
             if (keyword != null && !keyword.trim().isEmpty()) {
@@ -138,6 +145,15 @@ public class ProductServiceImpl implements ProductService {
                 throw new RuntimeException("Ngày sản xuất không thể lớn hơn hạn sử dụng.");
             }
         }
+        if (!Boolean.TRUE.equals(request.getForceCreate())) {
+            java.util.Optional<Product> deletedProduct = productRepository.findFirstByNameAndIsDeletedTrue(request.getName());
+            if (deletedProduct.isPresent()) {
+                throw new com.example.Hehe.exception.ProductDeletedConflictException(
+                    deletedProduct.get().getId(),
+                    "Sản phẩm này từng tồn tại và đã bị xóa. Bạn có muốn khôi phục lại nó không hay vẫn muốn tạo một mã sản phẩm mới hoàn toàn?"
+                );
+            }
+        }
 
         Product product = new Product();
         // Sinh SKU tự động: Kết hợp tiền tố PRD- với một chuỗi UUID ngẫu nhiên (cắt ngắn)
@@ -147,7 +163,6 @@ public class ProductServiceImpl implements ProductService {
         product.setName(request.getName());
         product.setImportPrice(request.getImportPrice() != null ? request.getImportPrice() : BigDecimal.ZERO);
         product.setPrice(request.getPrice());
-        product.setDescription(request.getDescription());
         product.setImageUrl(request.getImageUrl());
         product.setCategory(category);
         product.setManufacturingDate(request.getManufacturingDate());
@@ -160,8 +175,10 @@ public class ProductServiceImpl implements ProductService {
         // Lưu vào DB
         Product savedProduct = productRepository.save(product);
 
-        // Khởi tạo dòng tồn kho cho Kho Tổng đã bị vô hiệu hóa theo yêu cầu.
-        // Tồn kho sẽ chỉ được tạo ra khi có phiếu nhập kho hoặc phiếu kiểm kê.
+        // Ghi Nhật ký
+        auditLogService.logAction(currentUser, "CREATE", "products",
+                String.valueOf(savedProduct.getId()),
+                "Tạo mới sản phẩm: " + savedProduct.getName());
 
         return new ProductResponse(savedProduct);
     }
@@ -204,14 +221,31 @@ public class ProductServiceImpl implements ProductService {
             product.setImportPrice(request.getImportPrice());
         }
         product.setPrice(request.getPrice());
-        product.setDescription(request.getDescription());
         product.setImageUrl(newImageUrl);
         product.setCategory(category);
         product.setManufacturingDate(request.getManufacturingDate());
         product.setExpirationDate(request.getExpirationDate());
         product.setHasExpiry(request.getHasExpiry() != null ? request.getHasExpiry() : false);
+        
+        // Khôi phục lại nếu sản phẩm đang bị xóa mềm
+        boolean isRestoring = false;
+        if (Boolean.TRUE.equals(product.getIsDeleted())) {
+            product.setIsDeleted(false);
+            isRestoring = true;
+        }
 
         Product updatedProduct = productRepository.save(product);
+
+        // Ghi Nhật ký
+        if (isRestoring) {
+            auditLogService.logAction(currentUser, "RESTORE", "products",
+                    String.valueOf(updatedProduct.getId()),
+                    "Khôi phục sản phẩm: " + updatedProduct.getName());
+        } else {
+            auditLogService.logAction(currentUser, "UPDATE", "products",
+                    String.valueOf(updatedProduct.getId()),
+                    "Cập nhật thông tin sản phẩm: " + updatedProduct.getName());
+        }
 
         return new ProductResponse(updatedProduct);
     }
@@ -228,17 +262,14 @@ public class ProductServiceImpl implements ProductService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với ID: " + id));
 
         if (product != null) {
-            String imageUrl = product.getImageUrl();
-            try {
-                productRepository.delete(product);
-                productRepository.flush();
-                // Xóa file ảnh vật lý nếu có
-                if (imageUrl != null) {
-                    deletePhysicalImage(imageUrl);
-                }
-            } catch (org.springframework.dao.DataIntegrityViolationException e) {
-                throw new RuntimeException("Không thể xóa sản phẩm này vì đã phát sinh dữ liệu liên quan trong Tồn kho hoặc Phiếu kho.");
-            }
+            // Thực hiện Soft Delete thay vì xóa cứng (Hard Delete)
+            product.setIsDeleted(true);
+            productRepository.save(product);
+
+            // Ghi Nhật ký
+            auditLogService.logAction(currentUser, "DELETE", "products",
+                    String.valueOf(product.getId()),
+                    "Xóa sản phẩm: " + product.getName());
         }
     }
 
@@ -373,7 +404,6 @@ public class ProductServiceImpl implements ProductService {
                     product.setHasExpiry(false);
                     product.setManufacturingDate(null);
                     product.setExpirationDate(null);
-                    product.setDescription("");
 
                     Product savedProduct = productRepository.save(product);
 

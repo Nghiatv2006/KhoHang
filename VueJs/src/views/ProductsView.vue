@@ -44,6 +44,11 @@ const productForm = reactive({
 const pSaving = ref(false)
 const uploadingImage = ref(false)
 
+// Conflict Dialog
+const showConflictDialog = ref(false)
+const conflictProductId = ref<number | null>(null)
+const conflictMessage = ref('')
+
 async function handleImageUpload(event: Event) {
   const target = event.target as HTMLInputElement
   if (!target.files || target.files.length === 0) return
@@ -84,9 +89,13 @@ function openEditProduct(p: any) {
   })
   showProductModal.value = true
 }
-async function saveProduct() {
+async function saveProduct(forceCreate = false) {
   if (!productForm.name?.trim()) {
     toast.error('Tên sản phẩm là bắt buộc.')
+    return
+  }
+  if (!productForm.categoryId) {
+    toast.error('Vui lòng chọn danh mục cho sản phẩm.')
     return
   }
   pSaving.value = true
@@ -97,7 +106,8 @@ async function saveProduct() {
       importPrice: productForm.importPrice || 0,
       price: productForm.price || 0,
       unit: productForm.unit || 'Chiếc',
-      imageUrl: productForm.imageUrl
+      imageUrl: productForm.imageUrl,
+      forceCreate: forceCreate
     }
     const res = editingProduct.value
       ? await api.put(`/api/products/${editingProduct.value.id}`, payload)
@@ -105,6 +115,13 @@ async function saveProduct() {
     
     let data = {}
     try { data = await res.json() } catch {}
+
+    if (res.status === 409 && (data as any).code === 'DELETED_CONFLICT') {
+      conflictProductId.value = (data as any).productId
+      conflictMessage.value = (data as any).message
+      showConflictDialog.value = true
+      return
+    }
 
     if (res.ok) {
       toast.success(editingProduct.value ? 'Cập nhật sản phẩm thành công!' : 'Thêm sản phẩm thành công!')
@@ -115,6 +132,40 @@ async function saveProduct() {
     }
   } catch { toast.error('Không thể kết nối máy chủ.') }
   finally { pSaving.value = false }
+}
+
+async function doRestoreProduct() {
+  if (!conflictProductId.value) return
+  pSaving.value = true
+  showConflictDialog.value = false
+  try {
+    const payload = {
+      name: productForm.name.trim(),
+      categoryId: productForm.categoryId || null,
+      importPrice: productForm.importPrice || 0,
+      price: productForm.price || 0,
+      unit: productForm.unit || 'Chiếc',
+      imageUrl: productForm.imageUrl
+    }
+    // Restoring uses the PUT endpoint because we want to update it with the new form values
+    const res = await api.put(`/api/products/${conflictProductId.value}`, payload)
+    let data = {}
+    try { data = await res.json() } catch {}
+    
+    if (res.ok) {
+      toast.success('Khôi phục sản phẩm thành công!')
+      showProductModal.value = false
+      await loadProducts()
+    } else {
+      toast.error((data as any).message || 'Có lỗi xảy ra.')
+    }
+  } catch { toast.error('Không thể kết nối máy chủ.') }
+  finally { pSaving.value = false }
+}
+
+async function doForceCreateProduct() {
+  showConflictDialog.value = false
+  await saveProduct(true)
 }
 
 // Delete product
@@ -523,7 +574,7 @@ function formatDate(val: any) {
           <!-- Footer -->
           <div class="p-6 border-t border-[#f1f5f9] bg-[#f8fafc] flex gap-3">
             <button class="flex-1 h-11 bg-white border border-[#e2e8f0] hover:bg-[#f8f9fa] text-[#364a63] rounded-xl text-sm font-bold transition-colors shadow-sm" @click="showProductModal = false">Hủy bỏ</button>
-            <button class="flex-1 h-11 bg-[#4361ee] hover:bg-[#3a0ca3] text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2" :disabled="pSaving" @click="saveProduct">
+            <button class="flex-1 h-11 bg-[#4361ee] hover:bg-[#3a0ca3] text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2" :disabled="pSaving" @click="saveProduct(false)">
               <i v-if="pSaving" class="fas fa-spinner fa-spin"></i>
               {{ pSaving ? 'Đang lưu...' : 'Lưu sản phẩm' }}
             </button>
@@ -587,6 +638,32 @@ function formatDate(val: any) {
         <div class="mt-6 flex justify-end">
           <button class="bg-[#4361ee] text-white px-6 py-2.5 rounded-xl font-bold shadow-sm hover:bg-[#3a0ca3] transition-colors" @click="importResult = null">
             Đóng
+          </button>
+        </div>
+      </div>
+    </AppModal>
+
+    <!-- Conflict Dialog -->
+    <AppModal :show="showConflictDialog" title="Phát hiện trùng lặp" size="sm" @close="showConflictDialog = false">
+      <div class="p-6">
+        <div class="flex items-start gap-4 mb-6">
+          <div class="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+            <i class="fas fa-exclamation-triangle text-amber-500 text-xl"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-[#364a63] mb-1">Sản phẩm đã tồn tại</h4>
+            <p class="text-sm text-[#8094ae]">{{ conflictMessage }}</p>
+          </div>
+        </div>
+        <div class="flex flex-col gap-3">
+          <button class="w-full h-11 bg-[#10b981] hover:bg-[#059669] text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2" @click="doRestoreProduct">
+            <i class="fas fa-undo-alt"></i> Khôi phục lại
+          </button>
+          <button class="w-full h-11 bg-white border border-[#e2e8f0] hover:bg-[#f8f9fa] text-[#4361ee] rounded-xl text-sm font-bold transition-colors shadow-sm flex items-center justify-center gap-2" @click="doForceCreateProduct">
+            <i class="fas fa-plus"></i> Vẫn tạo mới
+          </button>
+          <button class="w-full h-11 bg-white hover:text-[#ea4f52] text-[#8094ae] rounded-xl text-sm font-bold transition-colors mt-2" @click="showConflictDialog = false">
+            Hủy bỏ
           </button>
         </div>
       </div>
