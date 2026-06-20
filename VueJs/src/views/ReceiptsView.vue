@@ -117,10 +117,10 @@ const createForm = ref<{
   description: string
   details: DetailRow[]
 }>({
-  type: 'IMPORT',
-  sourceBranchId: '',
+  type: 'EXPORT',
+  sourceBranchId: user.value?.branchId || headBranch.value?.id || '',
   destBranchId: '',
-  customerId: '',
+  customerName: '',
   paymentStatus: 'UNPAID',
   description: '',
   details: []
@@ -136,10 +136,10 @@ interface DetailRow {
 
 function openCreateModal() {
   createForm.value = {
-    type: 'IMPORT',
-    sourceBranchId: '',
-    destBranchId: user.value?.branchId || headBranch.value?.id || '',
-    customerId: '',
+    type: 'EXPORT',
+    sourceBranchId: user.value?.branchId || headBranch.value?.id || '',
+    destBranchId: '',
+    customerName: '',
     paymentStatus: 'UNPAID',
     description: '',
     details: [{ productId: '', manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 }]
@@ -180,16 +180,22 @@ import { watch } from 'vue'
 watch(() => createForm.value.sourceBranchId, async (newVal) => {
   if (newVal) {
     try {
-      const res = await api.get('/api/inventories?branchId=' + newVal)
+      const res = await api.get('/api/inventories/global')
       if (res.ok) {
-        sourceInventories.value = await res.json()
+        const allInventories = await res.json()
+        sourceInventories.value = allInventories.filter((inv: any) => inv.branchId === newVal)
       } else {
         let errStr = 'Lỗi server';
         try {
-          const err = await res.json()
-          errStr = err.message || errStr
+          const text = await res.text();
+          try {
+            const err = JSON.parse(text);
+            errStr = err.message || errStr;
+          } catch {
+            errStr = text || errStr;
+          }
         } catch(e) {
-          errStr = await res.text() || errStr
+          // ignore
         }
         toast.error('Không thể tải tồn kho chi nhánh nguồn: ' + errStr)
         sourceInventories.value = []
@@ -201,7 +207,7 @@ watch(() => createForm.value.sourceBranchId, async (newVal) => {
   } else {
     sourceInventories.value = []
   }
-})
+}, { immediate: true })
 
 const availableProducts = computed(() => {
   const t = createForm.value.type
@@ -244,7 +250,7 @@ async function submitCreateDraft() {
     type: f.type,
     sourceBranchId: f.sourceBranchId || null,
     destBranchId: f.destBranchId || null,
-    customerId: f.customerId || null,
+    customerName: f.customerName || null,
     paymentStatus: f.paymentStatus,
     description: f.description,
     details: f.details.map(d => ({
@@ -831,7 +837,7 @@ function getCustomerName(id: number | null | undefined) {
                 <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Loại phiếu <span class="text-red-500">*</span></label>
                 <select v-model="createForm.type" @change="onTypeChange"
                   class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
-                  <option value="IMPORT">📥 Nhập kho</option>
+                  <option value="IMPORT" v-if="user?.branchId !== headBranch?.id">📥 Nhập kho</option>
                   <option value="EXPORT">📤 Xuất bán</option>
                   <option value="TRANSFER">🔄 Điều chuyển</option>
                   <option value="ADJUST_IN">⬆️ Cân bằng tăng</option>
@@ -856,16 +862,16 @@ function getCustomerName(id: number | null | undefined) {
               </div>
               <div v-if="createForm.type === 'EXPORT'">
                 <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Khách hàng</label>
-                <select v-model="createForm.customerId"
-                  class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
-                  <option value="">-- Không xác định --</option>
-                  <option v-for="c in customers" :key="c.id" :value="c.id">{{ c.name }}</option>
-                </select>
+                <input v-model="createForm.customerName" type="text" list="customer-list" placeholder="Nhập tên hoặc chọn..."
+                  class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
+                <datalist id="customer-list">
+                  <option v-for="c in customers" :key="c.id" :value="c.name"></option>
+                </datalist>
               </div>
             </div>
 
             <div class="grid grid-cols-2 gap-4">
-              <div v-if="createForm.type !== 'IMPORT'">
+              <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
                 <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Trạng thái thanh toán</label>
                 <select v-model="createForm.paymentStatus"
                   class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
@@ -908,18 +914,18 @@ function getCustomerName(id: number | null | undefined) {
                         <option v-for="p in availableProducts" :key="p.id" :value="p.id">{{ p.name }} ({{ p.code }})</option>
                       </select>
                     </div>
-                    <div :class="createForm.type !== 'IMPORT' ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-1 gap-2'">
+                    <div :class="(createForm.type === 'IMPORT' || createForm.type === 'TRANSFER') ? 'grid grid-cols-1 gap-2' : 'grid grid-cols-3 gap-2'">
                       <div>
                         <label class="block text-xs text-[#8094ae] mb-1">Số lượng <span class="text-red-500">*</span></label>
                         <input v-model.number="d.quantity" type="number" min="1"
                           class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
                       </div>
-                      <div v-if="createForm.type !== 'IMPORT'">
+                      <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
                         <label class="block text-xs text-[#8094ae] mb-1">Đơn giá</label>
                         <input v-model.number="d.price" type="number" min="0"
                           class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
                       </div>
-                      <div v-if="createForm.type !== 'IMPORT'">
+                      <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
                         <label class="block text-xs text-[#8094ae] mb-1">Thành tiền</label>
                         <div class="w-full h-9 px-3 border border-transparent flex items-center text-sm font-bold text-[#4361ee] truncate">
                           {{ formatVND(d.quantity * (d.price || 0)) }}

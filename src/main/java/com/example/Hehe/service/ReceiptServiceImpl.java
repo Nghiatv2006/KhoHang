@@ -19,15 +19,18 @@ public class ReceiptServiceImpl implements ReceiptService {
     private final ProductRepository productRepository;
     private final BranchRepository branchRepository;
     private final InventoryRepository inventoryRepository;
+    private final CustomerRepository customerRepository;
 
     public ReceiptServiceImpl(ReceiptRepository receiptRepository,
                               ProductRepository productRepository,
                               BranchRepository branchRepository,
-                              InventoryRepository inventoryRepository) {
+                              InventoryRepository inventoryRepository,
+                              CustomerRepository customerRepository) {
         this.receiptRepository = receiptRepository;
         this.productRepository = productRepository;
         this.branchRepository = branchRepository;
         this.inventoryRepository = inventoryRepository;
+        this.customerRepository = customerRepository;
     }
 
     @Override
@@ -69,10 +72,22 @@ public class ReceiptServiceImpl implements ReceiptService {
         Receipt r = new Receipt();
         r.setCode("REC-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         r.setType(request.getType());
-        r.setStatus(ReceiptStatus.COMPLETED);
+        r.setStatus(ReceiptStatus.DRAFT);
         r.setPaymentStatus(request.getPaymentStatus() == null ? "UNPAID" : request.getPaymentStatus());
         r.setCreatedBy(currentUser);
-        r.setCustomerId(request.getCustomerId());
+        
+        if (request.getCustomerName() != null && !request.getCustomerName().trim().isEmpty()) {
+            String cName = request.getCustomerName().trim();
+            Customer customer = customerRepository.findByName(cName).orElseGet(() -> {
+                Customer newC = new Customer();
+                newC.setName(cName);
+                newC.setStatus("ACTIVE");
+                newC.setDebt(java.math.BigDecimal.ZERO);
+                return customerRepository.save(newC);
+            });
+            r.setCustomerId(customer.getId());
+        }
+
         r.setDescription(request.getDescription());
 
         if (request.getSourceBranchId() != null) {
@@ -97,9 +112,6 @@ public class ReceiptServiceImpl implements ReceiptService {
             d.setQuantity(dReq.getQuantity());
             d.setPrice(dReq.getPrice());
             r.getDetails().add(d);
-
-            // Update Inventory
-            updateInventory(r.getType(), r.getSourceBranch(), r.getDestBranch(), d, false);
         }
 
         receiptRepository.save(r);
@@ -123,9 +135,12 @@ public class ReceiptServiceImpl implements ReceiptService {
             }
         }
 
+        boolean wasCompleted = (r.getStatus() == ReceiptStatus.COMPLETED);
         r.setStatus(ReceiptStatus.CANCELLED);
-        for (ReceiptDetail d : r.getDetails()) {
-            updateInventory(r.getType(), r.getSourceBranch(), r.getDestBranch(), d, true);
+        if (wasCompleted) {
+            for (ReceiptDetail d : r.getDetails()) {
+                updateInventory(r.getType(), r.getSourceBranch(), r.getDestBranch(), d, true);
+            }
         }
         
         receiptRepository.save(r);
@@ -176,5 +191,50 @@ public class ReceiptServiceImpl implements ReceiptService {
         }
         inv.setLastUpdated(java.time.LocalDateTime.now());
         inventoryRepository.save(inv);
+    }
+
+    @Transactional
+    @Override
+    public ReceiptResponse approveReceipt(Integer id, User currentUser) {
+        Receipt r = receiptRepository.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
+        if (r.getStatus() != ReceiptStatus.DRAFT) throw new RuntimeException("Phiếu không ở trạng thái chờ duyệt.");
+        
+        if (currentUser.getRole() == UserRole.STAFF) {
+            throw new RuntimeException("Nhân viên không có quyền duyệt phiếu.");
+        }
+        if (currentUser.getRole() != UserRole.ADMIN) {
+            Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
+            boolean hasPerm = (r.getSourceBranch() != null && r.getSourceBranch().getId().equals(myBranchId)) ||
+                              (r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId));
+            if (!hasPerm) {
+                throw new RuntimeException("Bạn không có quyền duyệt phiếu của chi nhánh này.");
+            }
+        }
+
+        r.setStatus(ReceiptStatus.COMPLETED);
+        for (ReceiptDetail d : r.getDetails()) {
+            updateInventory(r.getType(), r.getSourceBranch(), r.getDestBranch(), d, false);
+        }
+        
+        receiptRepository.save(r);
+        return new ReceiptResponse(r);
+    }
+
+    @Transactional
+    @Override
+    public ReceiptResponse markPaid(Integer id, User currentUser) {
+        Receipt r = receiptRepository.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
+        r.setPaymentStatus("PAID");
+        receiptRepository.save(r);
+        return new ReceiptResponse(r);
+    }
+
+    @Transactional
+    @Override
+    public ReceiptResponse confirmTransfer(Integer id, java.util.Map<String, Object> payload, User currentUser) {
+        Receipt r = receiptRepository.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
+        r.setPaymentStatus("RECEIVED");
+        receiptRepository.save(r);
+        return new ReceiptResponse(r);
     }
 }
