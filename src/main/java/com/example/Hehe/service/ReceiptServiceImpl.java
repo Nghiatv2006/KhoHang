@@ -139,8 +139,8 @@ public class ReceiptServiceImpl implements ReceiptService {
         switch (type) {
             case IMPORT:
             case ADJUST_IN:
-                // Increase at Dest (IMPORT usually has destBranch = 1, ADJUST_IN has sourceBranch)
-                Branch targetBranch = type == ReceiptType.IMPORT ? destBranch : sourceBranch;
+                // Increase at Dest (IMPORT usually has destBranch = 1, ADJUST_IN has destBranch)
+                Branch targetBranch = (type == ReceiptType.IMPORT || type == ReceiptType.ADJUST_IN) ? destBranch : sourceBranch;
                 addInventory(targetBranch, detail, qty);
                 break;
             case EXPORT:
@@ -158,9 +158,10 @@ public class ReceiptServiceImpl implements ReceiptService {
 
     private void addInventory(Branch branch, ReceiptDetail detail, int qtyDelta) {
         if (branch == null) throw new RuntimeException("Branch is required for inventory update.");
-        List<Inventory> invs = inventoryRepository.findByBranchIdAndProductId(branch.getId(), detail.getProduct().getId());
+        java.util.Optional<Inventory> opt = inventoryRepository.findByBranchIdAndProductIdAndBatchCode(
+                branch.getId(), detail.getProduct().getId(), detail.getBatchCode());
         Inventory inv;
-        if (invs.isEmpty()) {
+        if (opt.isEmpty()) {
             if (qtyDelta < 0) throw new RuntimeException("Không đủ tồn kho để thực hiện giao dịch cho sản phẩm: " + detail.getProduct().getName());
             inv = new Inventory();
             inv.setBranch(branch);
@@ -168,8 +169,11 @@ public class ReceiptServiceImpl implements ReceiptService {
             inv.setQuantity(qtyDelta);
             inv.setManufacturingDate(detail.getManufacturingDate());
             inv.setExpirationDate(detail.getExpirationDate());
+            inv.setBatchCode(detail.getBatchCode());
+            inv.setHasExpiry(detail.getProduct().getHasExpiry());
+            inv.setExpiryWarningDays(30);
         } else {
-            inv = invs.get(0);
+            inv = opt.get();
             int newQty = inv.getQuantity() + qtyDelta;
             if (newQty < 0) throw new RuntimeException("Không đủ tồn kho để thực hiện giao dịch cho sản phẩm: " + detail.getProduct().getName());
             inv.setQuantity(newQty);
