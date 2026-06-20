@@ -677,10 +677,14 @@ function getCustomerName(id: number | null | undefined) {
     <!-- DETAIL PANEL MODAL -->
     <!-- ═══════════════════════════════════════════════════════════ -->
     <Teleport to="body">
-      <div v-if="showDetail && selectedReceipt"
-        class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1000] flex items-start justify-end p-4 overflow-y-auto">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mt-4 mb-4 overflow-hidden flex flex-col"
-          style="max-height: 90vh">
+      <!-- Backdrop -->
+      <Transition name="fade">
+        <div v-if="showDetail && selectedReceipt" @click="showDetail = false" class="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[100]"></div>
+      </Transition>
+
+      <!-- Panel -->
+      <Transition name="slide-panel">
+        <div v-if="showDetail && selectedReceipt" class="fixed inset-y-0 right-0 z-[101] w-full max-w-[700px] bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] flex flex-col border-l border-[#e2e8f0]">
           <!-- Header -->
           <div class="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-[#4361ee] to-[#4cc9f0] text-white">
             <div>
@@ -692,7 +696,7 @@ function getCustomerName(id: number | null | undefined) {
             </button>
           </div>
 
-          <div class="overflow-y-auto flex-1 p-6 space-y-5">
+          <div class="overflow-y-auto flex-1 p-6 space-y-5 custom-scrollbar">
             <!-- Meta info -->
             <div class="grid grid-cols-2 gap-4 text-sm">
               <div>
@@ -808,17 +812,21 @@ function getCustomerName(id: number | null | undefined) {
             </div>
           </div>
         </div>
-      </div>
+      </Transition>
     </Teleport>
 
     <!-- ═══════════════════════════════════════════════════════════ -->
     <!-- CREATE DRAFT MODAL -->
     <!-- ═══════════════════════════════════════════════════════════ -->
     <Teleport to="body">
-      <div v-if="showCreateModal"
-        class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 overflow-y-auto">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-4 overflow-hidden flex flex-col"
-          style="max-height: 90vh">
+      <!-- Backdrop -->
+      <Transition name="fade">
+        <div v-if="showCreateModal" @click="showCreateModal = false" class="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[100]"></div>
+      </Transition>
+
+      <!-- Panel -->
+      <Transition name="slide-panel">
+        <div v-if="showCreateModal" class="fixed inset-y-0 right-0 z-[101] w-full max-w-[800px] bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] flex flex-col border-l border-[#e2e8f0]">
           <!-- Header -->
           <div class="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-[#4361ee] to-[#4cc9f0] text-white">
             <div>
@@ -830,119 +838,122 @@ function getCustomerName(id: number | null | undefined) {
             </button>
           </div>
 
-          <div class="overflow-y-auto flex-1 p-6 space-y-5">
-            <!-- Type & Branches -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Loại phiếu <span class="text-red-500">*</span></label>
-                <select v-model="createForm.type" @change="onTypeChange"
-                  class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
-                  <option value="IMPORT" v-if="user?.branchId !== headBranch?.id">📥 Nhập kho</option>
-                  <option value="EXPORT">📤 Xuất bán</option>
-                  <option value="TRANSFER">🔄 Điều chuyển</option>
-                  <option value="ADJUST_IN">⬆️ Cân bằng tăng</option>
-                  <option value="ADJUST_OUT">⬇️ Cân bằng giảm</option>
-                </select>
+          <!-- Body -->
+          <div class="overflow-y-auto flex-1 p-6 bg-[#f8f9fa] custom-scrollbar">
+            <div class="space-y-6">
+              <!-- Type & Branches -->
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Loại phiếu <span class="text-red-500">*</span></label>
+                  <select v-model="createForm.type" @change="onTypeChange"
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
+                    <option value="IMPORT" v-if="user?.branchId !== headBranch?.id">📥 Nhập kho</option>
+                    <option value="EXPORT">📤 Xuất bán</option>
+                    <option value="TRANSFER">🔄 Điều chuyển</option>
+                    <option value="ADJUST_IN">⬆️ Cân bằng tăng</option>
+                    <option value="ADJUST_OUT">⬇️ Cân bằng giảm</option>
+                  </select>
+                </div>
+                <div v-if="createForm.type === 'IMPORT'">
+                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh nguồn</label>
+                  <select v-model="createForm.sourceBranchId"
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
+                    <option value="">-- Chọn chi nhánh --</option>
+                    <option v-for="b in branches.filter(x => x.id !== createForm.destBranchId)" :key="b.id" :value="b.id">{{ b.name }}</option>
+                  </select>
+                </div>
+                <div v-if="createForm.type === 'IMPORT' || createForm.type === 'TRANSFER' || createForm.type === 'ADJUST_IN'">
+                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh đích</label>
+                  <select v-model="createForm.destBranchId" :disabled="createForm.type === 'IMPORT'"
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-[#f1f5f9] disabled:text-[#8094ae]">
+                    <option value="">-- Chọn chi nhánh --</option>
+                    <option v-for="b in branches.filter(x => x.id !== createForm.sourceBranchId)" :key="b.id" :value="b.id">{{ b.name }}</option>
+                  </select>
+                </div>
+                <div v-if="createForm.type === 'EXPORT'">
+                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Khách hàng</label>
+                  <input v-model="createForm.customerName" type="text" list="customer-list" placeholder="Nhập tên hoặc chọn..."
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
+                  <datalist id="customer-list">
+                    <option v-for="c in customers" :key="c.id" :value="c.name"></option>
+                  </datalist>
+                </div>
               </div>
-              <div v-if="createForm.type === 'IMPORT'">
-                <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh nguồn</label>
-                <select v-model="createForm.sourceBranchId"
-                  class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
-                  <option value="">-- Chọn chi nhánh --</option>
-                  <option v-for="b in branches.filter(x => x.id !== createForm.destBranchId)" :key="b.id" :value="b.id">{{ b.name }}</option>
-                </select>
-              </div>
-              <div v-if="createForm.type === 'IMPORT' || createForm.type === 'TRANSFER' || createForm.type === 'ADJUST_IN'">
-                <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh đích</label>
-                <select v-model="createForm.destBranchId" :disabled="createForm.type === 'IMPORT'"
-                  class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-[#f1f5f9] disabled:text-[#8094ae]">
-                  <option value="">-- Chọn chi nhánh --</option>
-                  <option v-for="b in branches.filter(x => x.id !== createForm.sourceBranchId)" :key="b.id" :value="b.id">{{ b.name }}</option>
-                </select>
-              </div>
-              <div v-if="createForm.type === 'EXPORT'">
-                <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Khách hàng</label>
-                <input v-model="createForm.customerName" type="text" list="customer-list" placeholder="Nhập tên hoặc chọn..."
-                  class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
-                <datalist id="customer-list">
-                  <option v-for="c in customers" :key="c.id" :value="c.name"></option>
-                </datalist>
-              </div>
-            </div>
 
-            <div class="grid grid-cols-2 gap-4">
-              <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
-                <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Trạng thái thanh toán</label>
-                <select v-model="createForm.paymentStatus"
-                  class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
-                  <option value="UNPAID">Chưa thanh toán</option>
-                  <option value="PAID">Đã thanh toán</option>
-                </select>
+              <div class="grid grid-cols-2 gap-4">
+                <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
+                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Trạng thái thanh toán</label>
+                  <select v-model="createForm.paymentStatus"
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
+                    <option value="UNPAID">Chưa thanh toán</option>
+                    <option value="PAID">Đã thanh toán</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Ghi chú</label>
+                  <input v-model="createForm.description" type="text" maxlength="500" placeholder="Ghi chú (tuỳ chọn)..."
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
+                </div>
               </div>
-              <div>
-                <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Ghi chú</label>
-                <input v-model="createForm.description" type="text" maxlength="500" placeholder="Ghi chú (tuỳ chọn)..."
-                  class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
-              </div>
-            </div>
 
-            <!-- Detail rows -->
-            <div>
-              <div class="flex items-center justify-between mb-3">
-                <div class="text-xs font-bold text-[#8094ae] uppercase">Danh sách hàng hóa</div>
-                <button @click="addDetailRow"
-                  class="h-8 px-3 bg-[#eef2ff] hover:bg-[#4361ee] hover:text-white text-[#4361ee] rounded-lg text-xs font-bold transition-all flex items-center gap-1">
-                  <i class="fas fa-plus"></i> Thêm dòng
-                </button>
-              </div>
-              <div class="space-y-3">
-                <div v-for="(d, idx) in createForm.details" :key="idx"
-                  class="border border-[#e2e8f0] rounded-xl p-4 bg-[#f8f9fa]/50 space-y-3">
-                  <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-[#8094ae]">Dòng {{ idx + 1 }}</span>
-                    <button v-if="createForm.details.length > 1" @click="removeDetailRow(idx)"
-                      class="w-6 h-6 flex items-center justify-center rounded bg-red-50 text-red-400 hover:bg-red-500 hover:text-white transition-all">
-                      <i class="fas fa-times text-xs"></i>
-                    </button>
-                  </div>
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <label class="block text-xs text-[#8094ae] mb-1">Sản phẩm <span class="text-red-500">*</span></label>
-                      <select v-model="d.productId" @change="onProductChange(d)"
-                        class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none bg-white">
-                        <option value="">-- Chọn sản phẩm --</option>
-                        <option v-for="p in availableProducts" :key="p.id" :value="p.id">{{ p.name }} ({{ p.code }})</option>
-                      </select>
+              <!-- Detail rows -->
+              <div>
+                <div class="flex items-center justify-between mb-3">
+                  <div class="text-xs font-bold text-[#8094ae] uppercase">Danh sách hàng hóa</div>
+                  <button @click="addDetailRow"
+                    class="h-8 px-3 bg-[#eef2ff] hover:bg-[#4361ee] hover:text-white text-[#4361ee] rounded-lg text-xs font-bold transition-all flex items-center gap-1">
+                    <i class="fas fa-plus"></i> Thêm dòng
+                  </button>
+                </div>
+                <div class="space-y-3">
+                  <div v-for="(d, idx) in createForm.details" :key="idx"
+                    class="border border-[#e2e8f0] rounded-xl p-4 bg-white space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-bold text-[#8094ae]">Dòng {{ idx + 1 }}</span>
+                      <button v-if="createForm.details.length > 1" @click="removeDetailRow(idx)"
+                        class="w-6 h-6 flex items-center justify-center rounded bg-red-50 text-red-400 hover:bg-red-500 hover:text-white transition-all">
+                        <i class="fas fa-times text-xs"></i>
+                      </button>
                     </div>
-                    <div :class="(createForm.type === 'IMPORT' || createForm.type === 'TRANSFER') ? 'grid grid-cols-1 gap-2' : 'grid grid-cols-3 gap-2'">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
-                        <label class="block text-xs text-[#8094ae] mb-1">Số lượng <span class="text-red-500">*</span></label>
-                        <input v-model.number="d.quantity" type="number" min="1"
-                          class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
+                        <label class="block text-xs text-[#8094ae] mb-1">Sản phẩm <span class="text-red-500">*</span></label>
+                        <select v-model="d.productId" @change="onProductChange(d)"
+                          class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none bg-white">
+                          <option value="">-- Chọn sản phẩm --</option>
+                          <option v-for="p in availableProducts" :key="p.id" :value="p.id">{{ p.name }} ({{ p.code }})</option>
+                        </select>
                       </div>
-                      <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
-                        <label class="block text-xs text-[#8094ae] mb-1">Đơn giá</label>
-                        <input v-model.number="d.price" type="number" min="0"
-                          class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
-                      </div>
-                      <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
-                        <label class="block text-xs text-[#8094ae] mb-1">Thành tiền</label>
-                        <div class="w-full h-9 px-3 border border-transparent flex items-center text-sm font-bold text-[#4361ee] truncate">
-                          {{ formatVND(d.quantity * (d.price || 0)) }}
+                      <div :class="(createForm.type === 'IMPORT' || createForm.type === 'TRANSFER') ? 'grid grid-cols-1 gap-2' : 'grid grid-cols-3 gap-2'">
+                        <div>
+                          <label class="block text-xs text-[#8094ae] mb-1">Số lượng <span class="text-red-500">*</span></label>
+                          <input v-model.number="d.quantity" type="number" min="1"
+                            class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
+                        </div>
+                        <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
+                          <label class="block text-xs text-[#8094ae] mb-1">Đơn giá</label>
+                          <input v-model.number="d.price" type="number" min="0"
+                            class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
+                        </div>
+                        <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
+                          <label class="block text-xs text-[#8094ae] mb-1">Thành tiền</label>
+                          <div class="w-full h-9 px-3 border border-transparent flex items-center text-sm font-bold text-[#4361ee] truncate">
+                            {{ formatVND(d.quantity * (d.price || 0)) }}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                  <div v-if="selectedProductHasExpiry(d)" class="grid grid-cols-2 gap-3">
-                    <div>
-                      <label class="block text-xs text-[#8094ae] mb-1">Ngày sản xuất (NSX)</label>
-                      <input v-model="d.manufacturingDate" type="date"
-                        class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
-                    </div>
-                    <div>
-                      <label class="block text-xs text-[#8094ae] mb-1">Hạn sử dụng (HSD)</label>
-                      <input v-model="d.expirationDate" type="date"
-                        class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
+                    <div v-if="selectedProductHasExpiry(d)" class="grid grid-cols-2 gap-3">
+                      <div>
+                        <label class="block text-xs text-[#8094ae] mb-1">Ngày sản xuất (NSX)</label>
+                        <input v-model="d.manufacturingDate" type="date"
+                          class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
+                      </div>
+                      <div>
+                        <label class="block text-xs text-[#8094ae] mb-1">Hạn sử dụng (HSD)</label>
+                        <input v-model="d.expirationDate" type="date"
+                          class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -951,7 +962,7 @@ function getCustomerName(id: number | null | undefined) {
           </div>
 
           <!-- Footer actions -->
-          <div class="px-6 py-4 border-t border-[#f1f5f9] flex justify-end gap-3 bg-[#f8f9fa]/50">
+          <div class="px-6 py-4 border-t border-[#f1f5f9] flex justify-end gap-3 bg-white">
             <button @click="showCreateModal = false"
               class="px-5 py-2.5 border border-[#e2e8f0] bg-white rounded-xl font-semibold text-[#364a63] text-sm hover:bg-[#f1f5f9] transition-all">
               Hủy
@@ -964,7 +975,7 @@ function getCustomerName(id: number | null | undefined) {
             </button>
           </div>
         </div>
-      </div>
+      </Transition>
     </Teleport>
 
     <!-- ═══════════════════════════════════════════════════════════ -->
@@ -1031,3 +1042,22 @@ function getCustomerName(id: number | null | undefined) {
 
   </div>
 </template>
+
+<style scoped>
+.slide-panel-enter-active, .slide-panel-leave-active {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.slide-panel-enter-from, .slide-panel-leave-to {
+  transform: translateX(100%);
+}
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+</style>
