@@ -1,0 +1,7 @@
+package com.example.Hehe.model;
+
+public enum StocktakeStatus {
+    DRAFT,
+    COMPLETED,
+    CANCELLED
+}

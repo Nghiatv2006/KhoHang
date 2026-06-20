@@ -17,6 +17,9 @@ public class InventoryResponse {
     private LocalDate manufacturingDate;
     private LocalDate expirationDate;
     private LocalDateTime lastUpdated;
+    private String batchCode;
+    private Boolean hasExpiry;
+    private Integer expiryWarningDays;
 
     public InventoryResponse(Inventory inventory) {
         this.id = inventory.getId();
@@ -24,6 +27,9 @@ public class InventoryResponse {
         this.manufacturingDate = inventory.getManufacturingDate();
         this.expirationDate = inventory.getExpirationDate();
         this.lastUpdated = inventory.getLastUpdated();
+        this.batchCode = inventory.getBatchCode();
+        this.hasExpiry = inventory.getHasExpiry();
+        this.expiryWarningDays = inventory.getExpiryWarningDays();
 
         if (inventory.getBranch() != null) {
             this.branchId = inventory.getBranch().getId();
@@ -51,4 +57,7 @@ public class InventoryResponse {
     public LocalDate getManufacturingDate() { return manufacturingDate; }
     public LocalDate getExpirationDate() { return expirationDate; }
     public LocalDateTime getLastUpdated() { return lastUpdated; }
+    public String getBatchCode() { return batchCode; }
+    public Boolean getHasExpiry() { return hasExpiry; }
+    public Integer getExpiryWarningDays() { return expiryWarningDays; }
 }

@@ -3,6 +3,10 @@
 -- (Không chứa lệnh INSERT - Dùng để xem cấu trúc hoặc dán vào dbdiagram.io)
 -- ==============================================================================
 
+-- DROP TABLE & TYPE (Dùng để reset nhanh database)
+DROP TABLE IF EXISTS audit_logs, stocktake_details, stocktakes, receipt_details, receipts, inventories, products, users, customers, categories, branches CASCADE;
+DROP TYPE IF EXISTS user_role, user_status, receipt_type, receipt_status, stocktake_status CASCADE;
+
 -- 1. ENUM TYPES
 CREATE TYPE user_role AS ENUM ('ADMIN', 'MANAGER', 'STAFF');
 CREATE TYPE user_status AS ENUM ('ACTIVE', 'LOCKED');
@@ -16,7 +20,9 @@ CREATE TABLE branches (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE,
     address TEXT NOT NULL,
-    low_stock_threshold INT NOT NULL DEFAULT 5
+    low_stock_threshold INT NOT NULL DEFAULT 5,
+    is_head BOOLEAN NOT NULL DEFAULT FALSE,
+    tax_code VARCHAR(50)
 );
 
 -- Bảng Danh mục sản phẩm (Categories)
@@ -59,6 +65,7 @@ CREATE TABLE products (
     id SERIAL PRIMARY KEY,
     code VARCHAR(50) NOT NULL UNIQUE CHECK (code = UPPER(code)),
     name VARCHAR(255) NOT NULL,
+    description TEXT,
     unit VARCHAR(50) NOT NULL,
     import_price NUMERIC(15, 2) NOT NULL DEFAULT 0.00,
     price NUMERIC(15, 2) NOT NULL CHECK (price >= 0), -- Giá bán
@@ -79,9 +86,12 @@ CREATE TABLE inventories (
     product_id INT NOT NULL,
     mfg_date DATE NOT NULL DEFAULT '1970-01-01',
     exp_date DATE NOT NULL DEFAULT '1970-01-01',
+    batch_code VARCHAR(100) NOT NULL DEFAULT 'DEFAULT_BATCH',
     quantity INT NOT NULL DEFAULT 0 CHECK (quantity >= 0),
+    has_expiry BOOLEAN NOT NULL DEFAULT FALSE,
+    expiry_warning_days INT NOT NULL DEFAULT 30,
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT unique_inventory_batch UNIQUE (branch_id, product_id, mfg_date, exp_date),
+    CONSTRAINT unique_inventory_batch UNIQUE (branch_id, product_id, batch_code),
     CONSTRAINT fk_inventory_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE RESTRICT,
     CONSTRAINT fk_inventory_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT,
     CONSTRAINT chk_inventory_dates CHECK (exp_date >= mfg_date)
@@ -113,6 +123,7 @@ CREATE TABLE receipt_details (
     product_id INT NOT NULL,
     mfg_date DATE NOT NULL DEFAULT '1970-01-01',
     exp_date DATE NOT NULL DEFAULT '1970-01-01',
+    batch_code VARCHAR(100) NOT NULL DEFAULT 'DEFAULT_BATCH',
     quantity INT NOT NULL CHECK (quantity > 0),
     price NUMERIC(15, 2) NOT NULL CHECK (price >= 0),
     CONSTRAINT fk_detail_receipt FOREIGN KEY (receipt_id) REFERENCES receipts(id) ON DELETE CASCADE,
@@ -140,6 +151,7 @@ CREATE TABLE stocktake_details (
     product_id INT NOT NULL,
     mfg_date DATE NOT NULL DEFAULT '1970-01-01',
     exp_date DATE NOT NULL DEFAULT '1970-01-01',
+    batch_code VARCHAR(100) NOT NULL DEFAULT 'DEFAULT_BATCH',
     expected_quantity INT NOT NULL CHECK (expected_quantity >= 0),
     actual_quantity INT NOT NULL CHECK (actual_quantity >= 0),
     adjustment_receipt_id INT,

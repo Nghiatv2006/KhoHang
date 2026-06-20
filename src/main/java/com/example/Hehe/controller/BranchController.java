@@ -117,26 +117,31 @@ public class BranchController {
             @RequestBody Branch requestBody,
             @AuthenticationPrincipal User currentUser) {
 
-        // Chỉ ADMIN mới có quyền sửa chi nhánh
+        // Quyền sửa chi nhánh: ADMIN được sửa mọi thông tin. MANAGER/STAFF chỉ được sửa ngưỡng tồn kho của mình.
         if (currentUser.getRole() != UserRole.ADMIN) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("message", "Chỉ ADMIN mới có quyền chỉnh sửa chi nhánh."));
+            if (currentUser.getBranch() == null || !currentUser.getBranch().getId().equals(id)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("message", "Bạn không có quyền chỉnh sửa chi nhánh này."));
+            }
         }
 
-        // Validate dữ liệu bắt buộc
-        if (requestBody.getName() == null || requestBody.getName().trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Tên chi nhánh không được để trống."));
+        // Validate dữ liệu bắt buộc đối với ADMIN
+        if (currentUser.getRole() == UserRole.ADMIN) {
+            if (requestBody.getName() == null || requestBody.getName().trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Tên chi nhánh không được để trống."));
+            }
+            if (requestBody.getAddress() == null || requestBody.getAddress().trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Địa chỉ chi nhánh không được để trống."));
+            }
+            if (requestBody.getTaxCode() == null || requestBody.getTaxCode().trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Mã số thuế không được để trống."));
+            }
+            String cleanTaxCode = requestBody.getTaxCode().trim();
+            if (!cleanTaxCode.matches("^[0-9A-Za-z-]{10,13}$")) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Mã số thuế không hợp lệ (phải từ 10 đến 13 ký tự chữ/số/dấu gạch)."));
+            }
         }
-        if (requestBody.getAddress() == null || requestBody.getAddress().trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Địa chỉ chi nhánh không được để trống."));
-        }
-        if (requestBody.getTaxCode() == null || requestBody.getTaxCode().trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Mã số thuế không được để trống."));
-        }
-        String cleanTaxCode = requestBody.getTaxCode().trim();
-        if (!cleanTaxCode.matches("^[0-9A-Za-z-]{10,13}$")) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Mã số thuế không hợp lệ (phải từ 10 đến 13 ký tự chữ/số/dấu gạch)."));
-        }
+
         if (requestBody.getLowStockThreshold() == null || requestBody.getLowStockThreshold() < 0) {
             return ResponseEntity.badRequest().body(Map.of("message", "Ngưỡng tồn kho tối thiểu không hợp lệ."));
         }
@@ -145,17 +150,34 @@ public class BranchController {
             Branch branch = branchRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh với ID: " + id));
 
-            // Kiểm tra trùng tên (loại trừ chính nó)
-            if (branchRepository.existsByNameAndIdNot(requestBody.getName().trim(), id)) {
-                return ResponseEntity.badRequest().body(Map.of("message", "Tên chi nhánh '" + requestBody.getName().trim() + "' đã tồn tại."));
-            }
-
-            branch.setName(requestBody.getName().trim());
-            branch.setAddress(requestBody.getAddress().trim());
-            branch.setLowStockThreshold(requestBody.getLowStockThreshold());
-            branch.setTaxCode(cleanTaxCode);
-            if (requestBody.getIsHead() != null) {
-                branch.setIsHead(requestBody.getIsHead());
+            if (currentUser.getRole() != UserRole.ADMIN) {
+                // Kiểm tra xem MANAGER/STAFF có cố tình chỉnh sửa thông tin khác không
+                if (requestBody.getName() != null && !requestBody.getName().trim().equals(branch.getName())) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                            .body(Map.of("message", "Bạn chỉ có quyền thay đổi ngưỡng tồn kho tối thiểu."));
+                }
+                if (requestBody.getAddress() != null && !requestBody.getAddress().trim().equals(branch.getAddress())) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                            .body(Map.of("message", "Bạn chỉ có quyền thay đổi ngưỡng tồn kho tối thiểu."));
+                }
+                if (requestBody.getTaxCode() != null && !requestBody.getTaxCode().trim().equals(branch.getTaxCode())) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                            .body(Map.of("message", "Bạn chỉ có quyền thay đổi ngưỡng tồn kho tối thiểu."));
+                }
+                
+                branch.setLowStockThreshold(requestBody.getLowStockThreshold());
+            } else {
+                // ADMIN cập nhật đầy đủ thông tin
+                if (branchRepository.existsByNameAndIdNot(requestBody.getName().trim(), id)) {
+                    return ResponseEntity.badRequest().body(Map.of("message", "Tên chi nhánh '" + requestBody.getName().trim() + "' đã tồn tại."));
+                }
+                branch.setName(requestBody.getName().trim());
+                branch.setAddress(requestBody.getAddress().trim());
+                branch.setLowStockThreshold(requestBody.getLowStockThreshold());
+                branch.setTaxCode(requestBody.getTaxCode().trim());
+                if (requestBody.getIsHead() != null) {
+                    branch.setIsHead(requestBody.getIsHead());
+                }
             }
 
             Branch updatedBranch = branchRepository.save(branch);
@@ -169,6 +191,7 @@ public class BranchController {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }
     }
+
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteBranch(

@@ -25,6 +25,7 @@ public class ProductResponse {
 
     private LocalDate manufacturingDate;
     private LocalDate expirationDate;
+
     private Boolean hasExpiry;
 
     public ProductResponse(Product product) {
@@ -33,9 +34,10 @@ public class ProductResponse {
         this.name = product.getName();
         this.importPrice = product.getImportPrice();
         this.price = product.getPrice();
+        this.unit = product.getUnit();
+        this.hasExpiry = product.getHasExpiry();
 
         this.imageUrl = product.getImageUrl();
-        this.unit = product.getUnit();
         
         // Trích xuất ID và Tên của Category thay vì trả toàn bộ object Category
         if (product.getCategory() != null) {
@@ -94,6 +96,7 @@ public class ProductResponse {
     public LocalDate getExpirationDate() {
         return expirationDate;
     }
+
 
     public Boolean getHasExpiry() {
         return hasExpiry;

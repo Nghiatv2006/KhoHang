@@ -2,15 +2,11 @@ package com.example.Hehe.service;
 
 import com.example.Hehe.dto.ProductResponse;
 import com.example.Hehe.dto.ProductSaveRequest;
-import com.example.Hehe.model.Category;
-import com.example.Hehe.model.Product;
-import com.example.Hehe.model.User;
-import com.example.Hehe.model.UserRole;
+import com.example.Hehe.model.*;
 import com.example.Hehe.repository.CategoryRepository;
 import com.example.Hehe.repository.ProductRepository;
 import com.example.Hehe.repository.BranchRepository;
 import com.example.Hehe.repository.InventoryRepository;
-import com.example.Hehe.model.Inventory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.data.jpa.domain.Specification;
@@ -45,16 +41,20 @@ public class ProductServiceImpl implements ProductService {
     private final BranchRepository branchRepository;
     private final InventoryRepository inventoryRepository;
     private final AuditLogService auditLogService;
+    private final com.example.Hehe.repository.ReceiptDetailRepository receiptDetailRepository;
 
     public ProductServiceImpl(ProductRepository productRepository, CategoryRepository categoryRepository,
                                BranchRepository branchRepository, InventoryRepository inventoryRepository,
-                               AuditLogService auditLogService) {
+                               AuditLogService auditLogService,
+                               com.example.Hehe.repository.ReceiptDetailRepository receiptDetailRepository) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.branchRepository = branchRepository;
         this.inventoryRepository = inventoryRepository;
         this.auditLogService = auditLogService;
+        this.receiptDetailRepository = receiptDetailRepository;
     }
+
 
     /**
      * Hàm dùng chung để kiểm tra quyền truy cập.
@@ -208,6 +208,18 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
+        // Kiểm tra thay đổi cài đặt Hạn sử dụng (hasExpiry)
+        boolean oldHasExpiry = product.getHasExpiry() != null && product.getHasExpiry();
+        boolean newHasExpiry = request.getExpirationDate() != null;
+        if (oldHasExpiry != newHasExpiry) {
+            boolean hasStock = inventoryRepository.existsByProductIdAndQuantityGreaterThan(product.getId(), 0);
+            boolean hasTransactions = receiptDetailRepository.existsByProductId(product.getId());
+            if (hasStock || hasTransactions) {
+                throw new RuntimeException("Không được phép thay đổi cài đặt Hạn sử dụng (hasExpiry) của sản phẩm đã phát sinh tồn kho hoặc giao dịch.");
+            }
+            product.setHasExpiry(newHasExpiry);
+        }
+
         // Delete old image if it has changed and is not null
         String oldImageUrl = product.getImageUrl();
         String newImageUrl = request.getImageUrl();
@@ -223,10 +235,14 @@ public class ProductServiceImpl implements ProductService {
         product.setPrice(request.getPrice());
         product.setImageUrl(newImageUrl);
         product.setCategory(category);
-        product.setManufacturingDate(request.getManufacturingDate());
-        product.setExpirationDate(request.getExpirationDate());
-        product.setHasExpiry(request.getHasExpiry() != null ? request.getHasExpiry() : false);
-        
+        if (newHasExpiry) {
+            product.setManufacturingDate(request.getManufacturingDate());
+            product.setExpirationDate(request.getExpirationDate());
+        } else {
+            product.setManufacturingDate(LocalDate.of(1970, 1, 1));
+            product.setExpirationDate(LocalDate.of(1970, 1, 1));
+        }
+
         // Khôi phục lại nếu sản phẩm đang bị xóa mềm
         boolean isRestoring = false;
         if (Boolean.TRUE.equals(product.getIsDeleted())) {

@@ -36,3 +36,8 @@ out/
 ### VS Code ###
 .vscode/
 .env
+
+### Windows Quick Launch Scripts ###
+run_backend.bat
+run_frontend.bat
+run_warehub.bat

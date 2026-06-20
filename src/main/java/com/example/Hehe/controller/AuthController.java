@@ -32,11 +32,11 @@ public class AuthController {
             
             // 1. Tạo Cookie chứa Token JWT
             ResponseCookie jwtCookie = ResponseCookie.from("accessToken", response.getToken())
-                    .httpOnly(true)
-                    .secure(false)
-                    .path("/")
-                    .maxAge(86400)
-                    .sameSite("Strict")
+                    .httpOnly(true)            // Cấm JS đọc cookie này (Chống XSS)
+                    .secure(false)             // Set true nếu chạy HTTPS (chạy local http tạm thời để false)
+                    .path("/")                 // Có hiệu lực cho toàn bộ API
+                    .maxAge(86400)             // Hết hạn sau 24h (tính bằng giây)
+                    .sameSite("Lax")           // Đổi sang Lax để tránh lỗi mất cookie khi chuyển trang SPA
                     .build();
 
             // 2. Trả về thông tin user và đính kèm Cookie
@@ -77,7 +77,7 @@ public class AuthController {
                 .secure(false)
                 .path("/")
                 .maxAge(0)
-                .sameSite("Strict")
+                .sameSite("Lax")
                 .build();
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, deleteCookie.toString())
