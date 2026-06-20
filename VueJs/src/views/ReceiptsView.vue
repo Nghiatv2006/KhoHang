@@ -159,7 +159,7 @@ function removeDetailRow(index: number) {
 function onTypeChange() {
   const t = createForm.value.type
   if (t === 'IMPORT') {
-    createForm.value.sourceBranchId = ''
+    createForm.value.sourceBranchId = headBranch.value?.id || ''
     createForm.value.destBranchId = user.value?.branchId || headBranch.value?.id || ''
   } else if (t === 'EXPORT') {
     createForm.value.sourceBranchId = user.value?.branchId || headBranch.value?.id || ''
@@ -211,11 +211,15 @@ watch(() => createForm.value.sourceBranchId, async (newVal) => {
 
 const availableProducts = computed(() => {
   const t = createForm.value.type
-  if (t === 'ADJUST_IN' || (!createForm.value.sourceBranchId && t === 'IMPORT')) {
+  if (t === 'ADJUST_IN' || t === 'IMPORT') {
     return products.value
   }
   if (createForm.value.sourceBranchId) {
-    const inStockIds = new Set(sourceInventories.value.map(inv => inv.productId))
+    const inStockIds = new Set(
+      sourceInventories.value
+        .filter(inv => inv.quantity > 0)
+        .map(inv => inv.productId)
+    )
     return products.value.filter(p => inStockIds.has(p.id))
   }
   return products.value
@@ -236,6 +240,36 @@ const selectedProductHasExpiry = (row: DetailRow) => {
   if (!row.productId) return false
   const p = products.value.find(x => x.id === Number(row.productId))
   return p?.hasExpiry ?? false
+}
+
+function getMaxQuantity(productId: number | string | null) {
+  if (!productId) return null
+  if (createForm.value.type === 'IMPORT' || createForm.value.type === 'ADJUST_IN') return null
+  if (!createForm.value.sourceBranchId) return null
+  const inv = sourceInventories.value.find(x => x.productId === Number(productId))
+  return inv ? inv.quantity : 0
+}
+
+function constrainQuantity(d: DetailRow) {
+  if (d.quantity === '' || d.quantity === null || typeof d.quantity !== 'number') return;
+  const max = getMaxQuantity(d.productId)
+  if (max !== null) {
+    if (max === 0) {
+      d.quantity = 0
+      return
+    }
+    if (d.quantity > max) d.quantity = max
+  }
+}
+
+function onQuantityBlur(d: DetailRow) {
+  if (!d.quantity || d.quantity < 1) {
+    d.quantity = 1;
+  }
+  const max = getMaxQuantity(d.productId)
+  if (max !== null && max === 0) {
+    d.quantity = 0;
+  }
 }
 
 async function submitCreateDraft() {
@@ -270,8 +304,19 @@ async function submitCreateDraft() {
       showCreateModal.value = false
       await loadData()
     } else {
-      const err = await res.json()
-      toast.error(err.message || 'Lỗi khi tạo phiếu.')
+      let errMsg = `Lỗi ${res.status}: ${res.statusText}`
+      try {
+        const text = await res.text()
+        try {
+          const err = JSON.parse(text)
+          errMsg = err.message || errMsg
+        } catch {
+          errMsg = text || errMsg
+        }
+      } catch (e: any) {
+        errMsg = e.message || errMsg
+      }
+      toast.error(errMsg)
     }
   } catch (e: any) {
     toast.error('Lỗi kết nối: ' + e.message)
@@ -856,10 +901,9 @@ function getCustomerName(id: number | null | undefined) {
                 </div>
                 <div v-if="createForm.type === 'IMPORT'">
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh nguồn</label>
-                  <select v-model="createForm.sourceBranchId"
-                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
-                    <option value="">-- Chọn chi nhánh --</option>
-                    <option v-for="b in branches.filter(x => x.id !== createForm.destBranchId)" :key="b.id" :value="b.id">{{ b.name }}</option>
+                  <select v-model="createForm.sourceBranchId" disabled
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-[#f1f5f9] disabled:text-[#8094ae] cursor-not-allowed">
+                    <option v-if="headBranch" :value="headBranch.id">{{ headBranch.name }}</option>
                   </select>
                 </div>
                 <div v-if="createForm.type === 'IMPORT' || createForm.type === 'TRANSFER' || createForm.type === 'ADJUST_IN'">
@@ -872,11 +916,8 @@ function getCustomerName(id: number | null | undefined) {
                 </div>
                 <div v-if="createForm.type === 'EXPORT'">
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Khách hàng</label>
-                  <input v-model="createForm.customerName" type="text" list="customer-list" placeholder="Nhập tên hoặc chọn..."
+                  <input v-model="createForm.customerName" type="text" placeholder="Nhập tên khách hàng..."
                     class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
-                  <datalist id="customer-list">
-                    <option v-for="c in customers" :key="c.id" :value="c.name"></option>
-                  </datalist>
                 </div>
               </div>
 
@@ -927,8 +968,13 @@ function getCustomerName(id: number | null | undefined) {
                       <div :class="(createForm.type === 'IMPORT' || createForm.type === 'TRANSFER') ? 'grid grid-cols-1 gap-2' : 'grid grid-cols-3 gap-2'">
                         <div>
                           <label class="block text-xs text-[#8094ae] mb-1">Số lượng <span class="text-red-500">*</span></label>
-                          <input v-model.number="d.quantity" type="number" min="1"
-                            class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
+                          <div class="relative">
+                            <input v-model.number="d.quantity" type="number" min="1" @input="constrainQuantity(d)" @blur="onQuantityBlur(d)"
+                              class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none pr-12" />
+                            <span v-if="getMaxQuantity(d.productId) !== null" class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[#8094ae] font-bold">
+                              / {{ getMaxQuantity(d.productId) }}
+                            </span>
+                          </div>
                         </div>
                         <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
                           <label class="block text-xs text-[#8094ae] mb-1">Đơn giá</label>
