@@ -1,0 +1,1 @@
+-- Tổng hợp các file migration thành 1 file duy nhất cho dễ theo dõi
