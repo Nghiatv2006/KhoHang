@@ -14,8 +14,11 @@ Bộ script khởi động dự án bao gồm:
 3. **`run_frontend.bat`**: Script chạy Vite dev server cho Frontend VueJS.
 
 ### Các bước thực hiện:
-1. **Sao chép ra Desktop (Tùy chọn)**: Bạn có thể copy file `run_warehub.bat` ra ngoài màn hình Desktop để kích hoạt nhanh bằng 1 click.
-2. **Kích hoạt**: Click đúp chuột vào file **`run_warehub.bat`**.
+1. **Tạo Shortcut ra Desktop (Khuyên dùng)**: 
+   * Click chuột phải vào file **`run_warehub.bat`** trong thư mục dự án gốc.
+   * Chọn **Send to** -> **Desktop (create shortcut)**.
+   * Shortcut ngoài Desktop sẽ tự động ghi nhớ đường dẫn dự án và hoạt động ở mọi máy mà không cần chỉnh sửa code.
+2. **Kích hoạt**: Click đúp chuột vào Shortcut vừa tạo ngoài Desktop.
 3. **Trải nghiệm**:
    * Cửa sổ CMD Backend sẽ khởi động Spring Boot trên cổng `8080`.
    * Cửa sổ CMD Frontend sẽ chạy Vite dev server trên cổng `3000` (hoặc `3001`).
@@ -23,18 +26,24 @@ Bộ script khởi động dự án bao gồm:
 
 ---
 
-## Lưu ý cấu hình riêng cho từng Máy phát triển
+## Cơ chế tự động dò tìm JDK 17 (Auto-detect)
 
-Vì mỗi thành viên trong đội phát triển sử dụng các đường dẫn thư mục và JDK khác nhau, dự án đã thiết lập Git để **bỏ qua các thay đổi cục bộ** của các file `.bat` này. Bạn có thể sửa đổi cấu hình trong file `.bat` trên máy mình thoải mái mà không sợ bị Git báo thay đổi hoặc đẩy đè cấu hình lên người khác.
+File script `run_backend.bat` đã được cấu hình thông minh:
+* **Tự động kiểm tra**: Nếu biến môi trường `JAVA_HOME` hiện tại của bạn không trỏ tới JDK 17 hoặc bị lỗi, script sẽ tự động tìm kiếm JDK 17 hợp lệ (chứa tệp thực thi `bin\java.exe`) trong các thư mục cài đặt tiêu chuẩn:
+  * `D:\jdk17`
+  * `C:\Program Files\Java`
+  * `C:\Program Files\Eclipse Adoptium`
+  * `D:\Java`
+  * `C:\Java`
+* **Gán tự động**: Khi tìm thấy JDK 17 hợp lệ, hệ thống sẽ tự động gán biến `JAVA_HOME` tạm thời cho phiên làm việc để chạy dự án. Bạn **không cần phải chỉnh sửa cấu hình thủ công**.
 
-### 1. Thay đổi đường dẫn JDK 17 (nếu cần)
-Mặc định script trỏ tới thư mục cài đặt `D:\jdk17`. Nếu máy của bạn cài đặt JDK ở thư mục khác (ví dụ: `C:\Program Files\Java\jdk-17`), hãy mở file `run_backend.bat` bằng Notepad hoặc VS Code và chỉnh sửa lại dòng:
-```bat
-powershell -Command "... $env:JAVA_HOME='C:\Program Files\Java\jdk-17'; .\gradlew.bat bootRun"
-```
+---
 
-### 2. Lệnh thiết lập ignore thay đổi cục bộ cho thành viên mới
-Các file `.bat` này đã được cấu hình ignore sẵn. Nếu bạn clone dự án về máy mới và muốn áp dụng quy tắc bỏ qua thay đổi cục bộ cho các file `.bat`, hãy mở PowerShell tại thư mục dự án và chạy lệnh:
+## Quản lý mã nguồn trên Git cho các file `.bat`
+
+Các file `.bat` này đã được cấu hình ignore thay đổi cục bộ sẵn trong Git. Bạn có thể thay đổi cấu hình trên máy mình thoải mái mà không sợ bị Git báo thay đổi hoặc đẩy đè cấu hình lên người khác.
+
+Nếu bạn clone dự án về máy mới và muốn áp dụng quy tắc bỏ qua thay đổi cục bộ này cho các file `.bat`, hãy mở PowerShell tại thư mục dự án và chạy lệnh:
 ```bash
 git update-index --skip-worktree run_backend.bat run_frontend.bat run_warehub.bat
 ```
