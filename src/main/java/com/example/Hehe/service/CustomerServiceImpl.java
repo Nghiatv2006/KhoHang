@@ -30,12 +30,17 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<CustomerResponse> searchCustomers(String keyword, String status) {
+    public List<CustomerResponse> searchCustomers(String keyword, String status, User currentUser) {
         String pattern = (keyword != null && !keyword.trim().isEmpty()) ? "%" + keyword.trim().toLowerCase() + "%" : null;
         String filterStatus = (status != null && !status.trim().isEmpty()) ? status.trim().toUpperCase() : null;
 
         return customerRepository.searchCustomers(pattern, filterStatus)
                 .stream()
+                .filter(c -> {
+                    if (currentUser.getRole() == com.example.Hehe.model.UserRole.ADMIN) return true;
+                    if (c.getBranch() == null) return true;
+                    return currentUser.getBranch() != null && c.getBranch().getId().equals(currentUser.getBranch().getId());
+                })
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
@@ -60,6 +65,7 @@ public class CustomerServiceImpl implements CustomerService {
         customer.setAddress(request.getAddress() != null ? request.getAddress().trim() : null);
         customer.setDebt(request.getDebt() != null ? request.getDebt() : BigDecimal.ZERO);
         customer.setStatus("ACTIVE");
+        customer.setBranch(currentUser.getBranch());
 
         Customer savedCustomer = customerRepository.save(customer);
 

@@ -36,7 +36,10 @@ public class ReceiptServiceImpl implements ReceiptService {
     @Override
     public List<ReceiptResponse> getAllReceipts(User currentUser) {
         if (currentUser.getRole() == UserRole.ADMIN) {
-            return receiptRepository.findAll().stream().map(ReceiptResponse::new).collect(Collectors.toList());
+            return receiptRepository.findAll().stream()
+                    .filter(r -> !(r.getStatus() == ReceiptStatus.DRAFT && r.getCreatedBy() != null && r.getCreatedBy().getRole() == UserRole.STAFF))
+                    .map(ReceiptResponse::new)
+                    .collect(Collectors.toList());
         }
         
         Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
@@ -45,8 +48,19 @@ public class ReceiptServiceImpl implements ReceiptService {
         // MANAGER / STAFF can see receipts related to their branch
         List<Receipt> all = receiptRepository.findAll();
         return all.stream()
-                .filter(r -> (r.getSourceBranch() != null && r.getSourceBranch().getId().equals(myBranchId)) ||
-                             (r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId)))
+                .filter(r -> {
+                    boolean relatedToBranch = (r.getSourceBranch() != null && r.getSourceBranch().getId().equals(myBranchId)) ||
+                                              (r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId));
+                    if (!relatedToBranch) return false;
+                    
+                    if (r.getStatus() == ReceiptStatus.DRAFT && r.getCreatedBy() != null && r.getCreatedBy().getRole() == UserRole.STAFF) {
+                        if (currentUser.getRole() == UserRole.STAFF) {
+                            return r.getCreatedBy().getId().equals(currentUser.getId());
+                        }
+                        // MANAGER can see it
+                    }
+                    return true;
+                })
                 .map(ReceiptResponse::new)
                 .collect(Collectors.toList());
     }
@@ -76,6 +90,12 @@ public class ReceiptServiceImpl implements ReceiptService {
         r.setPaymentStatus(request.getPaymentStatus() == null ? "UNPAID" : request.getPaymentStatus());
         r.setCreatedBy(currentUser);
         
+        if (request.getType() == ReceiptType.EXPORT) {
+            if (request.getCustomerName() == null || request.getCustomerName().trim().isEmpty()) {
+                throw new RuntimeException("Tên khách hàng là bắt buộc đối với phiếu xuất bán.");
+            }
+        }
+
         if (request.getCustomerName() != null && !request.getCustomerName().trim().isEmpty()) {
             String cName = request.getCustomerName().trim();
             Customer customer = customerRepository.findByName(cName).orElseGet(() -> {
@@ -83,6 +103,7 @@ public class ReceiptServiceImpl implements ReceiptService {
                 newC.setName(cName);
                 newC.setStatus("ACTIVE");
                 newC.setDebt(java.math.BigDecimal.ZERO);
+                newC.setBranch(currentUser.getBranch());
                 return customerRepository.save(newC);
             });
             r.setCustomerId(customer.getId());
@@ -95,6 +116,34 @@ public class ReceiptServiceImpl implements ReceiptService {
         }
         if (request.getDestBranchId() != null) {
             r.setDestBranch(branchRepository.findById(request.getDestBranchId()).orElseThrow(() -> new RuntimeException("Dest branch not found")));
+        }
+
+        if (currentUser.getRole() != UserRole.ADMIN) {
+            Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
+            if (myBranchId == null) throw new RuntimeException("Bạn chưa thuộc chi nhánh nào.");
+
+            if (request.getType() == ReceiptType.IMPORT || request.getType() == ReceiptType.ADJUST_IN) {
+                if (request.getDestBranchId() == null || !request.getDestBranchId().equals(myBranchId)) {
+                    throw new RuntimeException("Bạn chỉ được phép lập phiếu cho chi nhánh đích là chi nhánh của mình.");
+                }
+            } else {
+                if (request.getSourceBranchId() == null || !request.getSourceBranchId().equals(myBranchId)) {
+                    throw new RuntimeException("Bạn chỉ được phép lập phiếu xuất/điều chuyển/giảm từ kho của chi nhánh mình.");
+                }
+            }
+        }
+
+        if ((request.getType() == ReceiptType.IMPORT || request.getType() == ReceiptType.ADJUST_IN) && request.getDestBranchId() == null) {
+             throw new RuntimeException("Chi nhánh đích là bắt buộc.");
+        }
+        if ((request.getType() == ReceiptType.EXPORT || request.getType() == ReceiptType.TRANSFER || request.getType() == ReceiptType.ADJUST_OUT) && request.getSourceBranchId() == null) {
+             throw new RuntimeException("Kho xuất/nguồn là bắt buộc.");
+        }
+        if (request.getType() == ReceiptType.TRANSFER && request.getDestBranchId() == null) {
+             throw new RuntimeException("Chi nhánh nhận là bắt buộc đối với phiếu điều chuyển.");
+        }
+        if (request.getType() == ReceiptType.TRANSFER && request.getSourceBranchId().equals(request.getDestBranchId())) {
+             throw new RuntimeException("Kho xuất và nhận phải khác nhau.");
         }
 
 
@@ -128,10 +177,18 @@ public class ReceiptServiceImpl implements ReceiptService {
         if (currentUser.getRole() != UserRole.ADMIN) {
             Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
             if (myBranchId == null) throw new RuntimeException("Bạn chưa thuộc chi nhánh nào.");
-            boolean hasPerm = (r.getSourceBranch() != null && r.getSourceBranch().getId().equals(myBranchId)) ||
-                              (r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId));
-            if (!hasPerm || currentUser.getRole() == UserRole.STAFF) {
-                throw new RuntimeException("Bạn không có quyền hủy phiếu này.");
+            
+            if (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.ADJUST_IN) {
+                if (r.getDestBranch() == null || !r.getDestBranch().getId().equals(myBranchId)) {
+                    throw new RuntimeException("Bạn không có quyền hủy phiếu của chi nhánh khác.");
+                }
+            } else {
+                if (r.getSourceBranch() == null || !r.getSourceBranch().getId().equals(myBranchId)) {
+                    throw new RuntimeException("Bạn không có quyền hủy phiếu của chi nhánh khác.");
+                }
+            }
+            if (currentUser.getRole() == UserRole.STAFF) {
+                throw new RuntimeException("Nhân viên không có quyền hủy phiếu.");
             }
         }
 
@@ -141,6 +198,7 @@ public class ReceiptServiceImpl implements ReceiptService {
             for (ReceiptDetail d : r.getDetails()) {
                 updateInventory(r.getType(), r.getSourceBranch(), r.getDestBranch(), d, true);
             }
+            updateCustomerDebt(r, true, true, false);
         }
         
         receiptRepository.save(r);
@@ -168,6 +226,33 @@ public class ReceiptServiceImpl implements ReceiptService {
                 addInventory(sourceBranch, detail, -qty);
                 addInventory(destBranch, detail, qty);
                 break;
+        }
+    }
+
+    private void updateCustomerDebt(Receipt r, boolean isApprove, boolean isRevert, boolean isPayment) {
+        if (r.getCustomerId() == null) return;
+        if (r.getType() != ReceiptType.EXPORT && r.getType() != ReceiptType.IMPORT) return;
+        
+        java.math.BigDecimal totalAmount = r.getDetails().stream()
+                .map(d -> d.getPrice().multiply(java.math.BigDecimal.valueOf(d.getQuantity())))
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+                
+        java.math.BigDecimal delta = java.math.BigDecimal.ZERO;
+        if (isPayment) {
+            if (r.getType() == ReceiptType.EXPORT) delta = totalAmount.negate();
+            if (r.getType() == ReceiptType.IMPORT) delta = totalAmount;
+        } else {
+            if (r.getType() == ReceiptType.EXPORT) {
+                delta = isRevert ? totalAmount.negate() : totalAmount;
+            } else if (r.getType() == ReceiptType.IMPORT) {
+                delta = isRevert ? totalAmount : totalAmount.negate();
+            }
+        }
+        
+        Customer customer = customerRepository.findById(r.getCustomerId()).orElse(null);
+        if (customer != null) {
+            customer.setDebt(customer.getDebt().add(delta));
+            customerRepository.save(customer);
         }
     }
 
@@ -202,19 +287,43 @@ public class ReceiptServiceImpl implements ReceiptService {
         if (currentUser.getRole() == UserRole.STAFF) {
             throw new RuntimeException("Nhân viên không có quyền duyệt phiếu.");
         }
+        
+        User creator = r.getCreatedBy();
+        if (creator != null) {
+            if (creator.getRole() == UserRole.STAFF) {
+                if (currentUser.getRole() != UserRole.MANAGER) {
+                    throw new RuntimeException("Chỉ Quản lý mới được quyền duyệt phiếu của Nhân viên.");
+                }
+            } else if (creator.getRole() == UserRole.MANAGER) {
+                if (currentUser.getRole() != UserRole.ADMIN) {
+                    throw new RuntimeException("Chỉ Admin mới được quyền duyệt phiếu của Quản lý.");
+                }
+            }
+        }
+
         if (currentUser.getRole() != UserRole.ADMIN) {
             Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
-            boolean hasPerm = (r.getSourceBranch() != null && r.getSourceBranch().getId().equals(myBranchId)) ||
-                              (r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId));
-            if (!hasPerm) {
-                throw new RuntimeException("Bạn không có quyền duyệt phiếu của chi nhánh này.");
+            if (myBranchId == null) throw new RuntimeException("Bạn chưa thuộc chi nhánh nào.");
+
+            if (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.ADJUST_IN) {
+                if (r.getDestBranch() == null || !r.getDestBranch().getId().equals(myBranchId)) {
+                    throw new RuntimeException("Bạn không có quyền duyệt phiếu của chi nhánh khác.");
+                }
+            } else {
+                if (r.getSourceBranch() == null || !r.getSourceBranch().getId().equals(myBranchId)) {
+                    throw new RuntimeException("Bạn không có quyền duyệt phiếu của chi nhánh khác.");
+                }
             }
         }
 
         r.setStatus(ReceiptStatus.COMPLETED);
+        if (r.getType() == ReceiptType.TRANSFER) {
+            r.setPaymentStatus("IN_TRANSIT");
+        }
         for (ReceiptDetail d : r.getDetails()) {
             updateInventory(r.getType(), r.getSourceBranch(), r.getDestBranch(), d, false);
         }
+        updateCustomerDebt(r, true, false, false);
         
         receiptRepository.save(r);
         return new ReceiptResponse(r);
@@ -224,6 +333,25 @@ public class ReceiptServiceImpl implements ReceiptService {
     @Override
     public ReceiptResponse markPaid(Integer id, User currentUser) {
         Receipt r = receiptRepository.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
+        
+        if (currentUser.getRole() != UserRole.ADMIN) {
+            Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
+            if (myBranchId == null) throw new RuntimeException("Bạn chưa thuộc chi nhánh nào.");
+            
+            if (r.getType() == ReceiptType.EXPORT) {
+                if (r.getSourceBranch() == null || !r.getSourceBranch().getId().equals(myBranchId)) {
+                    throw new RuntimeException("Chỉ chi nhánh xuất mới được xác nhận thanh toán.");
+                }
+            } else if (r.getType() == ReceiptType.IMPORT) {
+                if (r.getDestBranch() == null || !r.getDestBranch().getId().equals(myBranchId)) {
+                    throw new RuntimeException("Chỉ chi nhánh nhập mới được xác nhận thanh toán.");
+                }
+            }
+        }
+
+        if (!"PAID".equals(r.getPaymentStatus()) && !"Đã thanh toán".equals(r.getPaymentStatus())) {
+            updateCustomerDebt(r, false, false, true);
+        }
         r.setPaymentStatus("PAID");
         receiptRepository.save(r);
         return new ReceiptResponse(r);
@@ -233,6 +361,15 @@ public class ReceiptServiceImpl implements ReceiptService {
     @Override
     public ReceiptResponse confirmTransfer(Integer id, java.util.Map<String, Object> payload, User currentUser) {
         Receipt r = receiptRepository.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
+        
+        if (currentUser.getRole() != UserRole.ADMIN) {
+            Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
+            if (myBranchId == null) throw new RuntimeException("Bạn chưa thuộc chi nhánh nào.");
+            if (r.getDestBranch() == null || !r.getDestBranch().getId().equals(myBranchId)) {
+                throw new RuntimeException("Chỉ chi nhánh nhận mới được xác nhận nhận hàng.");
+            }
+        }
+
         r.setPaymentStatus("RECEIVED");
         receiptRepository.save(r);
         return new ReceiptResponse(r);

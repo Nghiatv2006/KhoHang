@@ -10,6 +10,13 @@ const isManager = computed(() => user.value?.role === 'MANAGER')
 const isStaff = computed(() => user.value?.role === 'STAFF')
 const canApprove = computed(() => isAdmin.value || isManager.value)
 
+function canApproveReceipt(r: any) {
+  if (r.status !== 'DRAFT') return false;
+  if (isAdmin.value && r.createdByRole === 'MANAGER') return true;
+  if (isManager.value && r.createdByRole === 'STAFF') return true;
+  return false;
+}
+
 // ──────────────────────────────────────────────────────────────
 // DATA
 // ──────────────────────────────────────────────────────────────
@@ -29,7 +36,13 @@ const searchKeyword = ref('')
 const filteredReceipts = computed(() => {
   let result = [...receipts.value]
   if (filterType.value) result = result.filter(r => r.type === filterType.value)
-  if (filterStatus.value) result = result.filter(r => r.status === filterStatus.value || r.paymentStatus === filterStatus.value)
+  if (filterStatus.value) {
+    if (filterStatus.value === 'UNPAID') {
+      result = result.filter(r => r.type === 'EXPORT' && r.status === 'COMPLETED' && (r.paymentStatus === 'UNPAID' || r.paymentStatus === 'Chưa thanh toán'))
+    } else {
+      result = result.filter(r => r.status === filterStatus.value || r.paymentStatus === filterStatus.value)
+    }
+  }
   if (searchKeyword.value.trim()) {
     const kw = searchKeyword.value.toLowerCase()
     result = result.filter(r =>
@@ -79,10 +92,11 @@ const subBranches = computed(() => branches.value.filter(b => b.id !== headBranc
 // ──────────────────────────────────────────────────────────────
 // STATS
 // ──────────────────────────────────────────────────────────────
-const statDraft = computed(() => receipts.value.filter(r => r.status === 'DRAFT').length)
+const statDraft = computed(() => receipts.value.filter(r => canApproveReceipt(r)).length)
 const statCompleted = computed(() => receipts.value.filter(r => r.status === 'COMPLETED').length)
 const statCancelled = computed(() => receipts.value.filter(r => r.status === 'CANCELLED').length)
 const statInTransit = computed(() => receipts.value.filter(r => r.paymentStatus === 'IN_TRANSIT').length)
+const statUnpaid = computed(() => receipts.value.filter(r => r.type === 'EXPORT' && r.status === 'COMPLETED' && (r.paymentStatus === 'UNPAID' || r.paymentStatus === 'Chưa thanh toán')).length)
 
 // ──────────────────────────────────────────────────────────────
 // DETAIL PANEL
@@ -117,7 +131,7 @@ const createForm = ref<{
   description: string
   details: DetailRow[]
 }>({
-  type: 'EXPORT',
+  type: 'IMPORT',
   sourceBranchId: user.value?.branchId || headBranch.value?.id || '',
   destBranchId: '',
   customerName: '',
@@ -135,8 +149,9 @@ interface DetailRow {
 }
 
 function openCreateModal() {
+  const defaultType = (user.value?.branchId !== headBranch.value?.id) ? 'IMPORT' : 'EXPORT';
   createForm.value = {
-    type: 'EXPORT',
+    type: defaultType,
     sourceBranchId: user.value?.branchId || headBranch.value?.id || '',
     destBranchId: '',
     customerName: '',
@@ -144,6 +159,7 @@ function openCreateModal() {
     description: '',
     details: [{ productId: '', manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 }]
   }
+  onTypeChange()
   showCreateModal.value = true
 }
 
@@ -171,6 +187,7 @@ function onTypeChange() {
     createForm.value.sourceBranchId = user.value?.branchId || headBranch.value?.id || ''
     createForm.value.destBranchId = ''
   }
+  createForm.value.details.forEach(d => constrainQuantity(d))
 }
 
 const sourceInventories = ref<any[]>([])
@@ -184,6 +201,7 @@ watch(() => createForm.value.sourceBranchId, async (newVal) => {
       if (res.ok) {
         const allInventories = await res.json()
         sourceInventories.value = allInventories.filter((inv: any) => inv.branchId === newVal)
+        createForm.value.details.forEach(d => constrainQuantity(d))
       } else {
         let errStr = 'Lỗi server';
         try {
@@ -211,7 +229,7 @@ watch(() => createForm.value.sourceBranchId, async (newVal) => {
 
 const availableProducts = computed(() => {
   const t = createForm.value.type
-  if (t === 'ADJUST_IN' || t === 'IMPORT') {
+  if (t === 'ADJUST_IN') {
     return products.value
   }
   if (createForm.value.sourceBranchId) {
@@ -225,6 +243,15 @@ const availableProducts = computed(() => {
   return products.value
 })
 
+function getAvailableProductsForRow(index: number) {
+  const selectedIds = new Set(
+    createForm.value.details
+      .map((d, i) => i !== index ? Number(d.productId) : null)
+      .filter(id => id !== null && !isNaN(id))
+  )
+  return availableProducts.value.filter(p => !selectedIds.has(p.id))
+}
+
 function onProductChange(row: DetailRow) {
   const p = products.value.find(x => x.id === Number(row.productId))
   if (p) {
@@ -234,6 +261,7 @@ function onProductChange(row: DetailRow) {
       row.expirationDate = '1970-01-01'
     }
   }
+  constrainQuantity(row)
 }
 
 const selectedProductHasExpiry = (row: DetailRow) => {
@@ -244,7 +272,7 @@ const selectedProductHasExpiry = (row: DetailRow) => {
 
 function getMaxQuantity(productId: number | string | null) {
   if (!productId) return null
-  if (createForm.value.type === 'IMPORT' || createForm.value.type === 'ADJUST_IN') return null
+  if (createForm.value.type === 'ADJUST_IN') return null
   if (!createForm.value.sourceBranchId) return null
   const inv = sourceInventories.value.find(x => x.productId === Number(productId))
   return inv ? inv.quantity : 0
@@ -277,6 +305,18 @@ async function submitCreateDraft() {
   if (!f.type) { toast.error('Vui lòng chọn loại phiếu.'); return }
   if (f.details.some(d => !d.productId || d.quantity <= 0)) {
     toast.error('Vui lòng điền đầy đủ sản phẩm và số lượng hợp lệ.')
+    return
+  }
+  if (f.type === 'EXPORT' && !f.customerName?.trim()) {
+    toast.error('Vui lòng nhập tên khách hàng khi xuất bán.')
+    return
+  }
+
+  if (f.details.some(d => {
+    const max = getMaxQuantity(d.productId)
+    return max !== null && d.quantity > max
+  })) {
+    toast.error('Số lượng vượt quá tồn kho hiện tại.')
     return
   }
 
@@ -340,11 +380,18 @@ async function approveReceipt(receipt: any) {
       showDetail.value = false
       await loadData()
     } else {
-      const err = await res.json()
-      toast.error(err.message || 'Lỗi khi duyệt phiếu.')
+      let errMessage = 'Lỗi khi duyệt phiếu.'
+      try {
+        const err = await res.json()
+        errMessage = err.message || errMessage
+      } catch {
+        const text = await res.text()
+        errMessage = text ? text.substring(0, 100) + '...' : errMessage
+      }
+      toast.error(errMessage)
     }
   } catch (e: any) {
-    toast.error('Lỗi kết nối: ' + e.message)
+    toast.error('Lỗi: ' + e.message)
   } finally {
     approvingId.value = null
   }
@@ -583,6 +630,16 @@ function getCustomerName(id: number | null | undefined) {
           <div class="text-2xl font-extrabold text-red-400">{{ statCancelled }}</div>
         </div>
       </div>
+      <div @click="filterStatus = filterStatus === 'UNPAID' ? '' : 'UNPAID'"
+        :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'UNPAID' ? 'border-orange-400 ring-2 ring-orange-200' : 'border-[#f1f5f9] hover:border-orange-300']">
+        <div class="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center text-orange-400 text-xl">
+          <i class="fas fa-file-invoice-dollar"></i>
+        </div>
+        <div>
+          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide">Chưa thanh toán</div>
+          <div class="text-2xl font-extrabold text-orange-400">{{ statUnpaid }}</div>
+        </div>
+      </div>
     </div>
 
     <!-- TABLE CARD -->
@@ -600,8 +657,6 @@ function getCustomerName(id: number | null | undefined) {
           <option value="IMPORT">Nhập kho</option>
           <option value="EXPORT">Xuất bán</option>
           <option value="TRANSFER">Điều chuyển</option>
-          <option value="ADJUST_IN">Cân bằng +</option>
-          <option value="ADJUST_OUT">Cân bằng -</option>
         </select>
         <select v-model="filterStatus"
           class="h-[40px] px-3 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 outline-none transition-all text-[#364a63]">
@@ -691,7 +746,7 @@ function getCustomerName(id: number | null | undefined) {
                     title="Xem chi tiết">
                     <i class="fas fa-eye text-xs"></i>
                   </button>
-                  <button v-if="r.status === 'DRAFT' && canApprove"
+                  <button v-if="canApproveReceipt(r)"
                     @click.stop="approveReceipt(r)"
                     :disabled="approvingId === r.id"
                     class="w-8 h-8 flex items-center justify-center rounded-lg bg-green-50 hover:bg-green-500 hover:text-white text-green-600 transition-all disabled:opacity-50"
@@ -837,7 +892,7 @@ function getCustomerName(id: number | null | undefined) {
                 class="px-5 py-2.5 bg-red-50 border border-red-200 text-red-600 rounded-xl font-bold text-sm hover:bg-red-500 hover:text-white transition-all">
                 <i class="fas fa-times mr-2"></i>Hủy phiếu
               </button>
-              <button v-if="selectedReceipt.status === 'DRAFT' && canApprove"
+              <button v-if="canApproveReceipt(selectedReceipt)"
                 @click="approveReceipt(selectedReceipt)"
                 :disabled="approvingId === selectedReceipt.id"
                 class="px-5 py-2.5 bg-[#4361ee] text-white rounded-xl font-bold text-sm hover:bg-[#3a0ca3] transition-all disabled:opacity-60 flex items-center gap-2">
@@ -895,8 +950,6 @@ function getCustomerName(id: number | null | undefined) {
                     <option value="IMPORT" v-if="user?.branchId !== headBranch?.id">📥 Nhập kho</option>
                     <option value="EXPORT">📤 Xuất bán</option>
                     <option value="TRANSFER">🔄 Điều chuyển</option>
-                    <option value="ADJUST_IN">⬆️ Cân bằng tăng</option>
-                    <option value="ADJUST_OUT">⬇️ Cân bằng giảm</option>
                   </select>
                 </div>
                 <div v-if="createForm.type === 'IMPORT'">
@@ -915,7 +968,7 @@ function getCustomerName(id: number | null | undefined) {
                   </select>
                 </div>
                 <div v-if="createForm.type === 'EXPORT'">
-                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Khách hàng</label>
+                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Khách hàng <span class="text-red-500">*</span></label>
                   <input v-model="createForm.customerName" type="text" placeholder="Nhập tên khách hàng..."
                     class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
                 </div>
@@ -962,14 +1015,14 @@ function getCustomerName(id: number | null | undefined) {
                         <select v-model="d.productId" @change="onProductChange(d)"
                           class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none bg-white">
                           <option value="">-- Chọn sản phẩm --</option>
-                          <option v-for="p in availableProducts" :key="p.id" :value="p.id">{{ p.name }} ({{ p.code }})</option>
+                          <option v-for="p in getAvailableProductsForRow(idx)" :key="p.id" :value="p.id">{{ p.name }} ({{ p.code }})</option>
                         </select>
                       </div>
                       <div :class="(createForm.type === 'IMPORT' || createForm.type === 'TRANSFER') ? 'grid grid-cols-1 gap-2' : 'grid grid-cols-3 gap-2'">
                         <div>
                           <label class="block text-xs text-[#8094ae] mb-1">Số lượng <span class="text-red-500">*</span></label>
                           <div class="relative">
-                            <input v-model.number="d.quantity" type="number" min="1" @input="constrainQuantity(d)" @blur="onQuantityBlur(d)"
+                            <input v-model.number="d.quantity" type="number" min="1" @input="constrainQuantity(d)" @blur="onQuantityBlur(d)" @keypress="(e) => { if(!/[0-9]/.test(e.key)) e.preventDefault() }"
                               class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none pr-12" />
                             <span v-if="getMaxQuantity(d.productId) !== null" class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[#8094ae] font-bold">
                               / {{ getMaxQuantity(d.productId) }}
