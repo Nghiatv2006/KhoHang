@@ -17,7 +17,6 @@ public class ProductResponse {
     private BigDecimal importPrice;
     private BigDecimal price;
 
-    private String description;
     private String imageUrl;
     private String unit;
     
@@ -38,7 +37,6 @@ public class ProductResponse {
         this.unit = product.getUnit();
         this.hasExpiry = product.getHasExpiry();
 
-        this.description = product.getDescription();
         this.imageUrl = product.getImageUrl();
         
         // Trích xuất ID và Tên của Category thay vì trả toàn bộ object Category
@@ -74,10 +72,6 @@ public class ProductResponse {
         return price;
     }
 
-
-    public String getDescription() {
-        return description;
-    }
 
     public String getImageUrl() {
         return imageUrl;

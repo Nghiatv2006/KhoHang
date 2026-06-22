@@ -73,6 +73,12 @@ const routes: RouteRecordRaw[] = [
         name: 'Receipts',
         component: () => import('../views/ReceiptsView.vue'),
       },
+      {
+        path: '/audit-logs',
+        name: 'AuditLogs',
+        component: () => import('../views/AuditLogView.vue'),
+        meta: { roles: ['ADMIN', 'MANAGER'] },
+      },
     ],
   },
 ]
@@ -87,7 +93,7 @@ router.beforeEach((to, _from, next) => {
   const userStr = localStorage.getItem('wh_user')
   const user = userStr ? JSON.parse(userStr) : null
   const isLoggedIn = !!user
-  
+
   if (to.meta.requiresAuth && !isLoggedIn) {
     next('/login')
   } else if (to.path === '/login' && isLoggedIn) {
@@ -97,6 +103,14 @@ router.beforeEach((to, _from, next) => {
     const hasCrud = user && user.role === 'ADMIN'
     if (!hasCrud) {
       next('/global-inventory')
+    } else {
+      next()
+    }
+  } else if (to.path === '/audit-logs') {
+    // Chỉ ADMIN và MANAGER mới được xem Nhật ký
+    const canView = user && ['ADMIN', 'MANAGER'].includes(user.role)
+    if (!canView) {
+      next('/dashboard')
     } else {
       next()
     }

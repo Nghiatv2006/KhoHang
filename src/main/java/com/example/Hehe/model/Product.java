@@ -29,9 +29,6 @@ public class Product {
     @Column(name = "price")
     private BigDecimal price;
 
-    @Column(name = "description", columnDefinition = "TEXT")
-    private String description;
-
     // Liên kết ManyToOne với Category (Nhiều sản phẩm thuộc 1 danh mục)
     // FetchType.LAZY để tối ưu hiệu suất, chỉ query danh mục khi cần thiết.
     @ManyToOne(fetch = FetchType.LAZY)
@@ -54,6 +51,10 @@ public class Product {
     // Hạn sử dụng - Không bắt buộc
     @Column(name = "exp_date")
     private LocalDate expirationDate;
+
+    // Trạng thái xóa mềm
+    @Column(name = "is_deleted")
+    private Boolean isDeleted = false;
 
     // Getters and Setters
 
@@ -97,14 +98,6 @@ public class Product {
         this.price = price;
     }
 
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
     public Category getCategory() {
         return category;
     }
@@ -127,6 +120,14 @@ public class Product {
 
     public void setExpirationDate(LocalDate expirationDate) {
         this.expirationDate = expirationDate;
+    }
+
+    public Boolean getIsDeleted() {
+        return isDeleted;
+    }
+
+    public void setIsDeleted(Boolean isDeleted) {
+        this.isDeleted = isDeleted;
     }
 
     public String getUnit() {

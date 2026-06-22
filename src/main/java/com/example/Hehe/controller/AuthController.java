@@ -2,10 +2,14 @@ package com.example.Hehe.controller;
 
 import com.example.Hehe.dto.LoginRequest;
 import com.example.Hehe.dto.LoginResponse;
+import com.example.Hehe.exception.TooManyRequestsException;
+import com.example.Hehe.model.User;
 import com.example.Hehe.service.AuthService;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -35,7 +39,7 @@ public class AuthController {
                     .sameSite("Lax")           // Đổi sang Lax để tránh lỗi mất cookie khi chuyển trang SPA
                     .build();
 
-            // 2. Trả về thông tin user (không kèm token trong Body nữa) và đính kèm Cookie vào Header
+            // 2. Trả về thông tin user và đính kèm Cookie
             Map<String, Object> body = new HashMap<>();
             body.put("id", response.getId());
             body.put("username", response.getUsername());
@@ -48,13 +52,25 @@ public class AuthController {
             return ResponseEntity.ok()
                     .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
                     .body(body);
+        } catch (TooManyRequestsException ex) {
+            // Trả về HTTP 429 khi bị phạt spam
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of(
+                    "message", ex.getMessage(),
+                    "banUntil", ex.getBanUntil() != null ? ex.getBanUntil().toString() : ""
+            ));
         } catch (RuntimeException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout() {
+    public ResponseEntity<?> logout(@AuthenticationPrincipal User currentUser) {
+        // Ghi log đăng xuất nếu user đã đăng nhập
+        if (currentUser != null) {
+            try {
+                authService.logout(currentUser);
+            } catch (Exception ignored) {}
+        }
         // Xoá cookie bằng cách set maxAge = 0
         ResponseCookie deleteCookie = ResponseCookie.from("accessToken", "")
                 .httpOnly(true)

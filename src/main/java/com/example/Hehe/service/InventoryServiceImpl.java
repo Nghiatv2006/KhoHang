@@ -238,7 +238,6 @@ public class InventoryServiceImpl implements InventoryService {
         product.setSku("PRD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         product.setName(request.getName().trim());
         product.setPrice(request.getPrice());
-        product.setDescription(request.getDescription() != null ? request.getDescription().trim() : null);
         product.setUnit(request.getUnit().trim());
         product.setCategory(category);
         product.setHasExpiry(Boolean.TRUE.equals(request.getHasExpiry()));

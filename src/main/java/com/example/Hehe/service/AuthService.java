@@ -15,11 +15,14 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final AuditLogService auditLogService;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider) {
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
+                       JwtTokenProvider jwtTokenProvider, AuditLogService auditLogService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
+        this.auditLogService = auditLogService;
     }
 
     public LoginResponse login(LoginRequest request) {
@@ -27,15 +30,8 @@ public class AuthService {
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new RuntimeException("Tài khoản hoặc mật khẩu không chính xác"));
 
-        System.out.println("DEBUG: login request for user: " + request.getUsername());
-        System.out.println("DEBUG: request password length: " + (request.getPassword() != null ? request.getPassword().length() : "null"));
-        System.out.println("DEBUG: db password hash: '" + user.getPassword() + "'");
-        System.out.println("DEBUG: db password hash length: " + (user.getPassword() != null ? user.getPassword().length() : "null"));
-        
-        boolean isMatch = passwordEncoder.matches(request.getPassword(), user.getPassword());
-        System.out.println("DEBUG: passwordEncoder.matches result: " + isMatch);
-
         // 2. Kiểm tra mật khẩu (so khớp bằng BCrypt)
+        boolean isMatch = passwordEncoder.matches(request.getPassword(), user.getPassword());
         if (!isMatch) {
             throw new RuntimeException("Tài khoản hoặc mật khẩu không chính xác");
         }
@@ -45,14 +41,18 @@ public class AuthService {
             throw new RuntimeException("Tài khoản của bạn đã bị khóa");
         }
 
-        // 4. Sinh JWT Token
+        // 4. Kiểm tra và ghi log đăng nhập (có chống spam)
+        // Nếu đang bị phạt, auditLogService sẽ tự động throw TooManyRequestsException
+        auditLogService.logLoginWithSpamCheck(user);
+
+        // 5. Sinh JWT Token
         String token = jwtTokenProvider.generateToken(user.getUsername(), user.getRole().name());
 
-        // 5. Lấy thông tin Chi nhánh (nếu có)
+        // 6. Lấy thông tin Chi nhánh (nếu có)
         Integer branchId = user.getBranch() != null ? user.getBranch().getId() : null;
         String branchName = user.getBranch() != null ? user.getBranch().getName() : null;
 
-        // 6. Trả về thông tin đăng nhập thành công
+        // 7. Trả về thông tin đăng nhập thành công
         return new LoginResponse(
                 token,
                 user.getId(),
@@ -63,5 +63,12 @@ public class AuthService {
                 branchName,
                 user.getStatus().name()
         );
+    }
+
+    /**
+     * Ghi log đăng xuất cho user hiện tại.
+     */
+    public void logout(User user) {
+        auditLogService.logLogoutWithSpamCheck(user);
     }
 }

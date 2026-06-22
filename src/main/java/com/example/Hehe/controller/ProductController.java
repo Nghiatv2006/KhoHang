@@ -75,6 +75,12 @@ public class ProductController {
         try {
             ProductResponse response = productService.createProduct(request, currentUser);
             return ResponseEntity.ok(response);
+        } catch (com.example.Hehe.exception.ProductDeletedConflictException ex) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).body(Map.of(
+                "code", "DELETED_CONFLICT",
+                "message", ex.getMessage(),
+                "productId", ex.getProductId()
+            ));
         } catch (RuntimeException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }

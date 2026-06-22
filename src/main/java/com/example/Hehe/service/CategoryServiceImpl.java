@@ -19,9 +19,11 @@ import java.util.stream.Collectors;
 public class CategoryServiceImpl implements CategoryService {
 
     private final CategoryRepository categoryRepository;
+    private final AuditLogService auditLogService;
 
-    public CategoryServiceImpl(CategoryRepository categoryRepository) {
+    public CategoryServiceImpl(CategoryRepository categoryRepository, AuditLogService auditLogService) {
         this.categoryRepository = categoryRepository;
+        this.auditLogService = auditLogService;
     }
 
     /**
@@ -75,6 +77,11 @@ public class CategoryServiceImpl implements CategoryService {
 
         category = categoryRepository.save(category);
         
+        // Ghi log
+        auditLogService.logAction(currentUser, "CREATE", "categories", 
+                String.valueOf(category.getId()), 
+                "Tạo mới danh mục: " + category.getName());
+
         // 5. Trả về DTO
         return new CategoryResponse(category);
     }
@@ -108,6 +115,11 @@ public class CategoryServiceImpl implements CategoryService {
         category.setName(newName);
         category = categoryRepository.save(category);
 
+        // Ghi log
+        auditLogService.logAction(currentUser, "UPDATE", "categories", 
+                String.valueOf(category.getId()), 
+                "Cập nhật danh mục: " + category.getName());
+
         // 6. Trả về thông tin danh mục sau khi đã sửa
         return new CategoryResponse(category);
     }
@@ -129,6 +141,11 @@ public class CategoryServiceImpl implements CategoryService {
             // 3. Xóa danh mục khỏi cơ sở dữ liệu
             if (category != null) {
                 categoryRepository.delete(category);
+                
+                // Ghi log
+                auditLogService.logAction(currentUser, "DELETE", "categories", 
+                        String.valueOf(category.getId()), 
+                        "Xóa danh mục: " + category.getName());
             }
         } catch (DataIntegrityViolationException ex) {
             // Xử lý lỗi khi có ràng buộc khóa ngoại (sản phẩm đang thuộc danh mục này)
