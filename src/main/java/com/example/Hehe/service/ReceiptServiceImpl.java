@@ -94,19 +94,16 @@ public class ReceiptServiceImpl implements ReceiptService {
             if (request.getCustomerName() == null || request.getCustomerName().trim().isEmpty()) {
                 throw new RuntimeException("Tên khách hàng là bắt buộc đối với phiếu xuất bán.");
             }
+            if (request.getCustomerPhone() == null || request.getCustomerPhone().trim().isEmpty()) {
+                throw new RuntimeException("Số điện thoại khách hàng là bắt buộc đối với phiếu xuất bán.");
+            }
         }
 
         if (request.getCustomerName() != null && !request.getCustomerName().trim().isEmpty()) {
-            String cName = request.getCustomerName().trim();
-            Customer customer = customerRepository.findByName(cName).orElseGet(() -> {
-                Customer newC = new Customer();
-                newC.setName(cName);
-                newC.setStatus("ACTIVE");
-                newC.setDebt(java.math.BigDecimal.ZERO);
-                newC.setBranch(currentUser.getBranch());
-                return customerRepository.save(newC);
-            });
-            r.setCustomerId(customer.getId());
+            r.setCustomerName(request.getCustomerName().trim());
+        }
+        if (request.getCustomerPhone() != null && !request.getCustomerPhone().trim().isEmpty()) {
+            r.setCustomerPhone(request.getCustomerPhone().trim());
         }
 
         r.setDescription(request.getDescription());
@@ -149,6 +146,18 @@ public class ReceiptServiceImpl implements ReceiptService {
 
         if (request.getDetails() == null || request.getDetails().isEmpty()) {
             throw new RuntimeException("Receipt must have details.");
+        }
+
+        if (request.getType() == ReceiptType.EXPORT || request.getType() == ReceiptType.TRANSFER || request.getType() == ReceiptType.ADJUST_OUT) {
+            for (ReceiptDetailSaveRequest dReq : request.getDetails()) {
+                List<Inventory> invs = inventoryRepository.findByBranchIdAndProductId(request.getSourceBranchId(), dReq.getProductId());
+                int totalQty = invs.stream().mapToInt(Inventory::getQuantity).sum();
+                if (totalQty < dReq.getQuantity()) {
+                    Product p = productRepository.findById(dReq.getProductId()).orElse(null);
+                    String pName = p != null ? p.getName() : "ID " + dReq.getProductId();
+                    throw new RuntimeException("Sản phẩm " + pName + " chỉ còn " + totalQty + " trong kho nguồn, không đủ để lập phiếu.");
+                }
+            }
         }
 
         for (ReceiptDetailSaveRequest dReq : request.getDetails()) {
@@ -258,24 +267,44 @@ public class ReceiptServiceImpl implements ReceiptService {
 
     private void addInventory(Branch branch, ReceiptDetail detail, int qtyDelta) {
         if (branch == null) throw new RuntimeException("Branch is required for inventory update.");
+        if (qtyDelta == 0) return;
+
         List<Inventory> invs = inventoryRepository.findByBranchIdAndProductId(branch.getId(), detail.getProduct().getId());
-        Inventory inv;
-        if (invs.isEmpty()) {
-            if (qtyDelta < 0) throw new RuntimeException("Không đủ tồn kho để thực hiện giao dịch cho sản phẩm: " + detail.getProduct().getName());
-            inv = new Inventory();
-            inv.setBranch(branch);
-            inv.setProduct(detail.getProduct());
-            inv.setQuantity(qtyDelta);
-            inv.setManufacturingDate(detail.getManufacturingDate());
-            inv.setExpirationDate(detail.getExpirationDate());
+        
+        if (qtyDelta > 0) {
+            Inventory inv;
+            if (invs.isEmpty()) {
+                inv = new Inventory();
+                inv.setBranch(branch);
+                inv.setProduct(detail.getProduct());
+                inv.setQuantity(qtyDelta);
+                inv.setManufacturingDate(detail.getManufacturingDate());
+                inv.setExpirationDate(detail.getExpirationDate());
+            } else {
+                inv = invs.get(0);
+                inv.setQuantity(inv.getQuantity() + qtyDelta);
+            }
+            inv.setLastUpdated(java.time.LocalDateTime.now());
+            inventoryRepository.save(inv);
         } else {
-            inv = invs.get(0);
-            int newQty = inv.getQuantity() + qtyDelta;
-            if (newQty < 0) throw new RuntimeException("Không đủ tồn kho để thực hiện giao dịch cho sản phẩm: " + detail.getProduct().getName());
-            inv.setQuantity(newQty);
+            int remainingToDeduct = -qtyDelta;
+            int totalAvailable = invs.stream().mapToInt(Inventory::getQuantity).sum();
+            
+            if (totalAvailable < remainingToDeduct) {
+                throw new RuntimeException("Không đủ tồn kho để thực hiện giao dịch cho sản phẩm: " + detail.getProduct().getName());
+            }
+            
+            for (Inventory inv : invs) {
+                if (remainingToDeduct <= 0) break;
+                if (inv.getQuantity() > 0) {
+                    int deductAmount = Math.min(inv.getQuantity(), remainingToDeduct);
+                    inv.setQuantity(inv.getQuantity() - deductAmount);
+                    inv.setLastUpdated(java.time.LocalDateTime.now());
+                    inventoryRepository.save(inv);
+                    remainingToDeduct -= deductAmount;
+                }
+            }
         }
-        inv.setLastUpdated(java.time.LocalDateTime.now());
-        inventoryRepository.save(inv);
     }
 
     @Transactional
@@ -317,6 +346,37 @@ public class ReceiptServiceImpl implements ReceiptService {
         }
 
         r.setStatus(ReceiptStatus.COMPLETED);
+
+        // Tạo khách hàng nếu là xuất bán và có thông tin
+        if (r.getType() == ReceiptType.EXPORT && r.getCustomerName() != null && !r.getCustomerName().trim().isEmpty()) {
+            String cName = r.getCustomerName().trim();
+            
+            Integer branchIdToUse = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
+            if (r.getSourceBranch() != null) {
+                branchIdToUse = r.getSourceBranch().getId();
+            }
+            final Integer finalBranchId = branchIdToUse;
+
+            Customer customer = customerRepository.findByNameAndBranchId(cName, finalBranchId).orElseGet(() -> {
+                Customer newC = new Customer();
+                newC.setName(cName);
+                newC.setContactInfo(r.getCustomerPhone() != null ? r.getCustomerPhone().trim() : null);
+                newC.setStatus("ACTIVE");
+                newC.setDebt(java.math.BigDecimal.ZERO);
+                if (finalBranchId != null) {
+                    newC.setBranch(branchRepository.findById(finalBranchId).orElse(null));
+                }
+                return customerRepository.save(newC);
+            });
+            
+            // Cập nhật số điện thoại nếu khách hàng đã tồn tại nhưng thiếu sđt hoặc khác
+            if (r.getCustomerPhone() != null && !r.getCustomerPhone().trim().isEmpty()) {
+                customer.setContactInfo(r.getCustomerPhone().trim());
+                customerRepository.save(customer);
+            }
+
+            r.setCustomerId(customer.getId());
+        }
         if (r.getType() == ReceiptType.TRANSFER) {
             r.setPaymentStatus("IN_TRANSIT");
         }

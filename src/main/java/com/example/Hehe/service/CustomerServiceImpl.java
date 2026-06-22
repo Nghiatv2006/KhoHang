@@ -38,8 +38,7 @@ public class CustomerServiceImpl implements CustomerService {
                 .stream()
                 .filter(c -> {
                     if (currentUser.getRole() == com.example.Hehe.model.UserRole.ADMIN) return true;
-                    if (c.getBranch() == null) return true;
-                    return currentUser.getBranch() != null && c.getBranch().getId().equals(currentUser.getBranch().getId());
+                    return currentUser.getBranch() != null && c.getBranch() != null && c.getBranch().getId().equals(currentUser.getBranch().getId());
                 })
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
@@ -158,6 +157,11 @@ public class CustomerServiceImpl implements CustomerService {
 
         BigDecimal oldDebt = customer.getDebt() != null ? customer.getDebt() : BigDecimal.ZERO;
         BigDecimal newDebt = oldDebt.add(amount);
+
+        if (newDebt.compareTo(BigDecimal.ZERO) < 0) {
+            throw new RuntimeException("Công nợ không được điều chỉnh xuống mức âm (Số tiền giảm tối đa là " + oldDebt + " VNĐ).");
+        }
+
         customer.setDebt(newDebt);
 
         Customer savedCustomer = customerRepository.save(customer);

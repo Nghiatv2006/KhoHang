@@ -43,6 +43,12 @@ public class Receipt {
     @Column(name = "customer_id")
     private Integer customerId;
 
+    @Column(name = "customer_name")
+    private String customerName;
+
+    @Column(name = "customer_phone")
+    private String customerPhone;
+
     @Column(name = "description", length = 500)
     private String description;
 
@@ -78,6 +84,12 @@ public class Receipt {
 
     public Integer getCustomerId() { return customerId; }
     public void setCustomerId(Integer customerId) { this.customerId = customerId; }
+
+    public String getCustomerName() { return customerName; }
+    public void setCustomerName(String customerName) { this.customerName = customerName; }
+
+    public String getCustomerPhone() { return customerPhone; }
+    public void setCustomerPhone(String customerPhone) { this.customerPhone = customerPhone; }
 
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }

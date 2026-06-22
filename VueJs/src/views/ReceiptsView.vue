@@ -135,6 +135,7 @@ const createForm = ref<{
   sourceBranchId: user.value?.branchId || headBranch.value?.id || '',
   destBranchId: '',
   customerName: '',
+  customerPhone: '',
   paymentStatus: 'UNPAID',
   description: '',
   details: []
@@ -155,6 +156,7 @@ function openCreateModal() {
     sourceBranchId: user.value?.branchId || headBranch.value?.id || '',
     destBranchId: '',
     customerName: '',
+    customerPhone: '',
     paymentStatus: 'UNPAID',
     description: '',
     details: [{ productId: '', manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 }]
@@ -275,7 +277,18 @@ function getMaxQuantity(productId: number | string | null) {
   if (createForm.value.type === 'ADJUST_IN') return null
   if (!createForm.value.sourceBranchId) return null
   const inv = sourceInventories.value.find(x => x.productId === Number(productId))
-  return inv ? inv.quantity : 0
+  const totalQty = inv ? inv.quantity : 0
+  
+  if (createForm.value.type === 'IMPORT') return null
+
+  // Trừ đi số lượng đang nằm trong các phiếu nháp chờ xuất/điều chuyển
+  const pendingQty = receipts.value
+    .filter(r => r.status === 'DRAFT' && r.sourceBranchId === createForm.value.sourceBranchId && ['EXPORT', 'TRANSFER', 'ADJUST_OUT'].includes(r.type))
+    .flatMap(r => r.details || [])
+    .filter(d => Number(d.productId) === Number(productId))
+    .reduce((sum, d) => sum + Number(d.quantity), 0)
+
+  return Math.max(0, totalQty - pendingQty)
 }
 
 function constrainQuantity(d: DetailRow) {
@@ -307,8 +320,8 @@ async function submitCreateDraft() {
     toast.error('Vui lòng điền đầy đủ sản phẩm và số lượng hợp lệ.')
     return
   }
-  if (f.type === 'EXPORT' && !f.customerName?.trim()) {
-    toast.error('Vui lòng nhập tên khách hàng khi xuất bán.')
+  if (f.type === 'EXPORT' && (!f.customerName?.trim() || !f.customerPhone?.trim())) {
+    toast.error('Vui lòng nhập đầy đủ tên và số điện thoại khách hàng khi xuất bán.')
     return
   }
 
@@ -325,6 +338,7 @@ async function submitCreateDraft() {
     sourceBranchId: f.sourceBranchId || null,
     destBranchId: f.destBranchId || null,
     customerName: f.customerName || null,
+    customerPhone: f.customerPhone || null,
     paymentStatus: f.paymentStatus,
     description: f.description,
     details: f.details.map(d => ({
@@ -560,10 +574,16 @@ function canConfirmTransfer(receipt: any) {
   return receipt.destBranchId === user.value?.branchId
 }
 
-function getCustomerName(id: number | null | undefined) {
-  if (!id) return '—'
-  const c = customers.value.find(x => x.id === id)
-  return c ? c.name : '—'
+function getCustomerName(receipt: any) {
+  if (receipt.customerName) {
+    if (receipt.customerPhone) {
+      return `${receipt.customerName} - ${receipt.customerPhone}`;
+    }
+    return receipt.customerName;
+  }
+  if (!receipt.customerId) return '—'
+  const c = customers.value.find(x => x.id === receipt.customerId)
+  return c ? `${c.name} - ${c.contactInfo || 'Không có SĐT'}` : '—'
 }
 </script>
 
@@ -608,16 +628,6 @@ function getCustomerName(id: number | null | undefined) {
         <div>
           <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide">Đã duyệt</div>
           <div class="text-2xl font-extrabold text-green-500">{{ statCompleted }}</div>
-        </div>
-      </div>
-      <div @click="filterStatus = filterStatus === 'IN_TRANSIT' ? '' : 'IN_TRANSIT'"
-        :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'IN_TRANSIT' ? 'border-sky-400 ring-2 ring-sky-200' : 'border-[#f1f5f9] hover:border-sky-300']">
-        <div class="w-12 h-12 rounded-xl bg-sky-50 flex items-center justify-center text-sky-500 text-xl">
-          <i class="fas fa-truck"></i>
-        </div>
-        <div>
-          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide">Đang vận chuyển</div>
-          <div class="text-2xl font-extrabold text-sky-500">{{ statInTransit }}</div>
         </div>
       </div>
       <div @click="filterStatus = filterStatus === 'CANCELLED' ? '' : 'CANCELLED'"
@@ -730,7 +740,7 @@ function getCustomerName(id: number | null | undefined) {
                 <span class="text-[#364a63] font-medium">{{ r.sourceBranchName || '—' }}</span>
               </td>
               <td class="px-5 py-4">
-                <span class="text-[#364a63] font-medium" v-if="r.type === 'EXPORT'">{{ getCustomerName(r.customerId) }}</span>
+                <span class="text-[#364a63] font-medium" v-if="r.type === 'EXPORT'">{{ getCustomerName(r) }}</span>
                 <span class="text-[#364a63] font-medium" v-else>{{ r.destBranchName || '—' }}</span>
               </td>
               <td class="px-5 py-4">
@@ -817,7 +827,7 @@ function getCustomerName(id: number | null | undefined) {
               </div>
               <div v-if="selectedReceipt.type === 'EXPORT'">
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Khách hàng</div>
-                <div class="font-semibold text-[#364a63]">{{ getCustomerName(selectedReceipt.customerId) }}</div>
+                <div class="font-semibold text-[#364a63]">{{ getCustomerName(selectedReceipt) }}</div>
               </div>
               <div v-else>
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Chi nhánh đích</div>
@@ -898,7 +908,7 @@ function getCustomerName(id: number | null | undefined) {
                 class="px-5 py-2.5 bg-[#4361ee] text-white rounded-xl font-bold text-sm hover:bg-[#3a0ca3] transition-all disabled:opacity-60 flex items-center gap-2">
                 <i class="fas fa-check-circle"></i>Phê duyệt
               </button>
-              <button v-if="selectedReceipt.type === 'EXPORT' && selectedReceipt.status === 'COMPLETED' && selectedReceipt.paymentStatus === 'UNPAID' && canApprove"
+              <button v-if="selectedReceipt.type === 'EXPORT' && selectedReceipt.status === 'COMPLETED' && (selectedReceipt.paymentStatus === 'UNPAID' || selectedReceipt.paymentStatus === 'Chưa thanh toán') && canApprove"
                 @click="markAsPaid(selectedReceipt)"
                 :disabled="markingPaidId === selectedReceipt.id"
                 class="px-5 py-2.5 bg-emerald-500 text-white rounded-xl font-bold text-sm hover:bg-emerald-600 transition-all disabled:opacity-60 flex items-center gap-2">
@@ -970,6 +980,11 @@ function getCustomerName(id: number | null | undefined) {
                 <div v-if="createForm.type === 'EXPORT'">
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Khách hàng <span class="text-red-500">*</span></label>
                   <input v-model="createForm.customerName" type="text" placeholder="Nhập tên khách hàng..."
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
+                </div>
+                <div v-if="createForm.type === 'EXPORT'">
+                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Số điện thoại <span class="text-red-500">*</span></label>
+                  <input v-model="createForm.customerPhone" type="text" placeholder="Nhập số điện thoại..."
                     class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
                 </div>
               </div>
