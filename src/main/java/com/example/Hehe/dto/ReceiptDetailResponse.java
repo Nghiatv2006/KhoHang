@@ -13,6 +13,7 @@ public class ReceiptDetailResponse {
     private LocalDate expirationDate;
     private Integer quantity;
     private BigDecimal price;
+    private String batchCode;
 
     public ReceiptDetailResponse(ReceiptDetail d) {
         this.id = d.getId();
@@ -20,6 +21,7 @@ public class ReceiptDetailResponse {
         this.expirationDate = d.getExpirationDate();
         this.quantity = d.getQuantity();
         this.price = d.getPrice();
+        this.batchCode = d.getBatchCode();
 
         if (d.getProduct() != null) {
             this.productId = d.getProduct().getId();
@@ -36,4 +38,5 @@ public class ReceiptDetailResponse {
     public LocalDate getExpirationDate() { return expirationDate; }
     public Integer getQuantity() { return quantity; }
     public BigDecimal getPrice() { return price; }
+    public String getBatchCode() { return batchCode; }
 }

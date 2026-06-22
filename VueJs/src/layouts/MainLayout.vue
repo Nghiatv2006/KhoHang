@@ -32,12 +32,12 @@ const hasCrudPermission = computed(() => {
 const mainNavItems = computed(() => {
   const items = [
     { label: 'Tổng quan', to: '/dashboard', icon: 'fas fa-chart-pie' },
+    { label: 'Phiếu Nhập', to: '/receipts', icon: 'fas fa-file-invoice' }
   ]
   if (hasCrudPermission.value) {
     items.push({ label: 'Sản phẩm', to: '/products', icon: 'fas fa-box-open' })
   }
   items.push({ label: 'Tồn kho', to: '/inventory', icon: 'fas fa-warehouse' })
-  items.push({ label: 'Phiếu Nhập', to: '/receipts', icon: 'fas fa-file-invoice' })
   // @ts-ignore
   if (!user.value || user.value.role !== 'ADMIN') {
     items.push({ label: 'Tồn kho HT', to: '/global-inventory', icon: 'fas fa-globe' })

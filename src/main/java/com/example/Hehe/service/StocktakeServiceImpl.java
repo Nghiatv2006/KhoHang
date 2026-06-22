@@ -47,7 +47,7 @@ public class StocktakeServiceImpl implements StocktakeService {
     @Transactional(readOnly = true)
     public List<StocktakeResponse> getAllStocktakes(User currentUser) {
         Integer branchId = getUserBranchId(currentUser);
-        return stocktakeRepository.findByBranchId(branchId).stream()
+        return stocktakeRepository.findByBranchIdOrderByCreatedAtDesc(branchId).stream()
                 .map(StocktakeResponse::new)
                 .collect(Collectors.toList());
     }
@@ -213,7 +213,7 @@ public class StocktakeServiceImpl implements StocktakeService {
                 
                 int qtyDiff = d.getActualQuantity() - d.getExpectedQuantity();
                 rd.setQuantity(qtyDiff);
-                rd.setPrice(d.getProduct().getImportPrice());
+                rd.setPrice(java.math.BigDecimal.ZERO);
                 receiptIn.getDetails().add(rd);
 
                 // Link to receipt
@@ -248,7 +248,7 @@ public class StocktakeServiceImpl implements StocktakeService {
                 
                 int qtyDiff = d.getExpectedQuantity() - d.getActualQuantity(); // Positive qty in ReceiptDetail
                 rd.setQuantity(qtyDiff);
-                rd.setPrice(d.getProduct().getImportPrice());
+                rd.setPrice(java.math.BigDecimal.ZERO);
                 receiptOut.getDetails().add(rd);
 
                 // Link to receipt

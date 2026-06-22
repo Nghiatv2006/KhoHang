@@ -24,7 +24,7 @@ const filteredCustomers = computed(() => {
   return customers.value.filter(c =>
     c.name?.toLowerCase().includes(kw) ||
     c.email?.toLowerCase().includes(kw) ||
-    c.phone?.includes(kw)
+    c.contactInfo?.includes(kw)
   )
 })
 
@@ -40,7 +40,7 @@ const cDebtAmount = ref<any>('')
 const cDebtSaving = ref(false)
 
 function openAddC() { editingC.value = null; Object.assign(cForm, { name: '', email: '', phone: '', address: '', taxCode: '' }); showCModal.value = true }
-function openEditC(c: any) { editingC.value = c; Object.assign(cForm, { name: c.name, email: c.email || '', phone: c.phone || '', address: c.address || '', taxCode: c.taxCode || '' }); showCModal.value = true }
+function openEditC(c: any) { editingC.value = c; Object.assign(cForm, { name: c.name, email: c.email || '', phone: c.contactInfo || '', address: c.address || '', taxCode: c.taxCode || '' }); showCModal.value = true }
 function openCDebt(c: any) { cDebtTarget.value = c; cDebtAmount.value = ''; showCDebtModal.value = true }
 function confirmDeleteC(c: any) { deletingC.value = c; showDeleteC.value = true }
 
@@ -48,7 +48,7 @@ async function saveCustomer() {
   if (!cForm.name?.trim()) { toast.error('Tên khách hàng là bắt buộc.'); return }
   cSaving.value = true
   try {
-    const payload = { name: cForm.name.trim(), email: cForm.email, phone: cForm.phone, address: cForm.address, taxCode: cForm.taxCode }
+    const payload = { name: cForm.name.trim(), email: cForm.email, contactInfo: cForm.phone, address: cForm.address, taxCode: cForm.taxCode }
     const res = editingC.value
       ? await api.put(`/api/customers/${editingC.value.id}`, payload)
       : await api.post('/api/customers', payload)
@@ -81,9 +81,18 @@ async function toggleCustomer(c: any) {
 
 async function adjustCDebt() {
   if (!cDebtAmount.value) { toast.error('Vui lòng nhập số tiền.'); return }
+  
+  let amount = Number(cDebtAmount.value);
+  const currentDebt = cDebtTarget.value?.debt || 0;
+  
+  // Tự động giới hạn số tiền giảm (số âm) không vượt quá nợ hiện tại
+  if (amount < 0 && Math.abs(amount) > currentDebt) {
+    amount = -currentDebt;
+  }
+  
   cDebtSaving.value = true
   try {
-    const res = await api.patch(`/api/customers/${cDebtTarget.value.id}/adjust-debt`, { amount: Number(cDebtAmount.value) })
+    const res = await api.patch(`/api/customers/${cDebtTarget.value.id}/adjust-debt`, { amount })
     const data = await res.json()
     if (res.ok) { toast.success('Điều chỉnh công nợ thành công!'); showCDebtModal.value = false; await loadCustomers() }
     else toast.error(data.message || 'Có lỗi.')
@@ -91,11 +100,20 @@ async function adjustCDebt() {
   finally { cDebtSaving.value = false }
 }
 
-// Load
 async function loadCustomers() {
   cLoading.value = true
   try { const res = await api.get('/api/customers'); if (res.ok) customers.value = await res.json() }
   catch {} finally { cLoading.value = false }
+}
+
+function handleDebtInput() {
+  if (cDebtAmount.value && cDebtTarget.value) {
+    let val = Number(cDebtAmount.value);
+    const maxDebt = cDebtTarget.value.debt || 0;
+    if (val < 0 && Math.abs(val) > maxDebt) {
+      cDebtAmount.value = -maxDebt;
+    }
+  }
 }
 
 onMounted(() => { loadCustomers() })
@@ -154,7 +172,7 @@ function formatCurrency(val: any) {
                 <div class="text-xs text-[#8094ae] font-mono mt-0.5">MST: {{ c.taxCode || '—' }}</div>
               </td>
               <td class="p-4 first:rounded-l-xl last:rounded-r-xl">
-                <div class="text-[#364a63] font-medium">{{ c.phone || '—' }}</div>
+                <div class="text-[#364a63] font-medium">{{ c.contactInfo || '—' }}</div>
                 <div class="text-xs text-[#8094ae]">{{ c.email || '—' }}</div>
               </td>
               <td class="p-4 text-right first:rounded-l-xl last:rounded-r-xl">
@@ -238,7 +256,7 @@ function formatCurrency(val: any) {
         </div>
         <div>
           <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số tiền điều chỉnh (VNĐ)</label>
-          <input v-model="cDebtAmount" type="number" placeholder="VD: -500000 để giảm, 200000 để tăng" class="w-full h-11 px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all font-mono text-[#364a63]" />
+          <input v-model="cDebtAmount" @input="handleDebtInput" type="number" placeholder="VD: -500000 để giảm, 200000 để tăng" class="w-full h-11 px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all font-mono text-[#364a63]" />
           <p class="text-xs text-[#8094ae] mt-2 bg-[#eef2ff] text-[#4361ee] p-2 rounded-lg"><i class="fas fa-info-circle mr-1"></i> Nhập số âm để giảm nợ, số dương để tăng nợ.</p>
         </div>
         <div class="flex gap-3 pt-2">

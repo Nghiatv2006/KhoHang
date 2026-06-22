@@ -21,4 +21,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
         @Param("status") String status
     );
     java.util.Optional<Customer> findByName(String name);
+
+    @Query("SELECT c FROM Customer c WHERE c.name = :name AND ((c.branch.id = :branchId) OR (:branchId IS NULL AND c.branch IS NULL))")
+    java.util.Optional<Customer> findByNameAndBranchId(@Param("name") String name, @Param("branchId") Integer branchId);
 }

@@ -19,6 +19,8 @@ public class ReceiptResponse {
     private String createdByName;
     private String createdByRole;
     private Integer customerId;
+    private String customerName;
+    private String customerPhone;
     private String description;
     private LocalDateTime createdAt;
     private List<ReceiptDetailResponse> details;
@@ -47,6 +49,8 @@ public class ReceiptResponse {
         }
 
         this.customerId = r.getCustomerId();
+        this.customerName = r.getCustomerName();
+        this.customerPhone = r.getCustomerPhone();
         this.description = r.getDescription();
         this.createdAt = r.getCreatedAt();
         
@@ -68,6 +72,8 @@ public class ReceiptResponse {
     public String getCreatedByName() { return createdByName; }
     public String getCreatedByRole() { return createdByRole; }
     public Integer getCustomerId() { return customerId; }
+    public String getCustomerName() { return customerName; }
+    public String getCustomerPhone() { return customerPhone; }
     public String getDescription() { return description; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public List<ReceiptDetailResponse> getDetails() { return details; }

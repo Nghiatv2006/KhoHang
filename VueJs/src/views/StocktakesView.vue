@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { api } from '../api'
 import { useToast } from '../utils/toast'
 import AppModal from '../components/AppModal.vue'
@@ -13,6 +13,40 @@ const loading = ref(true)
 const stocktakes = ref<any[]>([])
 const searchKeyword = ref('')
 const selectedStatus = ref('')
+
+const filterTimeRange = ref('all')
+const filterFrom = ref('')
+const filterTo = ref('')
+
+watch(filterTimeRange, (val) => {
+  const today = new Date()
+  const fmt = (d: Date) => d.toISOString().substring(0, 10)
+  
+  if (val === 'all') {
+    filterFrom.value = ''
+    filterTo.value = ''
+  } else if (val === 'today') {
+    filterFrom.value = fmt(today)
+    filterTo.value = fmt(today)
+  } else if (val === 'week') {
+    const weekAgo = new Date(today)
+    weekAgo.setDate(weekAgo.getDate() - 7)
+    filterFrom.value = fmt(weekAgo)
+    filterTo.value = fmt(today)
+  } else if (val === 'month') {
+    const monthAgo = new Date(today)
+    monthAgo.setMonth(monthAgo.getMonth() - 1)
+    filterFrom.value = fmt(monthAgo)
+    filterTo.value = fmt(today)
+  }
+})
+
+watch([filterFrom, filterTo], () => {
+  if (filterFrom.value && filterTo.value && filterFrom.value > filterTo.value) {
+    toast.error('Từ ngày không thể lớn hơn Đến ngày!')
+    filterTo.value = filterFrom.value
+  }
+})
 
 // Selected stocktake details
 const selectedStocktake = ref<any>(null)
@@ -198,8 +232,39 @@ const filteredStocktakes = computed(() => {
     const codeMatch = st.code.toLowerCase().includes(searchKeyword.value.toLowerCase())
     const noteMatch = (st.notes || '').toLowerCase().includes(searchKeyword.value.toLowerCase())
     const statusMatch = selectedStatus.value ? st.status === selectedStatus.value : true
-    return (codeMatch || noteMatch) && statusMatch
+    
+    let timeMatch = true
+    if (filterFrom.value || filterTo.value) {
+      if (!st.createdAt) {
+        timeMatch = false
+      } else {
+        const itemDateStr = st.createdAt.substring(0, 10)
+        if (filterFrom.value && itemDateStr < filterFrom.value) timeMatch = false
+        if (filterTo.value && itemDateStr > filterTo.value) timeMatch = false
+      }
+    }
+    
+    return (codeMatch || noteMatch) && statusMatch && timeMatch
+  }).sort((a, b) => {
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+    return timeB - timeA
   })
+})
+
+const adjustmentReceipts = computed(() => {
+  if (!selectedStocktake.value || !selectedStocktake.value.details) return []
+  const map = new Map()
+  for (const d of selectedStocktake.value.details) {
+    if (d.adjustmentReceiptId) {
+      map.set(d.adjustmentReceiptId, {
+        id: d.adjustmentReceiptId,
+        code: d.adjustmentReceiptCode,
+        type: d.adjustmentReceiptCode?.startsWith('AI') ? 'ADJUST_IN' : 'ADJUST_OUT'
+      })
+    }
+  }
+  return Array.from(map.values())
 })
 
 // Formatting Helpers
@@ -272,26 +337,63 @@ onMounted(loadStocktakes)
     </div>
 
     <!-- FILTER & SEARCH BAR -->
-    <div class="bg-white rounded-[16px] p-6 shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-[#f1f5f9] flex flex-col md:flex-row gap-4">
-      <div class="relative flex-1">
-        <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae]"></i>
-        <input
-          v-model="searchKeyword"
-          type="text"
-          placeholder="Tìm theo mã kiểm kê hoặc ghi chú..."
-          class="w-full h-11 pl-11 pr-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]"
-        />
+    <div class="bg-white rounded-[16px] p-6 shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-[#f1f5f9] space-y-4">
+      <div class="flex flex-col md:flex-row gap-4">
+        <div class="relative flex-1">
+          <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae]"></i>
+          <input
+            v-model="searchKeyword"
+            type="text"
+            placeholder="Tìm theo mã kiểm kê hoặc ghi chú..."
+            class="w-full h-11 pl-11 pr-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]"
+          />
+        </div>
+        <div class="w-full md:w-[200px]">
+          <select
+            v-model="selectedStatus"
+            class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] font-medium"
+          >
+            <option value="">Tất cả trạng thái</option>
+            <option value="DRAFT">Lưu nháp</option>
+            <option value="COMPLETED">Đã hoàn tất</option>
+            <option value="CANCELLED">Đã hủy</option>
+          </select>
+        </div>
       </div>
-      <div class="w-full md:w-[200px]">
-        <select
-          v-model="selectedStatus"
-          class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] font-medium"
-        >
-          <option value="">Tất cả trạng thái</option>
-          <option value="DRAFT">Lưu nháp</option>
-          <option value="COMPLETED">Đã hoàn tất</option>
-          <option value="CANCELLED">Đã hủy</option>
-        </select>
+      
+      <!-- Date filters row -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
+        <div>
+          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-1.5">Thời gian</label>
+          <select
+            v-model="filterTimeRange"
+            class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] font-medium"
+          >
+            <option value="all">Tất cả thời gian</option>
+            <option value="today">Hôm nay</option>
+            <option value="week">7 ngày qua</option>
+            <option value="month">30 ngày qua</option>
+            <option value="custom">Tùy chọn ngày...</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-1.5">Từ ngày</label>
+          <input
+            v-model="filterFrom"
+            type="date"
+            :disabled="filterTimeRange !== 'custom'"
+            class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] disabled:opacity-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
+          />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-1.5">Đến ngày</label>
+          <input
+            v-model="filterTo"
+            type="date"
+            :disabled="filterTimeRange !== 'custom'"
+            class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] disabled:opacity-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
+          />
+        </div>
       </div>
     </div>
 
@@ -400,6 +502,30 @@ onMounted(loadStocktakes)
               placeholder="Nhập ghi chú hoặc lý do kiểm kê đợt này..."
               class="w-full p-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] disabled:opacity-75 disabled:cursor-not-allowed"
             ></textarea>
+          </div>
+
+          <!-- Adjustment Receipts links -->
+          <div v-if="adjustmentReceipts.length > 0" class="bg-blue-50 border border-blue-100 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
+                <i class="fas fa-file-invoice-dollar text-lg"></i>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-blue-800 uppercase tracking-wide">Phiếu điều chỉnh kho liên kết</div>
+                <div class="text-xs text-blue-600 mt-0.5">Phiên kiểm kê này có chênh lệch và đã sinh các phiếu cân bằng tồn kho:</div>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="r in adjustmentReceipts"
+                :key="r.id"
+                @click="viewReceipt(r.id)"
+                class="px-4 py-2 bg-white hover:bg-blue-600 hover:text-white text-blue-600 border border-blue-200 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+              >
+                <i class="fas" :class="r.type === 'ADJUST_IN' ? 'fa-plus-circle text-emerald-500' : 'fa-minus-circle text-amber-500'"></i>
+                {{ r.code }} ({{ r.type === 'ADJUST_IN' ? 'Cân bằng Tăng' : 'Cân bằng Giảm' }})
+              </button>
+            </div>
           </div>
 
           <!-- Items Table -->
