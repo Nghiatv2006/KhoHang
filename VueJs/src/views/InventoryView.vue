@@ -1049,7 +1049,6 @@ function formatDateTime(dateTimeStr: string) {
             class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
           />
         </div>
-
         <!-- Checkbox quản lý theo hạn dùng -->
         <div class="flex items-center gap-2 py-1">
           <input 
@@ -1253,7 +1252,6 @@ function formatDateTime(dateTimeStr: string) {
                 <span class="text-[#8094ae] font-semibold">Tổng giá trị nhập</span>
                 <span class="font-bold text-amber-600">{{ formatVND(selectedInv.totalImportValue) }}</span>
               </div>
-
               <!-- Last Updated -->
               <div class="flex justify-between py-1">
                 <span class="text-[#8094ae] font-semibold">Lần cuối cập nhật</span>

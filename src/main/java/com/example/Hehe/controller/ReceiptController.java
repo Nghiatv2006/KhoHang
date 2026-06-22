@@ -39,4 +39,19 @@ public class ReceiptController {
     public ResponseEntity<ReceiptResponse> cancelReceipt(@PathVariable Integer id, @AuthenticationPrincipal User currentUser) {
         return ResponseEntity.ok(receiptService.cancelReceipt(id, currentUser));
     }
+
+    @PostMapping("/{id}/approve")
+    public ResponseEntity<ReceiptResponse> approveReceipt(@PathVariable Integer id, @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(receiptService.approveReceipt(id, currentUser));
+    }
+
+    @PostMapping("/{id}/mark-paid")
+    public ResponseEntity<ReceiptResponse> markPaid(@PathVariable Integer id, @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(receiptService.markPaid(id, currentUser));
+    }
+
+    @PostMapping("/{id}/confirm-transfer")
+    public ResponseEntity<ReceiptResponse> confirmTransfer(@PathVariable Integer id, @RequestBody java.util.Map<String, Object> payload, @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(receiptService.confirmTransfer(id, payload, currentUser));
+    }
 }

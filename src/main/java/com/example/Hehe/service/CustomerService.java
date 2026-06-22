@@ -8,7 +8,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public interface CustomerService {
-    List<CustomerResponse> searchCustomers(String keyword, String status);
+    List<CustomerResponse> searchCustomers(String keyword, String status, User currentUser);
     CustomerResponse getCustomerById(Integer id);
     CustomerResponse createCustomer(CustomerSaveRequest request, User currentUser);
     CustomerResponse updateCustomer(Integer id, CustomerSaveRequest request, User currentUser);

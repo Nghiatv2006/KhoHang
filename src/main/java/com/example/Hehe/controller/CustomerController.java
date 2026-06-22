@@ -27,9 +27,10 @@ public class CustomerController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF')")
     public ResponseEntity<?> searchCustomers(
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String status) {
+            @RequestParam(required = false) String status,
+            @AuthenticationPrincipal User currentUser) {
         try {
-            List<CustomerResponse> response = customerService.searchCustomers(keyword, status);
+            List<CustomerResponse> response = customerService.searchCustomers(keyword, status, currentUser);
             return ResponseEntity.ok(response);
         } catch (RuntimeException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));

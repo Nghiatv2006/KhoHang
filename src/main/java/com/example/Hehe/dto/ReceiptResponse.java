@@ -17,6 +17,7 @@ public class ReceiptResponse {
     private String destBranchName;
     private Integer createdById;
     private String createdByName;
+    private String createdByRole;
     private Integer customerId;
     private String description;
     private LocalDateTime createdAt;
@@ -42,6 +43,7 @@ public class ReceiptResponse {
         if (r.getCreatedBy() != null) {
             this.createdById = r.getCreatedBy().getId();
             this.createdByName = r.getCreatedBy().getFullName();
+            this.createdByRole = r.getCreatedBy().getRole() != null ? r.getCreatedBy().getRole().name() : null;
         }
 
         this.customerId = r.getCustomerId();
@@ -64,6 +66,7 @@ public class ReceiptResponse {
     public String getDestBranchName() { return destBranchName; }
     public Integer getCreatedById() { return createdById; }
     public String getCreatedByName() { return createdByName; }
+    public String getCreatedByRole() { return createdByRole; }
     public Integer getCustomerId() { return customerId; }
     public String getDescription() { return description; }
     public LocalDateTime getCreatedAt() { return createdAt; }
