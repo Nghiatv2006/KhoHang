@@ -17,14 +17,19 @@ const isManager = computed(() => ['ADMIN', 'MANAGER'].includes(user.value?.role)
 const customers = ref<any[]>([])
 const cLoading = ref(true)
 const cSearch = ref('')
+const cStatusFilter = ref('')
 
 const filteredCustomers = computed(() => {
-  if (!cSearch.value.trim()) return customers.value
+  let list = customers.value
+  if (cStatusFilter.value) {
+    list = list.filter(c => c.status === cStatusFilter.value)
+  }
+  if (!cSearch.value.trim()) return list
   const kw = cSearch.value.toLowerCase()
-  return customers.value.filter(c =>
+  return list.filter(c =>
     c.name?.toLowerCase().includes(kw) ||
     c.email?.toLowerCase().includes(kw) ||
-    c.contactInfo?.includes(kw)
+    c.contactInfo?.toLowerCase().includes(kw)
   )
 })
 
@@ -139,9 +144,16 @@ function formatCurrency(val: any) {
     <div class="bg-slate-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#f4bd0e] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden">
       <!-- Toolbar -->
       <div class="p-5 border-b border-[#f1f5f9] flex items-center justify-between flex-wrap gap-4 bg-[#f8f9fa]/50">
-        <div class="relative min-w-[300px]">
-          <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae]"></i>
-          <input v-model="cSearch" type="text" placeholder="Tìm kiếm khách hàng..." class="w-full h-[42px] pl-11 pr-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
+        <div class="flex items-center gap-3 w-full md:w-auto flex-1">
+          <div class="relative min-w-[300px] flex-1 md:flex-none">
+            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae]"></i>
+            <input v-model="cSearch" type="text" placeholder="Tìm kiếm khách hàng..." class="w-full h-[42px] pl-11 pr-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
+          </div>
+          <select v-model="cStatusFilter" class="h-[42px] px-3 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]">
+            <option value="">Tất cả trạng thái</option>
+            <option value="ACTIVE">Hoạt động</option>
+            <option value="INACTIVE">Ngừng hoạt động</option>
+          </select>
         </div>
         <button v-if="isManager" class="bg-[#4361ee] text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-sm flex items-center gap-2" @click="openAddC">
           <i class="fas fa-plus"></i> Thêm Khách hàng
