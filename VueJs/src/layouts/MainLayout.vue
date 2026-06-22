@@ -43,7 +43,7 @@ const mainNavItems = computed(() => {
     items.push({ label: 'Tồn kho HT', to: '/global-inventory', icon: 'fas fa-globe' })
   }
   // @ts-ignore
-  if (user.value && user.value.role !== 'ADMIN') {
+  if (user.value) {
     items.push({ label: 'Kiểm kê kho', to: '/stocktakes', icon: 'fas fa-clipboard-list' })
   }
   return items

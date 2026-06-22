@@ -7,7 +7,7 @@ import ConfirmDialog from '../components/ConfirmDialog.vue'
 
 const toast = useToast()
 const user = ref<any>(JSON.parse(localStorage.getItem('wh_user') || '{}'))
-const isManager = computed(() => user.value?.role === 'MANAGER')
+const isManager = computed(() => ['ADMIN', 'MANAGER'].includes(user.value?.role))
 
 const loading = ref(true)
 const stocktakes = ref<any[]>([])
@@ -327,7 +327,8 @@ onMounted(loadStocktakes)
             <tr
               v-for="st in filteredStocktakes"
               :key="st.id"
-              class="border-b border-[#f1f5f9] last:border-b-0 hover:bg-[#f8f9fa]/50 transition-colors"
+              class="border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer group hover:-translate-y-[1px]"
+              @dblclick="openDetail(st)"
             >
               <td class="p-4 pl-8 font-mono font-bold text-[#4361ee]">{{ st.code }}</td>
               <td class="p-4 text-sm font-semibold text-[#364a63]">{{ st.branchName }}</td>

@@ -46,16 +46,7 @@ public class StocktakeServiceImpl implements StocktakeService {
     @Override
     @Transactional(readOnly = true)
     public List<StocktakeResponse> getAllStocktakes(User currentUser) {
-        if (currentUser.getRole() == UserRole.ADMIN) {
-            return stocktakeRepository.findAll().stream()
-                    .map(StocktakeResponse::new)
-                    .collect(Collectors.toList());
-        }
-
-        if (currentUser.getBranch() == null) {
-            throw new RuntimeException("Bạn chưa thuộc chi nhánh nào.");
-        }
-        Integer branchId = currentUser.getBranch().getId();
+        Integer branchId = getUserBranchId(currentUser);
         return stocktakeRepository.findByBranchId(branchId).stream()
                 .map(StocktakeResponse::new)
                 .collect(Collectors.toList());
@@ -67,24 +58,18 @@ public class StocktakeServiceImpl implements StocktakeService {
         Stocktake s = stocktakeRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy phiên kiểm kê với ID: " + id));
 
-        if (currentUser.getRole() != UserRole.ADMIN) {
-            if (currentUser.getBranch() == null || !currentUser.getBranch().getId().equals(s.getBranch().getId())) {
-                throw new RuntimeException("Bạn không có quyền xem thông tin kiểm kê của chi nhánh khác.");
-            }
+        Integer branchId = getUserBranchId(currentUser);
+        if (!s.getBranch().getId().equals(branchId)) {
+            throw new RuntimeException("Bạn không có quyền xem thông tin kiểm kê của chi nhánh khác.");
         }
         return new StocktakeResponse(s);
     }
 
     @Override
     public StocktakeResponse createStocktake(StocktakeSaveRequest request, User currentUser) {
-        if (currentUser.getRole() == UserRole.ADMIN) {
-            throw new RuntimeException("ADMIN không tham gia quy trình kiểm kê.");
-        }
-        if (currentUser.getBranch() == null) {
-            throw new RuntimeException("Bạn chưa được gán vào chi nhánh nào để kiểm kê.");
-        }
-
-        Branch branch = currentUser.getBranch();
+        Integer branchId = getUserBranchId(currentUser);
+        Branch branch = branchRepository.findById(branchId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh với ID: " + branchId));
 
         Stocktake s = new Stocktake();
         s.setCode("ST" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase());
@@ -132,10 +117,9 @@ public class StocktakeServiceImpl implements StocktakeService {
             throw new RuntimeException("Chỉ có thể chỉnh sửa số liệu phiên kiểm kê ở trạng thái DRAFT.");
         }
 
-        if (currentUser.getRole() != UserRole.ADMIN) {
-            if (currentUser.getBranch() == null || !currentUser.getBranch().getId().equals(s.getBranch().getId())) {
-                throw new RuntimeException("Bạn không có quyền chỉnh sửa phiên kiểm kê của chi nhánh này.");
-            }
+        Integer branchId = getUserBranchId(currentUser);
+        if (!s.getBranch().getId().equals(branchId)) {
+            throw new RuntimeException("Bạn không có quyền chỉnh sửa phiên kiểm kê của chi nhánh này.");
         }
 
         s.setNotes(request.getNotes());
@@ -175,11 +159,12 @@ public class StocktakeServiceImpl implements StocktakeService {
             throw new RuntimeException("Chỉ có thể hoàn tất phiên kiểm kê đang ở trạng thái DRAFT.");
         }
 
-        if (currentUser.getRole() != UserRole.MANAGER) {
-            throw new RuntimeException("Chỉ Quản lý (MANAGER) mới có quyền hoàn tất kiểm kê kho.");
+        if (currentUser.getRole() != UserRole.MANAGER && currentUser.getRole() != UserRole.ADMIN) {
+            throw new RuntimeException("Chỉ Quản lý hoặc Admin mới có quyền hoàn tất kiểm kê kho.");
         }
 
-        if (currentUser.getBranch() == null || !currentUser.getBranch().getId().equals(s.getBranch().getId())) {
+        Integer branchId = getUserBranchId(currentUser);
+        if (!s.getBranch().getId().equals(branchId)) {
             throw new RuntimeException("Bạn không có quyền duyệt hoàn tất phiên kiểm kê của chi nhánh này.");
         }
 
@@ -295,11 +280,12 @@ public class StocktakeServiceImpl implements StocktakeService {
             throw new RuntimeException("Chỉ có thể hủy phiên kiểm kê đang ở trạng thái DRAFT.");
         }
 
-        if (currentUser.getRole() != UserRole.MANAGER) {
-            throw new RuntimeException("Chỉ Quản lý (MANAGER) mới có quyền hủy bỏ phiên kiểm kê.");
+        if (currentUser.getRole() != UserRole.MANAGER && currentUser.getRole() != UserRole.ADMIN) {
+            throw new RuntimeException("Chỉ Quản lý hoặc Admin mới có quyền hủy bỏ phiên kiểm kê.");
         }
 
-        if (currentUser.getBranch() == null || !currentUser.getBranch().getId().equals(s.getBranch().getId())) {
+        Integer branchId = getUserBranchId(currentUser);
+        if (!s.getBranch().getId().equals(branchId)) {
             throw new RuntimeException("Bạn không có quyền hủy phiên kiểm kê của chi nhánh này.");
         }
 
@@ -356,5 +342,17 @@ public class StocktakeServiceImpl implements StocktakeService {
         } catch (Exception e) {
             System.err.println("Audit Log insertion failed inside Stocktake: " + e.getMessage());
         }
+    }
+
+    private Integer getUserBranchId(User currentUser) {
+        if (currentUser.getRole() == UserRole.ADMIN) {
+            return currentUser.getBranch() != null ? currentUser.getBranch().getId() :
+                   branchRepository.findByIsHeadTrue().stream().findFirst()
+                           .orElseThrow(() -> new RuntimeException("Không tìm thấy kho tổng.")).getId();
+        }
+        if (currentUser.getBranch() == null) {
+            throw new RuntimeException("Bạn chưa thuộc chi nhánh nào.");
+        }
+        return currentUser.getBranch().getId();
     }
 }
