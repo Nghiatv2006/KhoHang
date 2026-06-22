@@ -83,6 +83,21 @@ public class ReceiptServiceImpl implements ReceiptService {
         return new ReceiptResponse(r);
     }
 
+    @Override
+    public List<ReceiptResponse> getReceiptsByCustomer(Integer customerId, User currentUser) {
+        List<Receipt> receipts = receiptRepository.findByCustomerId(customerId);
+        return receipts.stream()
+                .filter(r -> {
+                    if (currentUser.getRole() == UserRole.ADMIN) return true;
+                    Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
+                    if (myBranchId == null) return false;
+                    return (r.getSourceBranch() != null && r.getSourceBranch().getId().equals(myBranchId)) ||
+                           (r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId));
+                })
+                .map(ReceiptResponse::new)
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     @Override
     public ReceiptResponse createReceipt(ReceiptSaveRequest request, User currentUser) {

@@ -30,6 +30,11 @@ public class ReceiptController {
         return ResponseEntity.ok(receiptService.getReceiptById(id, currentUser));
     }
 
+    @GetMapping("/customer/{customerId}")
+    public ResponseEntity<List<ReceiptResponse>> getReceiptsByCustomer(@PathVariable Integer customerId, @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(receiptService.getReceiptsByCustomer(customerId, currentUser));
+    }
+
     @PostMapping
     public ResponseEntity<ReceiptResponse> createReceipt(@RequestBody ReceiptSaveRequest request, @AuthenticationPrincipal User currentUser) {
         return ResponseEntity.ok(receiptService.createReceipt(request, currentUser));
