@@ -156,7 +156,9 @@ const headBranch = computed(() => branches.value.find(b => b.isHead) || branches
 const statDraft = computed(() => receipts.value.filter(r => canApproveReceipt(r)).length)
 const statCompleted = computed(() => receipts.value.filter(r => r.status === 'COMPLETED').length)
 const statCancelled = computed(() => receipts.value.filter(r => r.status === 'CANCELLED').length)
-const statInTransit = computed(() => receipts.value.filter(r => r.paymentStatus === 'IN_TRANSIT').length)
+// const statInTransit = computed(() => {
+//   return (receipts.value || []).filter(r => r.type === 'TRANSFER' && r.paymentStatus === 'IN_TRANSIT').length
+// })
 const statUnpaid = computed(() => receipts.value.filter(r => r.type === 'EXPORT' && r.status === 'COMPLETED' && (r.paymentStatus === 'UNPAID' || r.paymentStatus === 'Chưa thanh toán')).length)
 
 // ──────────────────────────────────────────────────────────────
@@ -373,8 +375,9 @@ function getMaxQuantity(productId: number | string | null) {
   if (!createForm.value.sourceBranchId) return null
   if (createForm.value.type === 'IMPORT' && createForm.value.sourceBranchId === createForm.value.destBranchId) return null
   
-  const inv = sourceInventories.value.find(x => x.productId === Number(productId))
-  const totalQty = inv ? inv.quantity : 0
+  const totalQty = sourceInventories.value
+    .filter(x => x.productId === Number(productId))
+    .reduce((sum, inv) => sum + inv.quantity, 0)
 
   // Trừ đi số lượng đang nằm trong các phiếu nháp chờ xuất/điều chuyển
   const pendingQty = receipts.value
@@ -419,8 +422,9 @@ function onQuantityBlur(d: DetailRow) {
 }
 
 async function submitCreateDraft() {
+  if (submittingCreate.value) return
+  if (!createForm.value.sourceBranchId && createForm.value.type !== 'IMPORT') { toast.error('Vui lòng chọn loại phiếu.'); return }
   const f = createForm.value
-  if (!f.type) { toast.error('Vui lòng chọn loại phiếu.'); return }
   if (f.details.some(d => !d.productId || d.quantity <= 0)) {
     toast.error('Vui lòng điền đầy đủ sản phẩm và số lượng hợp lệ.')
     return
@@ -498,7 +502,8 @@ async function submitCreateDraft() {
 const approvingId = ref<number | null>(null)
 
 async function approveReceipt(receipt: any) {
-  if (!confirm(`Xác nhận PHÊ DUYỆT phiếu ${receipt.code}?\nSau khi duyệt, tồn kho sẽ được cập nhật ngay và phiếu sẽ bị khóa.`)) return
+  if (approvingId.value === receipt.id) return
+  if (!confirm(`Xác nhận phê duyệt phiếu ${receipt.code}?`)) return
   approvingId.value = receipt.id
   try {
     const res = await api.post(`/api/receipts/${receipt.id}/approve`, {})
@@ -550,6 +555,7 @@ async function cancelReceipt(receipt: any) {
 const markingPaidId = ref<number | null>(null)
 
 async function markAsPaid(receipt: any) {
+  if (markingPaidId.value === receipt.id) return
   if (!confirm(`Xác nhận THANH TOÁN cho phiếu ${receipt.code}? Công nợ khách hàng sẽ được trừ tương ứng.`)) return
   markingPaidId.value = receipt.id
   try {
@@ -575,7 +581,7 @@ async function markAsPaid(receipt: any) {
 // ──────────────────────────────────────────────────────────────
 const showConfirmModal = ref(false)
 const confirmingReceipt = ref<any>(null)
-const confirmItems = ref<{ receiptDetailId: number; productName: string; sentQty: number; actualQuantity: number }[]>([])
+const confirmItems = ref<{ receiptDetailId: number; productName: string; sentQty: number; actualQuantity: number; shortfallReason?: string }[]>([])
 const submittingConfirm = ref(false)
 
 function openConfirmTransferModal(receipt: any) {
@@ -584,21 +590,27 @@ function openConfirmTransferModal(receipt: any) {
     receiptDetailId: d.id,
     productName: d.productName,
     sentQty: d.quantity,
-    actualQuantity: d.quantity
+    actualQuantity: d.quantity,
+    shortfallReason: ''
   }))
   showConfirmModal.value = true
 }
 
 async function submitConfirmTransfer() {
+  if (submittingConfirm.value) return
   if (confirmItems.value.some(i => i.actualQuantity < 0)) {
     toast.error('Số lượng nhận không được âm.'); return
+  }
+  if (confirmItems.value.some(i => i.actualQuantity < i.sentQty && (!i.shortfallReason || i.shortfallReason.trim() === ''))) {
+    toast.error('Vui lòng nhập đầy đủ lý do cho các sản phẩm bị hao hụt.'); return
   }
   submittingConfirm.value = true
   try {
     const payload = {
       items: confirmItems.value.map(i => ({
         receiptDetailId: i.receiptDetailId,
-        actualQuantity: i.actualQuantity
+        actualQuantity: i.actualQuantity,
+        shortfallReason: i.actualQuantity < i.sentQty ? i.shortfallReason : null
       }))
     }
     const res = await api.post(`/api/receipts/${confirmingReceipt.value.id}/confirm-transfer`, payload)
@@ -682,8 +694,8 @@ function canConfirmTransfer(receipt: any) {
   if (receipt.type !== 'TRANSFER') return false
   if (receipt.status !== 'COMPLETED') return false
   if (receipt.paymentStatus !== 'IN_TRANSIT') return false
-  if (isAdmin.value) return true
-  // Must be dest branch
+  // Must be dest branch (admin also blocked if not in dest branch)
+  return receipt.destBranchId === user.value?.branchId
   return receipt.destBranchId === user.value?.branchId
 }
 
@@ -879,10 +891,7 @@ function getCustomerContactInfo(id: number | null | undefined) {
                   <span :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-bold', statusClass(r.status)]">
                     {{ r.status === 'DRAFT' ? '⏳ Chờ duyệt' : r.status === 'COMPLETED' ? '✅ Đã duyệt' : '❌ Đã hủy' }}
                   </span>
-                  <span v-if="r.paymentStatus === 'IN_TRANSIT'" :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold', paymentStatusClass(r.paymentStatus)]">
-                    🚚 Đang vận chuyển
-                  </span>
-                  <span v-else-if="r.paymentStatus === 'RECEIVED'" :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold', paymentStatusClass(r.paymentStatus)]">
+                  <span v-if="r.paymentStatus === 'RECEIVED'" :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold mt-1', paymentStatusClass(r.paymentStatus)]">
                     📦 Đã nhận hàng
                   </span>
                 </div>
@@ -968,9 +977,14 @@ function getCustomerContactInfo(id: number | null | undefined) {
               </div>
               <div>
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Trạng thái</div>
-                <span :class="['inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold', statusClass(selectedReceipt.status)]">
-                  {{ selectedReceipt.status }}
-                </span>
+                <div class="flex flex-col items-start gap-1">
+                  <span :class="['inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold', statusClass(selectedReceipt.status)]">
+                    {{ selectedReceipt.status === 'DRAFT' ? '⏳ Chờ duyệt' : selectedReceipt.status === 'COMPLETED' ? '✅ Đã duyệt' : '❌ Đã hủy' }}
+                  </span>
+                  <span v-if="selectedReceipt.paymentStatus === 'RECEIVED'" :class="['inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold', paymentStatusClass(selectedReceipt.paymentStatus)]">
+                    📦 Đã nhận hàng
+                  </span>
+                </div>
               </div>
               <div>
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Chi nhánh nguồn</div>
@@ -1015,7 +1029,9 @@ function getCustomerContactInfo(id: number | null | undefined) {
                       <th class="px-4 py-2.5 text-left font-bold">Sản phẩm</th>
                       <th class="px-4 py-2.5 text-center font-bold">NSX</th>
                       <th class="px-4 py-2.5 text-center font-bold">HSD</th>
-                      <th class="px-4 py-2.5 text-right font-bold">SL</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type === 'TRANSFER' && selectedReceipt.paymentStatus === 'RECEIVED'">SL Gửi</th>
+                      <th class="px-4 py-2.5 text-right font-bold text-teal-600" v-if="selectedReceipt.type === 'TRANSFER' && selectedReceipt.paymentStatus === 'RECEIVED'">SL Nhận</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-else>SL</th>
                       <th class="px-4 py-2.5 text-right font-bold">Đơn giá</th>
                       <th class="px-4 py-2.5 text-right font-bold">Thành tiền</th>
                     </tr>
@@ -1025,14 +1041,22 @@ function getCustomerContactInfo(id: number | null | undefined) {
                       <td class="px-4 py-3 font-semibold text-[#364a63]">{{ d.productName }}</td>
                       <td class="px-4 py-3 text-center text-[#8094ae]">{{ formatDate(d.manufacturingDate) }}</td>
                       <td class="px-4 py-3 text-center text-[#8094ae]">{{ formatDate(d.expirationDate) }}</td>
-                      <td class="px-4 py-3 text-right font-bold">{{ d.quantity }}</td>
+                      <td class="px-4 py-3 text-right font-bold" v-if="selectedReceipt.type === 'TRANSFER' && selectedReceipt.paymentStatus === 'RECEIVED'">{{ d.quantity }}</td>
+                      <td class="px-4 py-3 text-right font-bold text-teal-600" v-if="selectedReceipt.type === 'TRANSFER' && selectedReceipt.paymentStatus === 'RECEIVED'">
+                        {{ d.receivedQuantity !== null ? d.receivedQuantity : d.quantity }}
+                        <span v-if="d.receivedQuantity !== null && d.receivedQuantity < d.quantity" class="text-xs text-amber-500 block" :title="d.shortfallReason">
+                          (-{{ d.quantity - d.receivedQuantity }})
+                          <br/><span class="text-[10px] text-red-400 font-normal">Lý do: {{ d.shortfallReason }}</span>
+                        </span>
+                      </td>
+                      <td class="px-4 py-3 text-right font-bold" v-else>{{ d.quantity }}</td>
                       <td class="px-4 py-3 text-right">{{ formatVND(d.price) }}</td>
                       <td class="px-4 py-3 text-right font-bold text-[#4361ee]">{{ formatVND(d.quantity * d.price) }}</td>
                     </tr>
                   </tbody>
                   <tfoot>
                     <tr class="bg-[#f8f9fa]">
-                      <td colspan="5" class="px-4 py-2.5 text-right font-bold text-[#8094ae] text-xs uppercase">Tổng cộng</td>
+                      <td :colspan="(selectedReceipt.type === 'TRANSFER' && selectedReceipt.paymentStatus === 'RECEIVED') ? 6 : 5" class="px-4 py-2.5 text-right font-bold text-[#8094ae] text-xs uppercase">Tổng cộng</td>
                       <td class="px-4 py-2.5 text-right font-extrabold text-[#4361ee]">
                         {{ formatVND((selectedReceipt.details || []).reduce((s: number, d: any) => s + d.quantity * d.price, 0)) }}
                       </td>
@@ -1190,7 +1214,7 @@ function getCustomerContactInfo(id: number | null | undefined) {
                         <select v-model="d.productId" @change="onProductChange(d)"
                           class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none bg-white">
                           <option value="">-- Chọn sản phẩm --</option>
-                          <option v-for="p in getAvailableProductsForRow(idx)" :key="p.id" :value="p.id">{{ p.name }} ({{ p.code }})</option>
+                          <option v-for="p in getAvailableProductsForRow(idx)" :key="p.id" :value="p.id">{{ p.name }} ({{ p.sku }})</option>
                         </select>
                       </div>
                       <div :class="(createForm.type === 'IMPORT' || createForm.type === 'TRANSFER') ? 'grid grid-cols-1 gap-2' : 'grid grid-cols-3 gap-2'">
@@ -1276,7 +1300,7 @@ function getCustomerContactInfo(id: number | null | undefined) {
           <div class="p-6 space-y-4">
             <div class="bg-sky-50 border border-sky-200 rounded-xl p-4 text-sm text-sky-700">
               <i class="fas fa-info-circle mr-2"></i>
-              Nhập <strong>số lượng thực tế nhận được</strong> cho từng sản phẩm. Nếu ít hơn số xuất đi, hệ thống sẽ tự động tạo phiếu hao hụt (ADJUST_OUT).
+              Nhập <strong>số lượng thực tế nhận được</strong> cho từng sản phẩm. Hao hụt trong quá trình vận chuyển (nếu có) sẽ được ghi nhận trực tiếp vào chi tiết phiếu này để đối soát.
             </div>
 
             <div class="space-y-3">
@@ -1296,6 +1320,12 @@ function getCustomerContactInfo(id: number | null | undefined) {
                     ⚠️ Hao hụt: {{ item.sentQty - item.actualQuantity }}
                   </span>
                   <span v-else class="text-xs font-bold text-green-600 whitespace-nowrap">✅ Đủ</span>
+                </div>
+                <!-- Input for shortfall reason -->
+                <div v-if="item.actualQuantity < item.sentQty" class="mt-3 bg-red-50 p-3 rounded-lg border border-red-100 flex items-start gap-3">
+                  <label class="text-xs font-bold text-red-600 whitespace-nowrap mt-2">Lý do hao hụt <span class="text-red-500">*</span></label>
+                  <input v-model="item.shortfallReason" type="text" placeholder="VD: Rơi vỡ, ẩm mốc, thiếu hàng..."
+                    class="flex-1 h-9 px-3 border border-red-200 rounded-lg text-sm focus:ring-2 focus:ring-red-400/20 focus:border-red-400 outline-none bg-white" />
                 </div>
               </div>
             </div>

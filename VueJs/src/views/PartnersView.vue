@@ -316,7 +316,7 @@ function formatCurrency(val: any) {
                   </div>
                   <div class="pt-3 border-t border-[#e2e8f0] flex justify-between items-center">
                     <span class="text-sm text-[#8094ae]">Tổng tiền:</span>
-                    <span class="font-bold text-xl text-[#4361ee]">{{ formatCurrency(cSelectedReceipt.details?.reduce((acc, d) => acc + (d.price * d.quantity), 0) || 0) }}</span>
+                    <span class="font-bold text-xl text-[#4361ee]">{{ formatCurrency(cSelectedReceipt.details?.reduce((acc: number, d: any) => acc + (d.price * d.quantity), 0) || 0) }}</span>
                   </div>
                 </div>
 
@@ -354,7 +354,7 @@ function formatCurrency(val: any) {
                     </div>
                     <div class="text-sm flex justify-between text-[#8094ae] items-center">
                       <span>{{ new Date(r.createdAt).toLocaleString('vi-VN', {hour: '2-digit', minute:'2-digit', day:'2-digit', month:'2-digit', year:'numeric'}) }}</span>
-                      <span class="font-bold text-[#4361ee] text-base" v-if="r.type === 'EXPORT'">{{ formatCurrency(r.details?.reduce((acc, d) => acc + (d.price * d.quantity), 0) || 0) }}</span>
+                      <span class="font-bold text-[#4361ee] text-base" v-if="r.type === 'EXPORT'">{{ formatCurrency(r.details?.reduce((acc: number, d: any) => acc + (d.price * d.quantity), 0) || 0) }}</span>
                     </div>
                   </div>
                 </div>
