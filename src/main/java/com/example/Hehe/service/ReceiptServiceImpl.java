@@ -83,6 +83,21 @@ public class ReceiptServiceImpl implements ReceiptService {
         return new ReceiptResponse(r);
     }
 
+    @Override
+    public List<ReceiptResponse> getReceiptsByCustomer(Integer customerId, User currentUser) {
+        List<Receipt> receipts = receiptRepository.findByCustomerId(customerId);
+        return receipts.stream()
+                .filter(r -> {
+                    if (currentUser.getRole() == UserRole.ADMIN) return true;
+                    Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
+                    if (myBranchId == null) return false;
+                    return (r.getSourceBranch() != null && r.getSourceBranch().getId().equals(myBranchId)) ||
+                           (r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId));
+                })
+                .map(ReceiptResponse::new)
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     @Override
     public ReceiptResponse createReceipt(ReceiptSaveRequest request, User currentUser) {
@@ -289,6 +304,11 @@ public class ReceiptServiceImpl implements ReceiptService {
         if (wasCompleted) {
             for (ReceiptDetail d : r.getDetails()) {
                 updateInventory(r.getType(), r.getSourceBranch(), r.getDestBranch(), d, true);
+                if (r.getType() == ReceiptType.TRANSFER && "RECEIVED".equals(r.getPaymentStatus())) {
+                    if (d.getReceivedQuantity() != null) {
+                         addInventory(r.getDestBranch(), d, -d.getReceivedQuantity());
+                    }
+                }
             }
             updateCustomerDebt(r, true, true, false);
         }
@@ -325,9 +345,8 @@ public class ReceiptServiceImpl implements ReceiptService {
                 addInventory(sourceBranch, detail, -qty);
                 break;
             case TRANSFER:
-                // Decrease at Source, Increase at Dest
+                // Decrease at Source only (will increase at Dest upon receive)
                 addInventory(sourceBranch, detail, -qty);
-                addInventory(destBranch, detail, qty);
                 break;
         }
     }
@@ -546,11 +565,50 @@ public class ReceiptServiceImpl implements ReceiptService {
     public ReceiptResponse confirmTransfer(Integer id, java.util.Map<String, Object> payload, User currentUser) {
         Receipt r = receiptRepository.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
         
-        if (currentUser.getRole() != UserRole.ADMIN) {
-            Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
-            if (myBranchId == null) throw new RuntimeException("Bạn chưa thuộc chi nhánh nào.");
-            if (r.getDestBranch() == null || !r.getDestBranch().getId().equals(myBranchId)) {
-                throw new RuntimeException("Chỉ chi nhánh nhận mới được xác nhận nhận hàng.");
+        Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
+        if (myBranchId == null) {
+            throw new RuntimeException("Bạn chưa thuộc chi nhánh nào. Không thể xác nhận nhận hàng.");
+        }
+        if (r.getDestBranch() == null || !r.getDestBranch().getId().equals(myBranchId)) {
+            throw new RuntimeException("Chỉ nhân viên thuộc chi nhánh đích mới có quyền xác nhận nhận hàng.");
+        }
+
+        if ("RECEIVED".equals(r.getPaymentStatus())) {
+            throw new RuntimeException("Phiếu này đã được xác nhận nhận hàng.");
+        }
+
+        java.util.Map<String, Integer> actualQuantities = new java.util.HashMap<>();
+        java.util.Map<String, String> shortfallReasons = new java.util.HashMap<>();
+        if (payload.containsKey("items")) {
+            java.util.List<java.util.Map<String, Object>> items = (java.util.List<java.util.Map<String, Object>>) payload.get("items");
+            for (java.util.Map<String, Object> item : items) {
+                if (item.containsKey("receiptDetailId") && item.containsKey("actualQuantity")) {
+                    String detailId = item.get("receiptDetailId").toString();
+                    actualQuantities.put(detailId, Integer.valueOf(item.get("actualQuantity").toString()));
+                    if (item.containsKey("shortfallReason") && item.get("shortfallReason") != null) {
+                        shortfallReasons.put(detailId, item.get("shortfallReason").toString());
+                    }
+                }
+            }
+        }
+
+        for (ReceiptDetail d : r.getDetails()) {
+            String detailIdStr = d.getId().toString();
+            Integer actualQty = actualQuantities.get(detailIdStr);
+            if (actualQty == null) actualQty = d.getQuantity(); // Default to full if not provided
+            if (actualQty > d.getQuantity()) {
+                throw new RuntimeException("Số lượng nhận không được vượt quá số lượng gửi.");
+            }
+            d.setReceivedQuantity(actualQty);
+            if (actualQty < d.getQuantity()) {
+                String reason = shortfallReasons.get(detailIdStr);
+                if (reason == null || reason.trim().isEmpty()) {
+                    throw new RuntimeException("Phải nhập lý do hao hụt cho sản phẩm bị thiếu: " + d.getProduct().getName());
+                }
+                d.setShortfallReason(reason);
+            }
+            if (actualQty > 0) {
+                addInventory(r.getDestBranch(), d, actualQty);
             }
         }
 

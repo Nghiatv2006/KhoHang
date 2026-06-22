@@ -14,4 +14,5 @@ public interface ReceiptService {
     ReceiptResponse approveReceipt(Integer id, User currentUser);
     ReceiptResponse markPaid(Integer id, User currentUser);
     ReceiptResponse confirmTransfer(Integer id, java.util.Map<String, Object> payload, User currentUser);
+    List<ReceiptResponse> getReceiptsByCustomer(Integer customerId, User currentUser);
 }

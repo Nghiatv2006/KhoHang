@@ -32,8 +32,14 @@ public class ReceiptDetail {
     @Column(name = "price", nullable = false)
     private BigDecimal price;
 
+    @Column(name = "received_quantity")
+    private Integer receivedQuantity;
+
     @Column(name = "batch_code", nullable = false)
     private String batchCode = "DEFAULT_BATCH";
+
+    @Column(name = "shortfall_reason", columnDefinition = "TEXT")
+    private String shortfallReason;
 
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
@@ -56,6 +62,12 @@ public class ReceiptDetail {
     public Integer getQuantity() { return quantity; }
     public void setQuantity(Integer quantity) { this.quantity = quantity; }
 
+    public String getShortfallReason() { return shortfallReason; }
+    public void setShortfallReason(String shortfallReason) { this.shortfallReason = shortfallReason; }
+
     public BigDecimal getPrice() { return price; }
     public void setPrice(BigDecimal price) { this.price = price; }
+
+    public Integer getReceivedQuantity() { return receivedQuantity; }
+    public void setReceivedQuantity(Integer receivedQuantity) { this.receivedQuantity = receivedQuantity; }
 }

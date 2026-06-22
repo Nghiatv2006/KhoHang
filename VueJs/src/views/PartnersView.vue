@@ -44,8 +44,41 @@ const cDebtTarget = ref<any>(null)
 const cDebtAmount = ref<any>('')
 const cDebtSaving = ref(false)
 
-function openAddC() { editingC.value = null; Object.assign(cForm, { name: '', email: '', phone: '', address: '', taxCode: '' }); showCModal.value = true }
-function openEditC(c: any) { editingC.value = c; Object.assign(cForm, { name: c.name, email: c.email || '', phone: c.contactInfo || '', address: c.address || '', taxCode: c.taxCode || '' }); showCModal.value = true }
+const cTab = ref('info')
+const cReceipts = ref<any[]>([])
+const cReceiptsLoading = ref(false)
+const cSelectedReceipt = ref<any>(null)
+
+async function loadCustomerReceipts(id: number) {
+  cReceiptsLoading.value = true
+  try {
+    const res = await api.get(`/api/receipts/customer/${id}`)
+    if (res.ok) {
+      cReceipts.value = await res.json()
+    }
+  } catch (e) {
+    console.error(e)
+  } finally {
+    cReceiptsLoading.value = false
+  }
+}
+
+function openAddC() { 
+  editingC.value = null; 
+  Object.assign(cForm, { name: '', email: '', phone: '', address: '', taxCode: '' }); 
+  cTab.value = 'info'; 
+  showCModal.value = true 
+}
+
+function openEditC(c: any) { 
+  editingC.value = c; 
+  Object.assign(cForm, { name: c.name, email: c.email || '', phone: c.contactInfo || '', address: c.address || '', taxCode: c.taxCode || '' }); 
+  cTab.value = 'info';
+  cReceipts.value = [];
+  cSelectedReceipt.value = null;
+  loadCustomerReceipts(c.id);
+  showCModal.value = true; 
+}
 function openCDebt(c: any) { cDebtTarget.value = c; cDebtAmount.value = ''; showCDebtModal.value = true }
 function confirmDeleteC(c: any) { deletingC.value = c; showDeleteC.value = true }
 
@@ -105,6 +138,7 @@ async function adjustCDebt() {
   finally { cDebtSaving.value = false }
 }
 
+// Load
 async function loadCustomers() {
   cLoading.value = true
   try { const res = await api.get('/api/customers'); if (res.ok) customers.value = await res.json() }
@@ -229,26 +263,114 @@ function formatCurrency(val: any) {
           <div class="px-6 py-5 border-b border-[#f1f5f9] flex justify-between items-center bg-gradient-to-r from-[#f8fafc] to-white">
             <h3 class="font-bold text-[#364a63] text-lg flex items-center gap-2">
               <i class="fas fa-users text-[#f4bd0e]"></i>
-              {{ editingC ? 'Sửa Khách hàng' : 'Thêm Khách hàng' }}
+              {{ editingC ? editingC.name : 'Thêm Khách hàng' }}
             </h3>
             <button @click="showCModal = false" class="text-[#8094ae] hover:text-[#ea4f52] transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50">
               <i class="fas fa-times"></i>
             </button>
           </div>
           
+          <!-- Tabs -->
+          <div v-if="editingC && !cSelectedReceipt" class="flex px-6 border-b border-[#e2e8f0] gap-4">
+            <button class="py-3 px-1 font-bold text-sm border-b-2 transition-colors" :class="cTab === 'info' ? 'border-[#f4bd0e] text-[#f4bd0e]' : 'border-transparent text-[#8094ae] hover:text-[#364a63]'" @click="cTab = 'info'">Thông tin chung</button>
+            <button class="py-3 px-1 font-bold text-sm border-b-2 transition-colors" :class="cTab === 'receipts' ? 'border-[#f4bd0e] text-[#f4bd0e]' : 'border-transparent text-[#8094ae] hover:text-[#364a63]'" @click="cTab = 'receipts'">Lịch sử mua hàng</button>
+          </div>
+          <div v-if="editingC && cSelectedReceipt" class="px-6 py-3 border-b border-[#e2e8f0] bg-slate-50 flex items-center gap-3">
+            <button @click="cSelectedReceipt = null" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 text-[#364a63] transition-colors"><i class="fas fa-arrow-left"></i></button>
+            <span class="font-bold text-[#364a63]">Chi tiết phiếu {{ cSelectedReceipt.code }}</span>
+          </div>
+          
           <!-- Body -->
-          <div class="p-6 flex-1 overflow-y-auto space-y-5 custom-scrollbar">
-            <div class="grid grid-cols-2 gap-5">
-              <div class="col-span-2"><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Tên khách hàng <span class="text-[#ea4f52]">*</span></label><input v-model="cForm.name" type="text" placeholder="Nguyễn Văn A..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all text-[#364a63]" /></div>
-              <div><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Email</label><input v-model="cForm.email" type="email" placeholder="email@..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all text-[#364a63]" /></div>
-              <div><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số điện thoại</label><input v-model="cForm.phone" type="text" placeholder="0900..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all text-[#364a63]" /></div>
-              <div><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Mã số thuế</label><input v-model="cForm.taxCode" type="text" placeholder="MST..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all font-mono text-[#364a63]" /></div>
-              <div class="col-span-2"><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Địa chỉ</label><input v-model="cForm.address" type="text" placeholder="Địa chỉ..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all text-[#364a63]" /></div>
+          <div class="p-6 flex-1 overflow-y-auto custom-scrollbar">
+            <div v-if="cTab === 'info'" class="space-y-5">
+              <div class="grid grid-cols-2 gap-5">
+                <div class="col-span-2"><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Tên khách hàng <span class="text-[#ea4f52]">*</span></label><input v-model="cForm.name" type="text" placeholder="Nguyễn Văn A..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all text-[#364a63]" /></div>
+                <div><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Email</label><input v-model="cForm.email" type="email" placeholder="email@..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all text-[#364a63]" /></div>
+                <div><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số điện thoại</label><input v-model="cForm.phone" type="text" placeholder="0900..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all text-[#364a63]" /></div>
+                <div><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Mã số thuế</label><input v-model="cForm.taxCode" type="text" placeholder="MST..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all font-mono text-[#364a63]" /></div>
+                <div class="col-span-2"><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Địa chỉ</label><input v-model="cForm.address" type="text" placeholder="Địa chỉ..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all text-[#364a63]" /></div>
+              </div>
+            </div>
+            <div v-else class="space-y-4">
+              <!-- Detail View -->
+              <div v-if="cSelectedReceipt" class="space-y-5">
+                <div class="bg-[#f8f9fa] rounded-xl p-4 border border-[#e2e8f0] space-y-4">
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Trạng thái phiếu</div>
+                      <StatusBadge :value="cSelectedReceipt.status" type="status" />
+                    </div>
+                    <div class="text-right">
+                      <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Thanh toán</div>
+                      <span class="px-2.5 py-1 rounded-md text-[11px] font-bold" :class="cSelectedReceipt.paymentStatus === 'PAID' ? 'bg-[#05b171]/10 text-[#05b171]' : 'bg-[#ea4f52]/10 text-[#ea4f52]'">
+                        {{ cSelectedReceipt.paymentStatus === 'PAID' ? 'Đã thanh toán' : 'Chưa thanh toán' }}
+                      </span>
+                    </div>
+                    
+                    <div>
+                      <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Người lập</div>
+                      <div class="text-sm font-bold text-[#364a63]">{{ cSelectedReceipt.createdByName || '—' }}</div>
+                    </div>
+                    <div class="text-right">
+                      <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Ngày lập</div>
+                      <div class="text-sm font-bold text-[#364a63]">{{ new Date(cSelectedReceipt.createdAt).toLocaleString('vi-VN', {hour: '2-digit', minute:'2-digit', day:'2-digit', month:'2-digit', year:'numeric'}) }}</div>
+                    </div>
+                    
+                    <div class="col-span-2" v-if="cSelectedReceipt.description">
+                      <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Ghi chú</div>
+                      <div class="text-sm text-[#364a63] bg-white p-2.5 rounded-lg border border-[#e2e8f0] italic">{{ cSelectedReceipt.description }}</div>
+                    </div>
+                  </div>
+                  <div class="pt-3 border-t border-[#e2e8f0] flex justify-between items-center">
+                    <span class="text-sm text-[#8094ae]">Tổng tiền:</span>
+                    <span class="font-bold text-xl text-[#4361ee]">{{ formatCurrency(cSelectedReceipt.details?.reduce((acc: number, d: any) => acc + (d.price * d.quantity), 0) || 0) }}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 class="font-bold text-[#364a63] text-sm mb-3 uppercase tracking-wider">Chi tiết sản phẩm</h4>
+                  <div class="space-y-3">
+                    <div v-for="d in cSelectedReceipt.details" :key="d.id" class="border border-[#f1f5f9] rounded-lg p-3 flex justify-between items-center bg-white shadow-sm">
+                      <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-[#f8f9fa] border border-[#e2e8f0] flex items-center justify-center">
+                          <i class="fas fa-box text-[#a8a29e]"></i>
+                        </div>
+                        <div>
+                          <div class="font-bold text-sm text-[#364a63]">{{ d.productName }}</div>
+                          <div class="text-xs text-[#8094ae] mt-0.5">{{ formatCurrency(d.price) }} x {{ d.quantity }}</div>
+                        </div>
+                      </div>
+                      <div class="font-bold text-sm text-[#364a63]">{{ formatCurrency(d.price * d.quantity) }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- List View -->
+              <div v-else>
+                <div v-if="cReceiptsLoading" class="text-center py-10 text-[#8094ae]"><i class="fas fa-spinner fa-spin text-2xl"></i></div>
+                <div v-else-if="cReceipts.length === 0" class="text-center py-10 text-[#8094ae]">
+                  <i class="fas fa-box-open text-4xl mb-3 opacity-30"></i>
+                  <div>Chưa có giao dịch nào</div>
+                </div>
+                <div v-else class="space-y-3">
+                  <div v-for="r in cReceipts" :key="r.id" class="border border-[#e2e8f0] rounded-xl p-4 hover:border-[#4361ee] transition-colors bg-white cursor-pointer" @click="cSelectedReceipt = r">
+                    <div class="flex justify-between items-start mb-2">
+                      <span class="font-bold text-[#364a63]">{{ r.code }}</span>
+                      <StatusBadge :value="r.status" type="status" />
+                    </div>
+                    <div class="text-sm flex justify-between text-[#8094ae] items-center">
+                      <span>{{ new Date(r.createdAt).toLocaleString('vi-VN', {hour: '2-digit', minute:'2-digit', day:'2-digit', month:'2-digit', year:'numeric'}) }}</span>
+                      <span class="font-bold text-[#4361ee] text-base" v-if="r.type === 'EXPORT'">{{ formatCurrency(r.details?.reduce((acc: number, d: any) => acc + (d.price * d.quantity), 0) || 0) }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           
           <!-- Footer -->
-          <div class="p-6 border-t border-[#f1f5f9] bg-[#f8fafc] flex gap-3">
+          <div v-if="cTab === 'info'" class="p-6 border-t border-[#f1f5f9] bg-[#f8fafc] flex gap-3">
             <button class="flex-1 h-11 bg-white border border-[#e2e8f0] hover:bg-[#f8f9fa] text-[#364a63] rounded-xl text-sm font-bold transition-colors shadow-sm" @click="showCModal = false">Hủy bỏ</button>
             <button class="flex-1 h-11 bg-[#f4bd0e] hover:bg-[#d9a80c] text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2" :disabled="cSaving" @click="saveCustomer">
               <i v-if="cSaving" class="fas fa-spinner fa-spin"></i>

@@ -10,4 +10,5 @@ import java.util.List;
 public interface ReceiptRepository extends JpaRepository<Receipt, Integer> {
     List<Receipt> findBySourceBranchId(Integer branchId);
     List<Receipt> findByDestBranchId(Integer branchId);
+    List<Receipt> findByCustomerId(Integer customerId);
 }

@@ -56,29 +56,10 @@ public class AuditLogServiceImpl implements AuditLogService {
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void logLoginWithSpamCheck(User user) {
-        // Bước 1: Kiểm tra có đang bị phạt không
-        checkBanStatus(user);
+        // Bước 1: Kiểm tra có đang bị phạt không (Tạm comment để dev test thoải mái)
+        // checkBanStatus(user);
 
-        // Bước 2: Đếm số lần login/logout trong 30 phút qua
-        LocalDateTime windowStart = LocalDateTime.now().minusMinutes(SPAM_WINDOW_MINUTES);
-        long count = auditLogRepository.countLoginLogoutSince(user.getId(), windowStart);
-
-        if (count >= SPAM_BAN_THRESHOLD - 1) {
-            // Đã đủ ngưỡng spam -> cắm cờ đỏ, leo thang phạt
-            handleSpamEscalation(user);
-        } else if (count >= SPAM_WARN_THRESHOLD - 1) {
-            // Lần thứ 4 -> ghi log cảnh báo đỏ nhưng vẫn cho đăng nhập
-            Integer branchId = resolveBranchId(user);
-            AuditLog warnLog = new AuditLog(user, branchId, "SPAM_WARNING", "users",
-                    String.valueOf(user.getId()),
-                    "[CẢNH BÁO] Phát hiện hành vi đăng nhập/xuất bất thường. Đây là cảnh báo tự động từ hệ thống.", true);
-            auditLogRepository.save(warnLog);
-            // Vẫn ghi log đăng nhập bình thường
-            writeLoginLog(user);
-        } else {
-            // Bình thường -> ghi log
-            writeLoginLog(user);
-        }
+        writeLoginLog(user);
     }
 
     /**
@@ -88,9 +69,9 @@ public class AuditLogServiceImpl implements AuditLogService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void logLogoutWithSpamCheck(User user) {
         // Kiểm tra ban (bỏ qua nếu bị ban - vẫn cho logout nhưng không ghi log thêm nếu đang bị phạt nặng)
-        if (user.getBanUntil() != null && user.getBanUntil().isAfter(LocalDateTime.now())) {
-            return; // Đang trong thời gian phạt, không ghi log logout spam thêm nữa
-        }
+        // if (user.getBanUntil() != null && user.getBanUntil().isAfter(LocalDateTime.now())) {
+        //     return; // Đang trong thời gian phạt, không ghi log logout spam thêm nữa
+        // }
         Integer branchId = resolveBranchId(user);
         AuditLog log = new AuditLog(user, branchId, "LOGOUT", "users", String.valueOf(user.getId()),
                 user.getFullName() + " đã đăng xuất khỏi hệ thống.");

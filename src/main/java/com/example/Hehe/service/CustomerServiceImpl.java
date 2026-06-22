@@ -156,6 +156,11 @@ public class CustomerServiceImpl implements CustomerService {
         }
 
         BigDecimal oldDebt = customer.getDebt() != null ? customer.getDebt() : BigDecimal.ZERO;
+        
+        if (amount.compareTo(BigDecimal.ZERO) < 0 && amount.abs().compareTo(oldDebt) > 0) {
+            throw new RuntimeException("Số tiền giảm nợ không được vượt quá số nợ hiện tại (" + oldDebt + " VNĐ).");
+        }
+        
         BigDecimal newDebt = oldDebt.add(amount);
 
         if (newDebt.compareTo(BigDecimal.ZERO) < 0) {

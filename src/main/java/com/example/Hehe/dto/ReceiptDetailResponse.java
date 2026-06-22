@@ -14,14 +14,18 @@ public class ReceiptDetailResponse {
     private Integer quantity;
     private BigDecimal price;
     private String batchCode;
+    private Integer receivedQuantity;
+    private String shortfallReason;
 
     public ReceiptDetailResponse(ReceiptDetail d) {
         this.id = d.getId();
         this.manufacturingDate = d.getManufacturingDate();
         this.expirationDate = d.getExpirationDate();
-        this.quantity = d.getQuantity();
         this.price = d.getPrice();
+        this.quantity = d.getQuantity();
         this.batchCode = d.getBatchCode();
+        this.receivedQuantity = d.getReceivedQuantity();
+        this.shortfallReason = d.getShortfallReason();
 
         if (d.getProduct() != null) {
             this.productId = d.getProduct().getId();
@@ -32,11 +36,13 @@ public class ReceiptDetailResponse {
 
     public Integer getId() { return id; }
     public Integer getProductId() { return productId; }
-    public String getProductName() { return productName; }
+    public String getBatchCode() { return batchCode; }
+    public Integer getReceivedQuantity() { return receivedQuantity; }
+    public String getShortfallReason() { return shortfallReason; }
     public String getProductSku() { return productSku; }
+    public String getProductName() { return productName; }
     public LocalDate getManufacturingDate() { return manufacturingDate; }
     public LocalDate getExpirationDate() { return expirationDate; }
     public Integer getQuantity() { return quantity; }
     public BigDecimal getPrice() { return price; }
-    public String getBatchCode() { return batchCode; }
 }
