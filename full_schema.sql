@@ -108,6 +108,8 @@ CREATE TABLE receipts (
     dest_branch_id INT,
     created_by INT NOT NULL,
     customer_id INT,
+    customer_name VARCHAR(255),    -- Tên khách hàng (lưu thẳng vào phiếu, không cần JOIN)
+    customer_phone VARCHAR(50),    -- SĐT khách hàng
     description VARCHAR(500),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_receipt_source_branch FOREIGN KEY (source_branch_id) REFERENCES branches(id) ON DELETE RESTRICT,
@@ -126,6 +128,8 @@ CREATE TABLE receipt_details (
     batch_code VARCHAR(100) NOT NULL DEFAULT 'DEFAULT_BATCH',
     quantity INT NOT NULL CHECK (quantity > 0),
     price NUMERIC(15, 2) NOT NULL CHECK (price >= 0),
+    received_quantity INT,          -- Số lượng thực nhận (chỉ điền khi phiếu TRANSFER được xác nhận)
+    shortfall_reason TEXT,          -- Lý do hao hụt nếu received_quantity < quantity
     CONSTRAINT fk_detail_receipt FOREIGN KEY (receipt_id) REFERENCES receipts(id) ON DELETE CASCADE,
     CONSTRAINT fk_detail_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT,
     CONSTRAINT chk_receipt_detail_dates CHECK (exp_date >= mfg_date)

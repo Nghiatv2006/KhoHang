@@ -37,6 +37,7 @@ public class ReceiptServiceImpl implements ReceiptService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ReceiptResponse> getAllReceipts(User currentUser) {
         if (currentUser.getRole() == UserRole.ADMIN) {
             return receiptRepository.findAll().stream()
@@ -69,6 +70,7 @@ public class ReceiptServiceImpl implements ReceiptService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public ReceiptResponse getReceiptById(Integer id, User currentUser) {
         Receipt r = receiptRepository.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
         // Check permission
@@ -84,6 +86,7 @@ public class ReceiptServiceImpl implements ReceiptService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ReceiptResponse> getReceiptsByCustomer(Integer customerId, User currentUser) {
         List<Receipt> receipts = receiptRepository.findByCustomerId(customerId);
         return receipts.stream()
