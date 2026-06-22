@@ -692,25 +692,36 @@ function formatDateTime(dateTimeStr: string) {
       <!-- Distinct products -->
       <div 
         @click="clearFilters"
-        class="bg-white rounded-2xl p-6 border border-[#f1f5f9] hover:border-blue-300 hover:shadow-md cursor-pointer transition-all flex items-center justify-between group"
-        title="Nhấp để hiển thị tất cả mặt hàng"
+        class="bg-white rounded-2xl p-6 border border-[#f1f5f9] hover:border-blue-300 hover:shadow-md cursor-pointer transition-all flex items-center justify-between gap-4 group relative"
       >
-        <div>
-          <div class="text-[0.75rem] font-bold text-[#8094ae] uppercase tracking-wider mb-1">Mặt hàng tồn kho</div>
-          <div class="text-2xl font-extrabold text-[#364a63] group-hover:text-[#4361ee] transition-colors">{{ totalDistinctProducts }}</div>
+        <!-- Custom Tooltip Bubble -->
+        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-blue-200 text-[#4361ee] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(67,97,238,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
+          <span>Xem tất cả {{ totalDistinctProducts }} mặt hàng</span>
+          <div class="w-2.5 h-2.5 bg-white border-r border-b border-blue-200 rotate-45 absolute -bottom-[5.5px] left-1/2 -translate-x-1/2"></div>
         </div>
-        <div class="w-12 h-12 rounded-xl bg-blue-50 text-[#4361ee] flex items-center justify-center text-xl shadow-sm group-hover:scale-110 transition-transform">
+
+        <div class="min-w-0">
+          <div class="text-[0.75rem] font-bold text-[#8094ae] uppercase tracking-wider mb-1 truncate">Mặt hàng tồn kho</div>
+          <div class="text-2xl font-extrabold text-[#364a63] group-hover:text-[#4361ee] transition-colors truncate">{{ totalDistinctProducts }}</div>
+        </div>
+        <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-blue-50 text-[#4361ee] flex items-center justify-center text-xl shadow-sm group-hover:scale-110 transition-transform">
           <i class="fas fa-box"></i>
         </div>
       </div>
 
       <!-- Total value -->
-      <div class="bg-white rounded-2xl p-6 border border-[#f1f5f9] shadow-sm flex items-center justify-between">
-        <div>
-          <div class="text-[0.75rem] font-bold text-[#8094ae] uppercase tracking-wider mb-1">Tổng giá trị kho</div>
-          <div class="text-2xl font-extrabold text-[#05b171]">{{ formatVND(totalInventoryValue) }}</div>
+      <div class="bg-white rounded-2xl p-6 border border-[#f1f5f9] shadow-sm flex items-center justify-between gap-4 group relative">
+        <!-- Custom Tooltip Bubble -->
+        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-emerald-200 text-[#05b171] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(5,177,113,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
+          <span class="font-mono text-sm">{{ formatVND(totalInventoryValue) }}</span>
+          <div class="w-2.5 h-2.5 bg-white border-r border-b border-emerald-200 rotate-45 absolute -bottom-[5.5px] left-1/2 -translate-x-1/2"></div>
         </div>
-        <div class="w-12 h-12 rounded-xl bg-emerald-50 text-[#05b171] flex items-center justify-center text-xl shadow-sm">
+
+        <div class="min-w-0">
+          <div class="text-[0.75rem] font-bold text-[#8094ae] uppercase tracking-wider mb-1 truncate">Tổng giá trị kho</div>
+          <div class="text-xl lg:text-2xl font-extrabold text-[#05b171] truncate">{{ formatVND(totalInventoryValue) }}</div>
+        </div>
+        <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-emerald-50 text-[#05b171] flex items-center justify-center text-xl shadow-sm">
           <i class="fas fa-wallet"></i>
         </div>
       </div>
@@ -719,21 +730,26 @@ function formatDateTime(dateTimeStr: string) {
       <div 
         @click="toggleOnlyWarning"
         :class="[
-          'bg-white rounded-2xl p-6 border transition-all flex items-center justify-between cursor-pointer select-none group', 
+          'bg-white rounded-2xl p-6 border transition-all flex items-center justify-between gap-4 cursor-pointer select-none group relative', 
           onlyWarning 
             ? 'border-yellow-400 ring-2 ring-yellow-400/20 shadow-md' 
             : 'border-[#f1f5f9] hover:border-yellow-300 hover:shadow-md'
         ]"
-        title="Nhấp để lọc nhanh danh sách cảnh báo tồn thấp"
       >
-        <div>
-          <div class="text-[0.75rem] font-bold text-[#8094ae] uppercase tracking-wider mb-1">Cảnh báo tồn thấp</div>
-          <div :class="['text-2xl font-extrabold transition-colors', totalWarningsCount > 0 || onlyWarning ? 'text-yellow-500' : 'text-[#364a63]']">
+        <!-- Custom Tooltip Bubble -->
+        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-yellow-200 text-[#d9a80c] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(217,168,12,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
+          <span>{{ onlyWarning ? 'Nhấp để bỏ lọc cảnh báo' : 'Lọc danh sách cảnh báo tồn thấp' }}</span>
+          <div class="w-2.5 h-2.5 bg-white border-r border-b border-yellow-200 rotate-45 absolute -bottom-[5.5px] left-1/2 -translate-x-1/2"></div>
+        </div>
+
+        <div class="min-w-0">
+          <div class="text-[0.75rem] font-bold text-[#8094ae] uppercase tracking-wider mb-1 truncate">Cảnh báo tồn thấp</div>
+          <div :class="['text-2xl font-extrabold transition-colors truncate', totalWarningsCount > 0 || onlyWarning ? 'text-yellow-500' : 'text-[#364a63]']">
             {{ totalWarningsCount }}
           </div>
         </div>
         <div 
-          :class="['w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm transition-transform group-hover:scale-110', 
+          :class="['flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm transition-transform group-hover:scale-110', 
                    totalWarningsCount > 0 || onlyWarning ? 'bg-yellow-50 text-yellow-500' : 'bg-slate-50 text-[#8094ae]']"
         >
           <i :class="['fas fa-exclamation-triangle', { 'animate-pulse': totalWarningsCount > 0 }]"></i>
@@ -744,21 +760,26 @@ function formatDateTime(dateTimeStr: string) {
       <div 
         @click="toggleOnlyExpired"
         :class="[
-          'bg-white rounded-2xl p-6 border transition-all flex items-center justify-between cursor-pointer select-none group', 
+          'bg-white rounded-2xl p-6 border transition-all flex items-center justify-between gap-4 cursor-pointer select-none group relative', 
           onlyExpired 
             ? 'border-[#ea4f52] ring-2 ring-[#ea4f52]/20 shadow-md' 
             : 'border-[#f1f5f9] hover:border-red-300 hover:shadow-md'
         ]"
-        title="Nhấp để lọc nhanh danh sách lô hàng đã hết hạn"
       >
-        <div>
-          <div class="text-[0.75rem] font-bold text-[#8094ae] uppercase tracking-wider mb-1">Lô hàng hết hạn</div>
-          <div :class="['text-2xl font-extrabold transition-colors', totalExpiredCount > 0 || onlyExpired ? 'text-[#ea4f52]' : 'text-[#364a63]']">
+        <!-- Custom Tooltip Bubble -->
+        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-red-200 text-[#ea4f52] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(234,79,82,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
+          <span>{{ onlyExpired ? 'Nhấp để bỏ lọc hết hạn' : 'Lọc danh sách lô hàng hết hạn' }}</span>
+          <div class="w-2.5 h-2.5 bg-white border-r border-b border-red-200 rotate-45 absolute -bottom-[5.5px] left-1/2 -translate-x-1/2"></div>
+        </div>
+
+        <div class="min-w-0">
+          <div class="text-[0.75rem] font-bold text-[#8094ae] uppercase tracking-wider mb-1 truncate">Lô hàng hết hạn</div>
+          <div :class="['text-2xl font-extrabold transition-colors truncate', totalExpiredCount > 0 || onlyExpired ? 'text-[#ea4f52]' : 'text-[#364a63]']">
             {{ totalExpiredCount }}
           </div>
         </div>
         <div 
-          :class="['w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm transition-transform group-hover:scale-110', 
+          :class="['flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm transition-transform group-hover:scale-110', 
                    totalExpiredCount > 0 || onlyExpired ? 'bg-red-50 text-[#ea4f52]' : 'bg-slate-50 text-[#8094ae]']"
         >
           <i :class="['fas fa-hourglass-end', { 'animate-pulse': totalExpiredCount > 0 }]"></i>
