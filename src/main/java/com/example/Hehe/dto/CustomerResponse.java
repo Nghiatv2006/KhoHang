@@ -10,17 +10,21 @@ public class CustomerResponse {
     private String address;
     private BigDecimal debt;
     private String status;
+    private String email;
+    private String taxCode;
     private LocalDateTime createdAt;
 
     public CustomerResponse() {}
 
-    public CustomerResponse(Integer id, String name, String contactInfo, String address, BigDecimal debt, String status, LocalDateTime createdAt) {
+    public CustomerResponse(Integer id, String name, String contactInfo, String address, BigDecimal debt, String status, String email, String taxCode, LocalDateTime createdAt) {
         this.id = id;
         this.name = name;
         this.contactInfo = contactInfo;
         this.address = address;
         this.debt = debt;
         this.status = status;
+        this.email = email;
+        this.taxCode = taxCode;
         this.createdAt = createdAt;
     }
 
@@ -47,6 +51,22 @@ public class CustomerResponse {
 
     public void setContactInfo(String contactInfo) {
         this.contactInfo = contactInfo;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getTaxCode() {
+        return taxCode;
+    }
+
+    public void setTaxCode(String taxCode) {
+        this.taxCode = taxCode;
     }
 
     public String getAddress() {

@@ -28,7 +28,9 @@ const filteredCustomers = computed(() => {
   const kw = cSearch.value.toLowerCase()
   return list.filter(c =>
     c.name?.toLowerCase().includes(kw) ||
-    c.contactInfo?.toLowerCase().includes(kw)
+    c.contactInfo?.toLowerCase().includes(kw) ||
+    c.email?.toLowerCase().includes(kw) ||
+    c.taxCode?.toLowerCase().includes(kw)
   )
 })
 
@@ -65,7 +67,7 @@ async function loadCustomerReceipts(id: number) {
 function openAddC() { editingC.value = null; Object.assign(cForm, { name: '', email: '', phone: '', address: '', taxCode: '' }); cTab.value = 'info'; showCModal.value = true }
 function openEditC(c: any) { 
   editingC.value = c; 
-  Object.assign(cForm, { name: c.name, email: '', phone: c.contactInfo || '', address: c.address || '', taxCode: '' }); 
+  Object.assign(cForm, { name: c.name, email: c.email || '', phone: c.contactInfo || '', address: c.address || '', taxCode: c.taxCode || '' }); 
   cTab.value = 'info';
   cReceipts.value = [];
   cSelectedReceipt.value = null;
@@ -79,7 +81,7 @@ async function saveCustomer() {
   if (!cForm.name?.trim()) { toast.error('Tên khách hàng là bắt buộc.'); return }
   cSaving.value = true
   try {
-    const payload = { name: cForm.name.trim(), contactInfo: cForm.phone, address: cForm.address }
+    const payload = { name: cForm.name.trim(), contactInfo: cForm.phone, email: cForm.email, taxCode: cForm.taxCode, address: cForm.address }
     const res = editingC.value
       ? await api.put(`/api/customers/${editingC.value.id}`, payload)
       : await api.post('/api/customers', payload)

@@ -8,6 +8,7 @@ const categories = ref<any[]>([])
 const customers = ref<any[]>([])
 
 const branches = ref<any[]>([])
+const inventories = ref<any[]>([])
 
 const loading = ref(true)
 const errorMsg = ref('')
@@ -24,11 +25,12 @@ let barChartInst: echarts.ECharts | null = null
 
 onMounted(async () => {
   try {
-    const [pRes, cRes, cuRes, bRes] = await Promise.allSettled([
+    const [pRes, cRes, cuRes, bRes, iRes] = await Promise.allSettled([
       api.get('/api/products'),
       api.get('/api/categories'),
       api.get('/api/customers'),
       api.get('/api/branches'),
+      api.get('/api/inventories'),
     ])
     
     if (pRes.status === 'fulfilled' && pRes.value.ok) products.value = await pRes.value.json()
@@ -44,6 +46,9 @@ onMounted(async () => {
     if (bRes.status === 'fulfilled' && bRes.value.ok) branches.value = await bRes.value.json()
     else errorMsg.value += 'Lỗi API Chi nhánh. '
     
+    if (iRes.status === 'fulfilled' && iRes.value.ok) inventories.value = await iRes.value.json()
+    else errorMsg.value += 'Lỗi API Tồn kho. '
+    
   } catch (err: any) {
     errorMsg.value = 'Lỗi kết nối máy chủ: ' + err.message
   } finally {
@@ -56,22 +61,35 @@ onMounted(async () => {
 })
 
 // SAFELY PARSE DATA
-const totalValue = computed(() => products.value.reduce((s, p) => s + (Number(p.price) || 0) * (Number(p.quantity) || 0), 0))
+const productStats = computed(() => {
+  const map = new Map<number, { id: number, name: string, quantity: number, price: number, categoryName: string }>()
+  products.value.forEach(p => {
+    map.set(p.id, { id: p.id, name: p.name, quantity: 0, price: p.price, categoryName: p.categoryName || 'Chưa phân loại' })
+  })
+  inventories.value.forEach(inv => {
+    if (map.has(inv.productId)) {
+      map.get(inv.productId)!.quantity += (inv.quantity || 0)
+    }
+  })
+  return Array.from(map.values())
+})
+
+const totalValue = computed(() => productStats.value.reduce((s, p) => s + (Number(p.price) || 0) * p.quantity, 0))
 const totalDebt = computed(() => customers.value.reduce((s, c) => s + (Number(c.debt) || 0), 0))
-const topProducts = computed(() => [...products.value].sort((a, b) => (Number(b.quantity) || 0) - (Number(a.quantity) || 0)).slice(0, 5))
+const topProducts = computed(() => [...productStats.value].sort((a, b) => b.quantity - a.quantity).slice(0, 5))
 const topCustomers = computed(() => [...customers.value].sort((a, b) => (Number(b.debt) || 0) - (Number(a.debt) || 0)).slice(0, 5))
 
 // Revenue By Category
 const revenueByCategory = computed(() => {
   const map = new Map<string, { name: string; val: number; qty: number }>()
-  products.value.forEach(p => {
-    const cName = p.categoryName || 'Chưa phân loại'
+  productStats.value.forEach(p => {
+    const cName = p.categoryName
     if (!map.has(cName)) {
       map.set(cName, { name: cName, val: 0, qty: 0 })
     }
     const c = map.get(cName)!
-    c.val += (Number(p.price) || 0) * (Number(p.quantity) || 0)
-    c.qty += (Number(p.quantity) || 0)
+    c.val += (Number(p.price) || 0) * p.quantity
+    c.qty += p.quantity
   })
   return Array.from(map.values()).filter(c => c.val > 0 || c.qty > 0).sort((a, b) => b.val - a.val)
 })
@@ -157,7 +175,7 @@ function updateCharts() {
   }
 }
 
-watch([products, customers, categories], () => {
+watch([products, customers, categories, inventories], () => {
   if (!loading.value) {
     updateCharts()
   }

@@ -24,6 +24,12 @@ public class Customer {
     @Column(name = "debt", nullable = false)
     private BigDecimal debt = BigDecimal.ZERO;
 
+    @Column(name = "email")
+    private String email;
+
+    @Column(name = "tax_code")
+    private String taxCode;
+
     @Column(name = "status", nullable = false)
     private String status = "ACTIVE"; // ACTIVE, INACTIVE
 
@@ -56,6 +62,22 @@ public class Customer {
 
     public void setContactInfo(String contactInfo) {
         this.contactInfo = contactInfo;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getTaxCode() {
+        return taxCode;
+    }
+
+    public void setTaxCode(String taxCode) {
+        this.taxCode = taxCode;
     }
 
     public String getAddress() {

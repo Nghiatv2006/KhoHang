@@ -61,6 +61,8 @@ public class CustomerServiceImpl implements CustomerService {
         Customer customer = new Customer();
         customer.setName(request.getName().trim());
         customer.setContactInfo(request.getContactInfo() != null ? request.getContactInfo().trim() : null);
+        customer.setEmail(request.getEmail() != null ? request.getEmail().trim() : null);
+        customer.setTaxCode(request.getTaxCode() != null ? request.getTaxCode().trim() : null);
         customer.setAddress(request.getAddress() != null ? request.getAddress().trim() : null);
         customer.setDebt(request.getDebt() != null ? request.getDebt() : BigDecimal.ZERO);
         customer.setStatus("ACTIVE");
@@ -87,6 +89,8 @@ public class CustomerServiceImpl implements CustomerService {
 
         customer.setName(request.getName().trim());
         customer.setContactInfo(request.getContactInfo() != null ? request.getContactInfo().trim() : null);
+        customer.setEmail(request.getEmail() != null ? request.getEmail().trim() : null);
+        customer.setTaxCode(request.getTaxCode() != null ? request.getTaxCode().trim() : null);
         customer.setAddress(request.getAddress() != null ? request.getAddress().trim() : null);
         if (request.getDebt() != null) {
             customer.setDebt(request.getDebt());
@@ -197,6 +201,8 @@ public class CustomerServiceImpl implements CustomerService {
                 c.getAddress(),
                 c.getDebt(),
                 c.getStatus(),
+                c.getEmail(),
+                c.getTaxCode(),
                 c.getCreatedAt()
         );
     }
