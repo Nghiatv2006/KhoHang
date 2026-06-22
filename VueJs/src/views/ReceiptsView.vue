@@ -12,9 +12,29 @@ const canApprove = computed(() => isAdmin.value || isManager.value)
 
 function canApproveReceipt(r: any) {
   if (r.status !== 'DRAFT') return false;
-  if (isAdmin.value && r.createdByRole === 'MANAGER') return true;
+  if (isAdmin.value) return true;
+  
+  const isCrossBranchImport = r.type === 'IMPORT' && r.sourceBranchId !== r.destBranchId;
+  if (isCrossBranchImport) {
+      if (isManager.value && r.sourceBranchId === user.value?.branchId) return true;
+      return false;
+  }
+  
   if (isManager.value && r.createdByRole === 'STAFF') return true;
   return false;
+}
+
+function canCancelReceipt(r: any) {
+  if (r.status !== 'DRAFT') return false;
+  if (isAdmin.value) return true;
+  if (!isManager.value) return false;
+  
+  const isCrossBranchImport = r.type === 'IMPORT' && r.sourceBranchId !== r.destBranchId;
+  if (isCrossBranchImport) {
+      return r.sourceBranchId === user.value?.branchId || r.destBranchId === user.value?.branchId;
+  }
+  
+  return true; 
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -193,6 +213,7 @@ function onTypeChange() {
 }
 
 const sourceInventories = ref<any[]>([])
+const globalInventories = ref<any[]>([])
 
 import { watch } from 'vue'
 
@@ -202,6 +223,7 @@ watch(() => createForm.value.sourceBranchId, async (newVal) => {
       const res = await api.get('/api/inventories/global')
       if (res.ok) {
         const allInventories = await res.json()
+        globalInventories.value = allInventories
         sourceInventories.value = allInventories.filter((inv: any) => inv.branchId === newVal)
         createForm.value.details.forEach(d => constrainQuantity(d))
       } else {
@@ -279,11 +301,13 @@ function getMaxQuantity(productId: number | string | null) {
   const inv = sourceInventories.value.find(x => x.productId === Number(productId))
   const totalQty = inv ? inv.quantity : 0
   
-  if (createForm.value.type === 'IMPORT') return null
+  if (createForm.value.type === 'IMPORT' && createForm.value.sourceBranchId === createForm.value.destBranchId) return null
 
   // Trừ đi số lượng đang nằm trong các phiếu nháp chờ xuất/điều chuyển
   const pendingQty = receipts.value
-    .filter(r => r.status === 'DRAFT' && r.sourceBranchId === createForm.value.sourceBranchId && ['EXPORT', 'TRANSFER', 'ADJUST_OUT'].includes(r.type))
+    .filter(r => r.status === 'DRAFT' && r.sourceBranchId === createForm.value.sourceBranchId && 
+            (['EXPORT', 'TRANSFER', 'ADJUST_OUT'].includes(r.type) || 
+             (r.type === 'IMPORT' && r.sourceBranchId !== r.destBranchId)))
     .flatMap(r => r.details || [])
     .filter(d => Number(d.productId) === Number(productId))
     .reduce((sum, d) => sum + Number(d.quantity), 0)
@@ -291,8 +315,17 @@ function getMaxQuantity(productId: number | string | null) {
   return Math.max(0, totalQty - pendingQty)
 }
 
+function getGlobalQuantity(productId: number | string | null) {
+  if (!productId) return 0
+  return globalInventories.value
+    .filter(x => x.productId === Number(productId))
+    .reduce((sum, inv) => sum + inv.quantity, 0)
+}
+
 function constrainQuantity(d: DetailRow) {
   if (d.quantity === '' || d.quantity === null || typeof d.quantity !== 'number') return;
+  if (createForm.value.type === 'ADJUST_IN' || (createForm.value.type === 'IMPORT' && createForm.value.sourceBranchId === createForm.value.destBranchId)) return;
+  
   const max = getMaxQuantity(d.productId)
   if (max !== null) {
     if (max === 0) {
@@ -307,6 +340,8 @@ function onQuantityBlur(d: DetailRow) {
   if (!d.quantity || d.quantity < 1) {
     d.quantity = 1;
   }
+  if (createForm.value.type === 'ADJUST_IN' || (createForm.value.type === 'IMPORT' && createForm.value.sourceBranchId === createForm.value.destBranchId)) return;
+  
   const max = getMaxQuantity(d.productId)
   if (max !== null && max === 0) {
     d.quantity = 0;
@@ -325,7 +360,8 @@ async function submitCreateDraft() {
     return
   }
 
-  if (f.details.some(d => {
+  const isConstrained = f.type !== 'ADJUST_IN' && !(f.type === 'IMPORT' && f.sourceBranchId === f.destBranchId)
+  if (isConstrained && f.details.some(d => {
     const max = getMaxQuantity(d.productId)
     return max !== null && d.quantity > max
   })) {
@@ -763,7 +799,7 @@ function getCustomerName(receipt: any) {
                     title="Phê duyệt">
                     <i class="fas fa-check text-xs"></i>
                   </button>
-                  <button v-if="r.status === 'DRAFT' && canApprove"
+                  <button v-if="canCancelReceipt(r)"
                     @click.stop="cancelReceipt(r)"
                     class="w-8 h-8 flex items-center justify-center rounded-lg bg-red-50 hover:bg-red-500 hover:text-white text-red-500 transition-all"
                     title="Hủy phiếu">
@@ -1039,7 +1075,10 @@ function getCustomerName(receipt: any) {
                           <div class="relative">
                             <input v-model.number="d.quantity" type="number" min="1" @input="constrainQuantity(d)" @blur="onQuantityBlur(d)" @keypress="(e) => { if(!/[0-9]/.test(e.key)) e.preventDefault() }"
                               class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none pr-12" />
-                            <span v-if="getMaxQuantity(d.productId) !== null" class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[#8094ae] font-bold">
+                            <span v-if="(createForm.type === 'IMPORT' && createForm.sourceBranchId === createForm.destBranchId) || createForm.type === 'ADJUST_IN'" class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[#8094ae] font-bold">
+                              / {{ getGlobalQuantity(d.productId) }}
+                            </span>
+                            <span v-else-if="getMaxQuantity(d.productId) !== null" class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[#8094ae] font-bold">
                               / {{ getMaxQuantity(d.productId) }}
                             </span>
                           </div>

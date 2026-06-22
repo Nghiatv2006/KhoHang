@@ -148,7 +148,7 @@ public class ReceiptServiceImpl implements ReceiptService {
             throw new RuntimeException("Receipt must have details.");
         }
 
-        if (request.getType() == ReceiptType.EXPORT || request.getType() == ReceiptType.TRANSFER || request.getType() == ReceiptType.ADJUST_OUT) {
+        if (request.getType() == ReceiptType.EXPORT || request.getType() == ReceiptType.TRANSFER || request.getType() == ReceiptType.ADJUST_OUT || (request.getType() == ReceiptType.IMPORT && request.getSourceBranchId() != null && !request.getSourceBranchId().equals(request.getDestBranchId()))) {
             for (ReceiptDetailSaveRequest dReq : request.getDetails()) {
                 List<Inventory> invs = inventoryRepository.findByBranchIdAndProductId(request.getSourceBranchId(), dReq.getProductId());
                 int totalQty = invs.stream().mapToInt(Inventory::getQuantity).sum();
@@ -188,8 +188,15 @@ public class ReceiptServiceImpl implements ReceiptService {
             if (myBranchId == null) throw new RuntimeException("Bạn chưa thuộc chi nhánh nào.");
             
             if (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.ADJUST_IN) {
-                if (r.getDestBranch() == null || !r.getDestBranch().getId().equals(myBranchId)) {
-                    throw new RuntimeException("Bạn không có quyền hủy phiếu của chi nhánh khác.");
+                boolean isCrossBranch = (r.getType() == ReceiptType.IMPORT && r.getSourceBranch() != null && r.getDestBranch() != null && !r.getSourceBranch().getId().equals(r.getDestBranch().getId()));
+                if (isCrossBranch) {
+                    if (!r.getDestBranch().getId().equals(myBranchId) && !r.getSourceBranch().getId().equals(myBranchId)) {
+                        throw new RuntimeException("Bạn không có quyền hủy phiếu của chi nhánh khác.");
+                    }
+                } else {
+                    if (r.getDestBranch() == null || !r.getDestBranch().getId().equals(myBranchId)) {
+                        throw new RuntimeException("Bạn không có quyền hủy phiếu của chi nhánh khác.");
+                    }
                 }
             } else {
                 if (r.getSourceBranch() == null || !r.getSourceBranch().getId().equals(myBranchId)) {
@@ -220,9 +227,14 @@ public class ReceiptServiceImpl implements ReceiptService {
 
         switch (type) {
             case IMPORT:
+                addInventory(destBranch, detail, qty);
+                if (sourceBranch != null && !sourceBranch.getId().equals(destBranch.getId())) {
+                    addInventory(sourceBranch, detail, -qty);
+                }
+                break;
             case ADJUST_IN:
                 // Increase at Dest (IMPORT usually has destBranch = 1, ADJUST_IN has sourceBranch)
-                Branch targetBranch = type == ReceiptType.IMPORT ? destBranch : sourceBranch;
+                Branch targetBranch = sourceBranch;
                 addInventory(targetBranch, detail, qty);
                 break;
             case EXPORT:
@@ -319,12 +331,14 @@ public class ReceiptServiceImpl implements ReceiptService {
         
         User creator = r.getCreatedBy();
         if (creator != null) {
+            boolean isCrossBranchRequest = (r.getType() == ReceiptType.IMPORT && r.getSourceBranch() != null && r.getDestBranch() != null && !r.getSourceBranch().getId().equals(r.getDestBranch().getId()));
+            
             if (creator.getRole() == UserRole.STAFF) {
                 if (currentUser.getRole() != UserRole.MANAGER) {
                     throw new RuntimeException("Chỉ Quản lý mới được quyền duyệt phiếu của Nhân viên.");
                 }
             } else if (creator.getRole() == UserRole.MANAGER) {
-                if (currentUser.getRole() != UserRole.ADMIN) {
+                if (!isCrossBranchRequest && currentUser.getRole() != UserRole.ADMIN) {
                     throw new RuntimeException("Chỉ Admin mới được quyền duyệt phiếu của Quản lý.");
                 }
             }
@@ -334,7 +348,18 @@ public class ReceiptServiceImpl implements ReceiptService {
             Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
             if (myBranchId == null) throw new RuntimeException("Bạn chưa thuộc chi nhánh nào.");
 
-            if (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.ADJUST_IN) {
+            if (r.getType() == ReceiptType.IMPORT) {
+                boolean isCrossBranch = (r.getSourceBranch() != null && r.getDestBranch() != null && !r.getSourceBranch().getId().equals(r.getDestBranch().getId()));
+                if (isCrossBranch) {
+                    if (!r.getSourceBranch().getId().equals(myBranchId)) {
+                        throw new RuntimeException("Chỉ Quản lý chi nhánh nguồn mới có quyền duyệt phiếu nhập kho yêu cầu từ chi nhánh khác.");
+                    }
+                } else {
+                    if (r.getDestBranch() == null || !r.getDestBranch().getId().equals(myBranchId)) {
+                        throw new RuntimeException("Bạn không có quyền duyệt phiếu của chi nhánh khác.");
+                    }
+                }
+            } else if (r.getType() == ReceiptType.ADJUST_IN) {
                 if (r.getDestBranch() == null || !r.getDestBranch().getId().equals(myBranchId)) {
                     throw new RuntimeException("Bạn không có quyền duyệt phiếu của chi nhánh khác.");
                 }
