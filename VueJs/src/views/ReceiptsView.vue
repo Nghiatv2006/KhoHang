@@ -12,9 +12,29 @@ const canApprove = computed(() => isAdmin.value || isManager.value)
 
 function canApproveReceipt(r: any) {
   if (r.status !== 'DRAFT') return false;
-  if (isAdmin.value && r.createdByRole === 'MANAGER') return true;
+  if (isAdmin.value) return true;
+  
+  const isCrossBranchImport = r.type === 'IMPORT' && r.sourceBranchId !== r.destBranchId;
+  if (isCrossBranchImport) {
+      if (isManager.value && r.sourceBranchId === user.value?.branchId) return true;
+      return false;
+  }
+  
   if (isManager.value && r.createdByRole === 'STAFF') return true;
   return false;
+}
+
+function canCancelReceipt(r: any) {
+  if (r.status !== 'DRAFT') return false;
+  if (isAdmin.value) return true;
+  if (!isManager.value) return false;
+  
+  const isCrossBranchImport = r.type === 'IMPORT' && r.sourceBranchId !== r.destBranchId;
+  if (isCrossBranchImport) {
+      return r.sourceBranchId === user.value?.branchId || r.destBranchId === user.value?.branchId;
+  }
+  
+  return true; 
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -32,6 +52,39 @@ const loading = ref(true)
 const filterType = ref('')
 const filterStatus = ref('')
 const searchKeyword = ref('')
+const filterTimeRange = ref('custom')
+const filterStartDate = ref('')
+const filterEndDate = ref('')
+
+watch(filterTimeRange, (val) => {
+  const today = new Date()
+  const fmt = (d: Date) => d.toISOString().substring(0, 10)
+  
+  if (val === 'today') {
+    filterStartDate.value = fmt(today)
+    filterEndDate.value = fmt(today)
+  } else if (val === 'week') {
+    const weekAgo = new Date(today)
+    weekAgo.setDate(weekAgo.getDate() - 7)
+    filterStartDate.value = fmt(weekAgo)
+    filterEndDate.value = fmt(today)
+  } else if (val === 'last_week') {
+    const twoWeeksAgo = new Date(today)
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
+    const oneWeekAgo = new Date(today)
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+    filterStartDate.value = fmt(twoWeeksAgo)
+    filterEndDate.value = fmt(oneWeekAgo)
+  } else if (val === 'month') {
+    const monthAgo = new Date(today)
+    monthAgo.setMonth(monthAgo.getMonth() - 1)
+    filterStartDate.value = fmt(monthAgo)
+    filterEndDate.value = fmt(today)
+  } else if (val === 'custom') {
+    filterStartDate.value = ''
+    filterEndDate.value = ''
+  }
+})
 
 const filteredReceipts = computed(() => {
   let result = [...receipts.value]
@@ -51,6 +104,14 @@ const filteredReceipts = computed(() => {
       r.sourceBranchName?.toLowerCase().includes(kw) ||
       r.destBranchName?.toLowerCase().includes(kw)
     )
+  }
+  if (filterStartDate.value) {
+    const start = new Date(filterStartDate.value).setHours(0, 0, 0, 0)
+    result = result.filter(r => r.createdAt && new Date(r.createdAt).getTime() >= start)
+  }
+  if (filterEndDate.value) {
+    const end = new Date(filterEndDate.value).setHours(23, 59, 59, 999)
+    result = result.filter(r => r.createdAt && new Date(r.createdAt).getTime() <= end)
   }
   return result.sort((a, b) => {
     const da = a.createdAt ? new Date(a.createdAt).getTime() : 0
@@ -128,6 +189,7 @@ const createForm = ref<{
   destBranchId: number | ''
   customerId: number | ''
   customerName: string
+  customerPhone: string
   paymentStatus: string
   description: string
   details: DetailRow[]
@@ -137,10 +199,39 @@ const createForm = ref<{
   destBranchId: '',
   customerId: '',
   customerName: '',
+  customerPhone: '',
   paymentStatus: 'UNPAID',
   description: '',
   details: []
 })
+
+const showCustomerDropdown = ref(false)
+
+const filteredCustomers = computed(() => {
+  if (!createForm.value.customerName) return customers.value
+  const kw = createForm.value.customerName.toLowerCase()
+  return customers.value.filter(c => 
+    c.name.toLowerCase().includes(kw) || 
+    (c.contactInfo && c.contactInfo.toLowerCase().includes(kw))
+  )
+})
+
+function selectCustomer(c: any) {
+  createForm.value.customerId = c.id
+  createForm.value.customerName = c.name
+  createForm.value.customerPhone = c.contactInfo || ''
+  showCustomerDropdown.value = false
+}
+
+function hideCustomerDropdown() {
+  setTimeout(() => { showCustomerDropdown.value = false }, 200)
+}
+
+function onCustomerInput() {
+  showCustomerDropdown.value = true
+  createForm.value.customerId = ''
+  // Không tự động xóa phone để người dùng có thể gõ tiếp
+}
 
 interface DetailRow {
   productId: number | ''
@@ -158,6 +249,7 @@ function openCreateModal() {
     destBranchId: '',
     customerId: '',
     customerName: '',
+    customerPhone: '',
     paymentStatus: 'UNPAID',
     description: '',
     details: [{ productId: '', manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 }]
@@ -194,6 +286,7 @@ function onTypeChange() {
 }
 
 const sourceInventories = ref<any[]>([])
+const globalInventories = ref<any[]>([])
 
 import { watch } from 'vue'
 
@@ -203,6 +296,7 @@ watch(() => createForm.value.sourceBranchId, async (newVal) => {
       const res = await api.get('/api/inventories/global')
       if (res.ok) {
         const allInventories = await res.json()
+        globalInventories.value = allInventories
         sourceInventories.value = allInventories.filter((inv: any) => inv.branchId === newVal)
         createForm.value.details.forEach(d => constrainQuantity(d))
       } else {
@@ -277,12 +371,33 @@ function getMaxQuantity(productId: number | string | null) {
   if (!productId) return null
   if (createForm.value.type === 'ADJUST_IN') return null
   if (!createForm.value.sourceBranchId) return null
+  if (createForm.value.type === 'IMPORT' && createForm.value.sourceBranchId === createForm.value.destBranchId) return null
+  
   const inv = sourceInventories.value.find(x => x.productId === Number(productId))
-  return inv ? inv.quantity : 0
+  const totalQty = inv ? inv.quantity : 0
+
+  // Trừ đi số lượng đang nằm trong các phiếu nháp chờ xuất/điều chuyển
+  const pendingQty = receipts.value
+    .filter(r => r.status === 'DRAFT' && r.sourceBranchId === createForm.value.sourceBranchId && 
+            (['EXPORT', 'TRANSFER', 'ADJUST_OUT'].includes(r.type) || 
+             (r.type === 'IMPORT' && r.sourceBranchId !== r.destBranchId)))
+    .flatMap(r => r.details || [])
+    .filter(d => Number(d.productId) === Number(productId))
+    .reduce((sum, d) => sum + Number(d.quantity), 0)
+
+  return Math.max(0, totalQty - pendingQty)
+}
+
+function getGlobalQuantity(productId: number | string | null) {
+  if (!productId) return 0
+  return globalInventories.value
+    .filter(x => x.productId === Number(productId))
+    .reduce((sum, inv) => sum + inv.quantity, 0)
 }
 
 function constrainQuantity(d: DetailRow) {
   if (d.quantity === null || d.quantity === undefined || (d.quantity as any) === '') return;
+  if (createForm.value.type === 'ADJUST_IN' || (createForm.value.type === 'IMPORT' && createForm.value.sourceBranchId === createForm.value.destBranchId)) return;
   const max = getMaxQuantity(d.productId)
   if (max !== null) {
     if (max === 0) {
@@ -310,12 +425,19 @@ async function submitCreateDraft() {
     toast.error('Vui lòng điền đầy đủ sản phẩm và số lượng hợp lệ.')
     return
   }
-  if (f.type === 'EXPORT' && !f.customerName?.trim()) {
-    toast.error('Vui lòng nhập tên khách hàng khi xuất bán.')
-    return
+  if (f.type === 'EXPORT') {
+    if (!f.customerName?.trim()) {
+      toast.error('Vui lòng nhập tên khách hàng khi xuất bán.')
+      return
+    }
+    if (!f.customerPhone?.trim()) {
+      toast.error('Vui lòng nhập số điện thoại khách hàng khi xuất bán.')
+      return
+    }
   }
 
-  if (f.details.some(d => {
+  const isConstrained = f.type !== 'ADJUST_IN' && !(f.type === 'IMPORT' && f.sourceBranchId === f.destBranchId)
+  if (isConstrained && f.details.some(d => {
     const max = getMaxQuantity(d.productId)
     return max !== null && d.quantity > max
   })) {
@@ -327,7 +449,9 @@ async function submitCreateDraft() {
     type: f.type,
     sourceBranchId: f.sourceBranchId || null,
     destBranchId: f.destBranchId || null,
+    customerId: f.customerId || null,
     customerName: f.customerName || null,
+    customerPhone: f.customerPhone || null,
     paymentStatus: f.paymentStatus,
     description: f.description,
     details: f.details.map(d => ({
@@ -565,8 +689,14 @@ function canConfirmTransfer(receipt: any) {
 
 function getCustomerName(id: number | null | undefined) {
   if (!id) return '—'
-  const c = customers.value.find(x => x.id === id)
+  const c = customers.value.find((x: any) => x.id === id)
   return c ? c.name : '—'
+}
+
+function getCustomerContactInfo(id: number | null | undefined) {
+  if (!id) return ''
+  const c = customers.value.find((x: any) => x.id === id)
+  return c && c.contactInfo ? c.contactInfo : ''
 }
 </script>
 
@@ -613,16 +743,7 @@ function getCustomerName(id: number | null | undefined) {
           <div class="text-2xl font-extrabold text-green-500">{{ statCompleted }}</div>
         </div>
       </div>
-      <div @click="filterStatus = filterStatus === 'IN_TRANSIT' ? '' : 'IN_TRANSIT'"
-        :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'IN_TRANSIT' ? 'border-sky-400 ring-2 ring-sky-200' : 'border-[#f1f5f9] hover:border-sky-300']">
-        <div class="w-12 h-12 rounded-xl bg-sky-50 flex items-center justify-center text-sky-500 text-xl">
-          <i class="fas fa-truck"></i>
-        </div>
-        <div>
-          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide">Đang vận chuyển</div>
-          <div class="text-2xl font-extrabold text-sky-500">{{ statInTransit }}</div>
-        </div>
-      </div>
+
       <div @click="filterStatus = filterStatus === 'CANCELLED' ? '' : 'CANCELLED'"
         :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'CANCELLED' ? 'border-red-400 ring-2 ring-red-200' : 'border-[#f1f5f9] hover:border-red-300']">
         <div class="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center text-red-400 text-xl">
@@ -648,33 +769,70 @@ function getCustomerName(id: number | null | undefined) {
     <!-- TABLE CARD -->
     <div class="bg-white rounded-2xl border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-sm overflow-hidden">
       <!-- Toolbar -->
-      <div class="p-5 border-b border-[#f1f5f9] flex flex-col sm:flex-row items-center gap-3">
-        <div class="relative flex-1 max-w-sm">
-          <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae]"></i>
-          <input v-model="searchKeyword" type="text" placeholder="Tìm mã phiếu, người lập, chi nhánh..."
-            class="w-full h-[40px] pl-10 pr-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all" />
+      <div class="p-5 border-b border-[#f1f5f9]">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <!-- Tìm kiếm đa năng -->
+          <div class="lg:col-span-2 relative">
+            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae] text-sm"></i>
+            <input v-model="searchKeyword" type="text" placeholder="Tìm kiếm mã phiếu, người lập, chi nhánh..."
+              class="w-full h-11 pl-10 pr-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all" />
+          </div>
+          <!-- Lọc loại phiếu -->
+          <div>
+            <select v-model="filterType"
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]">
+              <option value="">-- Tất cả loại phiếu --</option>
+              <option value="IMPORT">Nhập kho</option>
+              <option value="EXPORT">Xuất bán</option>
+              <option value="TRANSFER">Điều chuyển</option>
+            </select>
+          </div>
+          <!-- Lọc trạng thái -->
+          <div>
+            <select v-model="filterStatus"
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]">
+              <option value="">-- Tất cả trạng thái --</option>
+              <option value="DRAFT">Chờ duyệt</option>
+              <option value="COMPLETED">Đã duyệt</option>
+              <option value="CANCELLED">Đã hủy</option>
+              <option value="IN_TRANSIT">Đang vận chuyển</option>
+              <option value="RECEIVED">Đã nhận hàng</option>
+            </select>
+          </div>
+          <!-- Thời gian và Ngày -->
+          <div class="lg:col-span-4 grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-1.5">Thời gian</label>
+              <select v-model="filterTimeRange" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]">
+                <option value="today">Hôm nay</option>
+                <option value="week">7 ngày qua</option>
+                <option value="last_week">Tuần trước (14 ngày qua)</option>
+                <option value="month">30 ngày qua</option>
+                <option value="custom">Tùy chọn...</option>
+              </select>
+            </div>
+            <!-- Từ ngày -->
+            <div>
+              <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-1.5">Từ ngày</label>
+              <input v-model="filterStartDate" type="date" :disabled="filterTimeRange !== 'custom'"
+                class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] disabled:opacity-50 disabled:bg-gray-100 disabled:cursor-not-allowed" />
+            </div>
+            <!-- Đến ngày -->
+            <div>
+              <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-1.5">Đến ngày</label>
+              <input v-model="filterEndDate" type="date" :disabled="filterTimeRange !== 'custom'"
+                class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] disabled:opacity-50 disabled:bg-gray-100 disabled:cursor-not-allowed" />
+            </div>
+            <!-- Nút Xóa lọc -->
+            <div class="flex items-end">
+              <button v-if="filterType || filterStatus || searchKeyword || filterStartDate || filterEndDate || filterTimeRange !== 'custom'"
+                @click="filterType = ''; filterStatus = ''; searchKeyword = ''; filterTimeRange = 'custom'; filterStartDate = ''; filterEndDate = ''"
+                class="w-full h-11 flex items-center justify-center gap-2 px-6 bg-white border border-[#e2e8f0] rounded-xl text-sm font-semibold text-[#8094ae] hover:text-[#364a63] hover:bg-[#f8f9fa] transition-all shadow-sm">
+                <i class="fas fa-times"></i> Xóa lọc
+              </button>
+            </div>
+          </div>
         </div>
-        <select v-model="filterType"
-          class="h-[40px] px-3 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 outline-none transition-all text-[#364a63]">
-          <option value="">Tất cả loại phiếu</option>
-          <option value="IMPORT">Nhập kho</option>
-          <option value="EXPORT">Xuất bán</option>
-          <option value="TRANSFER">Điều chuyển</option>
-        </select>
-        <select v-model="filterStatus"
-          class="h-[40px] px-3 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 outline-none transition-all text-[#364a63]">
-          <option value="">Tất cả trạng thái</option>
-          <option value="DRAFT">Chờ duyệt</option>
-          <option value="COMPLETED">Đã duyệt</option>
-          <option value="CANCELLED">Đã hủy</option>
-          <option value="IN_TRANSIT">Đang vận chuyển</option>
-          <option value="RECEIVED">Đã nhận hàng</option>
-        </select>
-        <button v-if="filterType || filterStatus || searchKeyword"
-          @click="filterType = ''; filterStatus = ''; searchKeyword = ''"
-          class="h-[40px] px-4 border border-[#e2e8f0] text-[#8094ae] hover:text-[#364a63] bg-white rounded-xl text-sm transition-all">
-          <i class="fas fa-times mr-1"></i>Xóa lọc
-        </button>
       </div>
 
       <!-- Loading -->
@@ -756,7 +914,7 @@ function getCustomerName(id: number | null | undefined) {
                     title="Phê duyệt">
                     <i class="fas fa-check text-xs"></i>
                   </button>
-                  <button v-if="r.status === 'DRAFT' && canApprove"
+                  <button v-if="canCancelReceipt(r)"
                     @click.stop="cancelReceipt(r)"
                     class="w-8 h-8 flex items-center justify-center rounded-lg bg-red-50 hover:bg-red-500 hover:text-white text-red-500 transition-all"
                     title="Hủy phiếu">
@@ -821,6 +979,7 @@ function getCustomerName(id: number | null | undefined) {
               <div v-if="selectedReceipt.type === 'EXPORT'">
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Khách hàng</div>
                 <div class="font-semibold text-[#364a63]">{{ getCustomerName(selectedReceipt.customerId) }}</div>
+                <div class="text-xs text-[#8094ae] mt-0.5" v-if="getCustomerContactInfo(selectedReceipt.customerId)">{{ getCustomerContactInfo(selectedReceipt.customerId) }}</div>
               </div>
               <div v-else>
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Chi nhánh đích</div>
@@ -972,7 +1131,20 @@ function getCustomerName(id: number | null | undefined) {
                 </div>
                 <div v-if="createForm.type === 'EXPORT'">
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Khách hàng <span class="text-red-500">*</span></label>
-                  <input v-model="createForm.customerName" type="text" placeholder="Nhập tên khách hàng..."
+                  <div class="relative">
+                    <input v-model="createForm.customerName" @focus="showCustomerDropdown = true" @blur="hideCustomerDropdown" @input="onCustomerInput" type="text" placeholder="Nhập tên khách hàng..."
+                      class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
+                    <div v-if="showCustomerDropdown && filteredCustomers.length > 0" class="absolute z-10 w-full mt-1 bg-white border border-[#e2e8f0] rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                       <div v-for="c in filteredCustomers" :key="c.id" @mousedown.prevent="selectCustomer(c)" class="px-3 py-2.5 hover:bg-[#f8f9fa] cursor-pointer text-sm border-b border-[#f1f5f9] last:border-0">
+                          <div class="font-bold text-[#364a63]">{{ c.name }}</div>
+                          <div class="text-[#8094ae] text-xs mt-0.5" v-if="c.contactInfo"><i class="fas fa-phone-alt mr-1"></i> {{ c.contactInfo }}</div>
+                       </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="createForm.type === 'EXPORT'">
+                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Số điện thoại <span class="text-red-500">*</span></label>
+                  <input v-model="createForm.customerPhone" @input="createForm.customerId = ''" type="text" placeholder="Nhập số điện thoại..."
                     class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
                 </div>
               </div>
@@ -1027,7 +1199,10 @@ function getCustomerName(id: number | null | undefined) {
                           <div class="relative">
                             <input v-model.number="d.quantity" type="number" min="1" @input="constrainQuantity(d)" @blur="onQuantityBlur(d)" @keypress="(e) => { if(!/[0-9]/.test(e.key)) e.preventDefault() }"
                               class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none pr-12" />
-                            <span v-if="getMaxQuantity(d.productId) !== null" class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[#8094ae] font-bold">
+                            <span v-if="(createForm.type === 'IMPORT' && createForm.sourceBranchId === createForm.destBranchId) || createForm.type === 'ADJUST_IN'" class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[#8094ae] font-bold">
+                              / {{ getGlobalQuantity(d.productId) }}
+                            </span>
+                            <span v-else-if="getMaxQuantity(d.productId) !== null" class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[#8094ae] font-bold">
                               / {{ getMaxQuantity(d.productId) }}
                             </span>
                           </div>

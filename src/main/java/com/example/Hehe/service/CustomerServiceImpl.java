@@ -38,8 +38,7 @@ public class CustomerServiceImpl implements CustomerService {
                 .stream()
                 .filter(c -> {
                     if (currentUser.getRole() == com.example.Hehe.model.UserRole.ADMIN) return true;
-                    if (c.getBranch() == null) return true;
-                    return currentUser.getBranch() != null && c.getBranch().getId().equals(currentUser.getBranch().getId());
+                    return c.getBranch() != null && currentUser.getBranch() != null && c.getBranch().getId().equals(currentUser.getBranch().getId());
                 })
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());

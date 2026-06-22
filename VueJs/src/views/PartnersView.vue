@@ -17,14 +17,18 @@ const isManager = computed(() => ['ADMIN', 'MANAGER'].includes(user.value?.role)
 const customers = ref<any[]>([])
 const cLoading = ref(true)
 const cSearch = ref('')
+const cStatusFilter = ref('')
 
 const filteredCustomers = computed(() => {
-  if (!cSearch.value.trim()) return customers.value
+  let list = customers.value
+  if (cStatusFilter.value) {
+    list = list.filter(c => c.status === cStatusFilter.value)
+  }
+  if (!cSearch.value.trim()) return list
   const kw = cSearch.value.toLowerCase()
-  return customers.value.filter(c =>
+  return list.filter(c =>
     c.name?.toLowerCase().includes(kw) ||
-    c.email?.toLowerCase().includes(kw) ||
-    c.phone?.includes(kw)
+    c.contactInfo?.toLowerCase().includes(kw)
   )
 })
 
@@ -40,7 +44,7 @@ const cDebtAmount = ref<any>('')
 const cDebtSaving = ref(false)
 
 function openAddC() { editingC.value = null; Object.assign(cForm, { name: '', email: '', phone: '', address: '', taxCode: '' }); showCModal.value = true }
-function openEditC(c: any) { editingC.value = c; Object.assign(cForm, { name: c.name, email: c.email || '', phone: c.phone || '', address: c.address || '', taxCode: c.taxCode || '' }); showCModal.value = true }
+function openEditC(c: any) { editingC.value = c; Object.assign(cForm, { name: c.name, email: '', phone: c.contactInfo || '', address: c.address || '', taxCode: '' }); showCModal.value = true }
 function openCDebt(c: any) { cDebtTarget.value = c; cDebtAmount.value = ''; showCDebtModal.value = true }
 function confirmDeleteC(c: any) { deletingC.value = c; showDeleteC.value = true }
 
@@ -48,7 +52,7 @@ async function saveCustomer() {
   if (!cForm.name?.trim()) { toast.error('Tên khách hàng là bắt buộc.'); return }
   cSaving.value = true
   try {
-    const payload = { name: cForm.name.trim(), email: cForm.email, phone: cForm.phone, address: cForm.address, taxCode: cForm.taxCode }
+    const payload = { name: cForm.name.trim(), contactInfo: cForm.phone, address: cForm.address }
     const res = editingC.value
       ? await api.put(`/api/customers/${editingC.value.id}`, payload)
       : await api.post('/api/customers', payload)
@@ -121,9 +125,16 @@ function formatCurrency(val: any) {
     <div class="bg-slate-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#f4bd0e] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden">
       <!-- Toolbar -->
       <div class="p-5 border-b border-[#f1f5f9] flex items-center justify-between flex-wrap gap-4 bg-[#f8f9fa]/50">
-        <div class="relative min-w-[300px]">
-          <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae]"></i>
-          <input v-model="cSearch" type="text" placeholder="Tìm kiếm khách hàng..." class="w-full h-[42px] pl-11 pr-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
+        <div class="flex items-center gap-3 w-full md:w-auto flex-1">
+          <div class="relative min-w-[300px] flex-1 md:flex-none">
+            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae]"></i>
+            <input v-model="cSearch" type="text" placeholder="Tìm kiếm khách hàng..." class="w-full h-[42px] pl-11 pr-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
+          </div>
+          <select v-model="cStatusFilter" class="h-[42px] px-3 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]">
+            <option value="">Tất cả trạng thái</option>
+            <option value="ACTIVE">Hoạt động</option>
+            <option value="INACTIVE">Ngừng hoạt động</option>
+          </select>
         </div>
         <button v-if="isManager" class="bg-[#4361ee] text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-sm flex items-center gap-2" @click="openAddC">
           <i class="fas fa-plus"></i> Thêm Khách hàng
@@ -154,8 +165,8 @@ function formatCurrency(val: any) {
                 <div class="text-xs text-[#8094ae] font-mono mt-0.5">MST: {{ c.taxCode || '—' }}</div>
               </td>
               <td class="p-4 first:rounded-l-xl last:rounded-r-xl">
-                <div class="text-[#364a63] font-medium">{{ c.phone || '—' }}</div>
-                <div class="text-xs text-[#8094ae]">{{ c.email || '—' }}</div>
+                <div class="text-[#364a63] font-medium">{{ c.contactInfo || '—' }}</div>
+                <div class="text-xs text-[#8094ae]"></div>
               </td>
               <td class="p-4 text-right first:rounded-l-xl last:rounded-r-xl">
                 <span :class="['font-bold font-mono', (c.debt ?? 0) > 0 ? 'text-[#f4bd0e]' : 'text-[#8094ae]']">

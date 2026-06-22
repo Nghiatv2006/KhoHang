@@ -93,18 +93,65 @@ public class ReceiptServiceImpl implements ReceiptService {
         r.setPaymentStatus(request.getPaymentStatus() == null ? "UNPAID" : request.getPaymentStatus());
         r.setCreatedBy(currentUser);
         
+        if (request.getSourceBranchId() != null) {
+            r.setSourceBranch(branchRepository.findById(request.getSourceBranchId()).orElseThrow(() -> new RuntimeException("Source branch not found")));
+        }
+        if (request.getDestBranchId() != null) {
+            r.setDestBranch(branchRepository.findById(request.getDestBranchId()).orElseThrow(() -> new RuntimeException("Dest branch not found")));
+        }
+
         if (request.getCustomerId() != null) {
             r.setCustomerId(request.getCustomerId());
         } else if (request.getCustomerName() != null && !request.getCustomerName().trim().isEmpty()) {
             String cName = request.getCustomerName().trim();
-            Customer customer = customerRepository.findByName(cName).orElseGet(() -> {
-                Customer newC = new Customer();
-                newC.setName(cName);
-                newC.setStatus("ACTIVE");
-                newC.setDebt(java.math.BigDecimal.ZERO);
-                newC.setBranch(currentUser.getBranch());
-                return customerRepository.save(newC);
-            });
+            Branch targetBranch = (request.getType() == ReceiptType.IMPORT) ? r.getDestBranch() : r.getSourceBranch();
+            if (targetBranch == null) targetBranch = currentUser.getBranch();
+            
+            Customer customer;
+            if (targetBranch != null) {
+                final Branch finalBranch = targetBranch;
+                if (request.getCustomerPhone() != null && !request.getCustomerPhone().trim().isEmpty()) {
+                    customer = customerRepository.findByBranchIdAndNameAndContactInfo(targetBranch.getId(), cName, request.getCustomerPhone().trim()).orElseGet(() -> {
+                        Customer newC = new Customer();
+                        newC.setName(cName);
+                        newC.setContactInfo(request.getCustomerPhone().trim());
+                        newC.setStatus("ACTIVE");
+                        newC.setDebt(java.math.BigDecimal.ZERO);
+                        newC.setBranch(finalBranch);
+                        return customerRepository.save(newC);
+                    });
+                } else {
+                    customer = customerRepository.findByBranchIdAndName(targetBranch.getId(), cName).orElseGet(() -> {
+                        Customer newC = new Customer();
+                        newC.setName(cName);
+                        newC.setStatus("ACTIVE");
+                        newC.setDebt(java.math.BigDecimal.ZERO);
+                        newC.setBranch(finalBranch);
+                        return customerRepository.save(newC);
+                    });
+                }
+            } else {
+                if (request.getCustomerPhone() != null && !request.getCustomerPhone().trim().isEmpty()) {
+                    customer = customerRepository.findByNameAndContactInfo(cName, request.getCustomerPhone().trim()).orElseGet(() -> {
+                        Customer newC = new Customer();
+                        newC.setName(cName);
+                        newC.setContactInfo(request.getCustomerPhone().trim());
+                        newC.setStatus("ACTIVE");
+                        newC.setDebt(java.math.BigDecimal.ZERO);
+                        newC.setBranch(null);
+                        return customerRepository.save(newC);
+                    });
+                } else {
+                    customer = customerRepository.findByName(cName).orElseGet(() -> {
+                        Customer newC = new Customer();
+                        newC.setName(cName);
+                        newC.setStatus("ACTIVE");
+                        newC.setDebt(java.math.BigDecimal.ZERO);
+                        newC.setBranch(null);
+                        return customerRepository.save(newC);
+                    });
+                }
+            }
             r.setCustomerId(customer.getId());
         }
 
@@ -114,13 +161,6 @@ public class ReceiptServiceImpl implements ReceiptService {
             }
         }
         r.setDescription(request.getDescription());
-
-        if (request.getSourceBranchId() != null) {
-            r.setSourceBranch(branchRepository.findById(request.getSourceBranchId()).orElseThrow(() -> new RuntimeException("Source branch not found")));
-        }
-        if (request.getDestBranchId() != null) {
-            r.setDestBranch(branchRepository.findById(request.getDestBranchId()).orElseThrow(() -> new RuntimeException("Dest branch not found")));
-        }
 
         if (currentUser.getRole() != UserRole.ADMIN) {
             Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
@@ -188,8 +228,15 @@ public class ReceiptServiceImpl implements ReceiptService {
             Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
             if (myBranchId == null) throw new RuntimeException("Bạn chưa thuộc chi nhánh nào.");
             if (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.ADJUST_IN) {
-                if (r.getDestBranch() == null || !r.getDestBranch().getId().equals(myBranchId)) {
-                    throw new RuntimeException("Bạn không có quyền hủy phiếu của chi nhánh khác.");
+                boolean isCrossBranch = (r.getType() == ReceiptType.IMPORT && r.getSourceBranch() != null && r.getDestBranch() != null && !r.getSourceBranch().getId().equals(r.getDestBranch().getId()));
+                if (isCrossBranch) {
+                    if (!r.getDestBranch().getId().equals(myBranchId) && !r.getSourceBranch().getId().equals(myBranchId)) {
+                        throw new RuntimeException("Bạn không có quyền hủy phiếu của chi nhánh khác.");
+                    }
+                } else {
+                    if (r.getDestBranch() == null || !r.getDestBranch().getId().equals(myBranchId)) {
+                        throw new RuntimeException("Bạn không có quyền hủy phiếu của chi nhánh khác.");
+                    }
                 }
             } else {
                 if (r.getSourceBranch() == null || !r.getSourceBranch().getId().equals(myBranchId)) {
@@ -227,9 +274,11 @@ public class ReceiptServiceImpl implements ReceiptService {
         switch (type) {
             case IMPORT:
             case ADJUST_IN:
-                // Increase at Dest (IMPORT usually has destBranch = 1, ADJUST_IN has destBranch)
                 Branch targetBranch = (type == ReceiptType.IMPORT || type == ReceiptType.ADJUST_IN) ? destBranch : sourceBranch;
                 addInventory(targetBranch, detail, qty);
+                if (type == ReceiptType.IMPORT && sourceBranch != null && !sourceBranch.getId().equals(destBranch.getId())) {
+                    addInventory(sourceBranch, detail, -qty);
+                }
                 break;
             case EXPORT:
             case ADJUST_OUT:
@@ -273,28 +322,60 @@ public class ReceiptServiceImpl implements ReceiptService {
 
     private void addInventory(Branch branch, ReceiptDetail detail, int qtyDelta) {
         if (branch == null) throw new RuntimeException("Branch is required for inventory update.");
-        java.util.Optional<Inventory> opt = inventoryRepository.findByBranchIdAndProductIdAndBatchCode(
-                branch.getId(), detail.getProduct().getId(), detail.getBatchCode());
-        Inventory inv;
-        if (opt.isEmpty()) {
-            if (qtyDelta < 0) throw new RuntimeException("Không đủ tồn kho để thực hiện giao dịch cho sản phẩm: " + detail.getProduct().getName());
-            inv = new Inventory();
-            inv.setBranch(branch);
-            inv.setProduct(detail.getProduct());
-            inv.setQuantity(qtyDelta);
-            inv.setManufacturingDate(detail.getManufacturingDate());
-            inv.setExpirationDate(detail.getExpirationDate());
-            inv.setBatchCode(detail.getBatchCode());
-            inv.setHasExpiry(detail.getProduct().getHasExpiry());
-            inv.setExpiryWarningDays(30);
+        
+        if (qtyDelta < 0) {
+            int remainingToDeduct = -qtyDelta;
+            java.util.List<Inventory> availableInvs = inventoryRepository.findByBranchIdAndProductId(branch.getId(), detail.getProduct().getId());
+            
+            availableInvs.sort((i1, i2) -> {
+                if (i1.getExpirationDate() == null && i2.getExpirationDate() == null) return 0;
+                if (i1.getExpirationDate() == null) return 1;
+                if (i2.getExpirationDate() == null) return -1;
+                return i1.getExpirationDate().compareTo(i2.getExpirationDate());
+            });
+            
+            int totalAvailable = availableInvs.stream().mapToInt(Inventory::getQuantity).sum();
+            if (totalAvailable < remainingToDeduct) {
+                throw new RuntimeException("Không đủ tồn kho để thực hiện giao dịch cho sản phẩm: " + detail.getProduct().getName());
+            }
+            
+            for (Inventory inv : availableInvs) {
+                if (remainingToDeduct == 0) break;
+                if (inv.getQuantity() > 0) {
+                    int deduct = Math.min(inv.getQuantity(), remainingToDeduct);
+                    inv.setQuantity(inv.getQuantity() - deduct);
+                    inv.setLastUpdated(java.time.LocalDateTime.now());
+                    inventoryRepository.save(inv);
+                    remainingToDeduct -= deduct;
+                }
+            }
+            
+            if (remainingToDeduct > 0) {
+                throw new RuntimeException("Không đủ tồn kho để thực hiện giao dịch cho sản phẩm: " + detail.getProduct().getName());
+            }
         } else {
-            inv = opt.get();
-            int newQty = inv.getQuantity() + qtyDelta;
-            if (newQty < 0) throw new RuntimeException("Không đủ tồn kho để thực hiện giao dịch cho sản phẩm: " + detail.getProduct().getName());
-            inv.setQuantity(newQty);
+            java.util.Optional<Inventory> opt = inventoryRepository.findByBranchIdAndProductIdAndBatchCode(
+                    branch.getId(), detail.getProduct().getId(), detail.getBatchCode());
+            Inventory inv;
+            if (opt.isEmpty()) {
+                inv = new Inventory();
+                inv.setBranch(branch);
+                inv.setProduct(detail.getProduct());
+                inv.setQuantity(qtyDelta);
+                inv.setManufacturingDate(detail.getManufacturingDate());
+                inv.setExpirationDate(detail.getExpirationDate());
+                inv.setBatchCode(detail.getBatchCode());
+                inv.setHasExpiry(detail.getProduct().getHasExpiry());
+                inv.setExpiryWarningDays(30);
+            } else {
+                inv = opt.get();
+                inv.setQuantity(inv.getQuantity() + qtyDelta);
+                inv.setManufacturingDate(detail.getManufacturingDate());
+                inv.setExpirationDate(detail.getExpirationDate());
+            }
+            inv.setLastUpdated(java.time.LocalDateTime.now());
+            inventoryRepository.save(inv);
         }
-        inv.setLastUpdated(java.time.LocalDateTime.now());
-        inventoryRepository.save(inv);
     }
 
 
@@ -310,12 +391,14 @@ public class ReceiptServiceImpl implements ReceiptService {
         
         User creator = r.getCreatedBy();
         if (creator != null) {
+            boolean isCrossBranchRequest = (r.getType() == ReceiptType.IMPORT && r.getSourceBranch() != null && r.getDestBranch() != null && !r.getSourceBranch().getId().equals(r.getDestBranch().getId()));
+            
             if (creator.getRole() == UserRole.STAFF) {
                 if (currentUser.getRole() != UserRole.MANAGER) {
                     throw new RuntimeException("Chỉ Quản lý mới được quyền duyệt phiếu của Nhân viên.");
                 }
             } else if (creator.getRole() == UserRole.MANAGER) {
-                if (currentUser.getRole() != UserRole.ADMIN) {
+                if (!isCrossBranchRequest && currentUser.getRole() != UserRole.ADMIN) {
                     throw new RuntimeException("Chỉ Admin mới được quyền duyệt phiếu của Quản lý.");
                 }
             }
@@ -325,7 +408,18 @@ public class ReceiptServiceImpl implements ReceiptService {
             Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
             if (myBranchId == null) throw new RuntimeException("Bạn chưa thuộc chi nhánh nào.");
 
-            if (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.ADJUST_IN) {
+            if (r.getType() == ReceiptType.IMPORT) {
+                boolean isCrossBranch = (r.getSourceBranch() != null && r.getDestBranch() != null && !r.getSourceBranch().getId().equals(r.getDestBranch().getId()));
+                if (isCrossBranch) {
+                    if (!r.getSourceBranch().getId().equals(myBranchId)) {
+                        throw new RuntimeException("Chỉ Quản lý chi nhánh nguồn mới có quyền duyệt phiếu nhập kho yêu cầu từ chi nhánh khác.");
+                    }
+                } else {
+                    if (r.getDestBranch() == null || !r.getDestBranch().getId().equals(myBranchId)) {
+                        throw new RuntimeException("Bạn không có quyền duyệt phiếu của chi nhánh khác.");
+                    }
+                }
+            } else if (r.getType() == ReceiptType.ADJUST_IN) {
                 if (r.getDestBranch() == null || !r.getDestBranch().getId().equals(myBranchId)) {
                     throw new RuntimeException("Bạn không có quyền duyệt phiếu của chi nhánh khác.");
                 }

@@ -21,4 +21,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
         @Param("status") String status
     );
     java.util.Optional<Customer> findByName(String name);
+    java.util.Optional<Customer> findByBranchIdAndName(Integer branchId, String name);
+    java.util.Optional<Customer> findByBranchIdAndNameAndContactInfo(Integer branchId, String name, String contactInfo);
+    java.util.Optional<Customer> findByNameAndContactInfo(String name, String contactInfo);
 }
