@@ -23,12 +23,14 @@ import java.util.stream.Collectors;
 
 @Service
 @Transactional
+@SuppressWarnings("null")
 public class InventoryServiceImpl implements InventoryService {
 
     private final InventoryRepository inventoryRepository;
     private final BranchRepository branchRepository;
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final AuditLogService auditLogService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -37,11 +39,13 @@ public class InventoryServiceImpl implements InventoryService {
             InventoryRepository inventoryRepository,
             BranchRepository branchRepository,
             ProductRepository productRepository,
-            CategoryRepository categoryRepository) {
+            CategoryRepository categoryRepository,
+            AuditLogService auditLogService) {
         this.inventoryRepository = inventoryRepository;
         this.branchRepository = branchRepository;
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
+        this.auditLogService = auditLogService;
     }
 
     @Override
@@ -102,7 +106,7 @@ public class InventoryServiceImpl implements InventoryService {
         String batchMsg = String.format("Nhập thêm %d sản phẩm '%s' vào lô '%s' tại '%s' (Số lượng cũ: %d -> mới: %d)",
                 quantityToAdd, productName, inventory.getBatchCode(), branchName, oldQty, newQty);
 
-        logAudit(currentUser.getId(), "ADD_INVENTORY_STOCK", "inventories", id.toString(), batchMsg);
+        auditLogService.logAction(currentUser, "Nhập thêm hàng", "inventories", id.toString(), batchMsg);
 
         return new InventoryResponse(savedInventory);
     }
@@ -188,10 +192,10 @@ public class InventoryServiceImpl implements InventoryService {
         Inventory savedInventory = inventoryRepository.save(inventory);
 
         // Ghi audit log
-        String action = existingOpt.isPresent() ? "ADD_INVENTORY_STOCK" : "CREATE_INVENTORY";
+        String action = existingOpt.isPresent() ? "Nhập thêm hàng" : "Tạo lô hàng mới";
         String batchMsg = String.format("Nhập lô mới: %d sản phẩm '%s' (lô '%s') tại '%s' (Số lượng cũ: %d -> mới: %d)",
                 request.getQuantity(), product.getName(), savedInventory.getBatchCode(), branch.getName(), oldQty, savedInventory.getQuantity());
-        logAudit(currentUser.getId(), action, "inventories", savedInventory.getId().toString(), batchMsg);
+        auditLogService.logAction(currentUser, action, "inventories", savedInventory.getId().toString(), batchMsg);
 
         return new InventoryResponse(savedInventory);
     }
@@ -238,7 +242,6 @@ public class InventoryServiceImpl implements InventoryService {
         product.setSku("PRD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         product.setName(request.getName().trim());
         product.setPrice(request.getPrice());
-        product.setDescription(request.getDescription() != null ? request.getDescription().trim() : null);
         product.setUnit(request.getUnit().trim());
         product.setCategory(category);
         product.setHasExpiry(Boolean.TRUE.equals(request.getHasExpiry()));
@@ -282,7 +285,7 @@ public class InventoryServiceImpl implements InventoryService {
         // Ghi Audit log
         String detailsMsg = String.format("Tạo mới sản phẩm '%s' (Mã: %s, ĐVT: %s) và nhập %d sản phẩm vào lô '%s' tại Kho Tổng.",
                 savedProduct.getName(), savedProduct.getSku(), savedProduct.getUnit(), request.getQuantity(), savedInventory.getBatchCode());
-        logAudit(currentUser.getId(), "CREATE_PRODUCT_WITH_INVENTORY", "products", savedProduct.getId().toString(), detailsMsg);
+        auditLogService.logAction(currentUser, "Tạo SP & Nhập kho", "products", savedProduct.getId().toString(), detailsMsg);
 
         return new InventoryResponse(savedInventory);
     }
@@ -316,25 +319,12 @@ public class InventoryServiceImpl implements InventoryService {
         // Ghi audit log
         String batchMsg = String.format("Cập nhật số ngày cảnh báo hạn dùng lô '%s' (Sản phẩm: '%s') từ %d ngày thành %d ngày",
                 inventory.getBatchCode(), inventory.getProduct().getName(), oldDays, expiryWarningDays);
-        logAudit(currentUser.getId(), "UPDATE_EXPIRY_WARNING", "inventories", id.toString(), batchMsg);
+        auditLogService.logAction(currentUser, "Sửa cảnh báo HSD", "inventories", id.toString(), batchMsg);
 
         return new InventoryResponse(savedInventory);
     }
 
-    private void logAudit(Integer userId, String action, String entityName, String entityId, String details) {
-        try {
-            entityManager.createNativeQuery(
-                    "INSERT INTO audit_logs (user_id, action, entity_name, entity_id, details) VALUES (?, ?, ?, ?, ?)")
-                    .setParameter(1, userId)
-                    .setParameter(2, action)
-                    .setParameter(3, entityName)
-                    .setParameter(4, entityId)
-                    .setParameter(5, details)
-                    .executeUpdate();
-        } catch (Exception e) {
-            System.err.println("Audit Log insertion failed: " + e.getMessage());
-        }
-    }
+
 
     @Override
     public List<InventoryResponse> getGlobalInventories() {
@@ -354,6 +344,10 @@ public class InventoryServiceImpl implements InventoryService {
                 throw new RuntimeException("Bạn không có quyền xoá dữ liệu tồn kho của chi nhánh này.");
             }
         }
+
+        String details = String.format("Xóa lô hàng '%s' (Sản phẩm: '%s') khỏi chi nhánh '%s'",
+                inventory.getBatchCode(), inventory.getProduct().getName(), inventory.getBranch().getName());
+        auditLogService.logAction(currentUser, "Xóa lô hàng", "inventories", id.toString(), details);
 
         inventoryRepository.delete(inventory);
     }

@@ -32,7 +32,7 @@ public class ReceiptDetail {
     @Column(name = "price", nullable = false)
     private BigDecimal price;
 
-    @Column(name = "batch_code", nullable = false)
+    @Column(name = "batch_code", nullable = false, length = 100, columnDefinition = "varchar(100) default 'DEFAULT_BATCH'")
     private String batchCode = "DEFAULT_BATCH";
 
     public Integer getId() { return id; }

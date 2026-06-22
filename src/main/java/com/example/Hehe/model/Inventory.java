@@ -29,16 +29,16 @@ public class Inventory {
     @Column(name = "quantity", nullable = false)
     private Integer quantity = 0;
 
-    @Column(name = "batch_code", nullable = false)
+    @Column(name = "batch_code", nullable = false, length = 100, columnDefinition = "varchar(100) default 'DEFAULT_BATCH'")
     private String batchCode = "DEFAULT_BATCH";
 
     @Column(name = "last_updated")
     private LocalDateTime lastUpdated;
 
-    @Column(name = "has_expiry", nullable = false)
+    @Column(name = "has_expiry", nullable = false, columnDefinition = "boolean default false")
     private Boolean hasExpiry = false;
 
-    @Column(name = "expiry_warning_days", nullable = false)
+    @Column(name = "expiry_warning_days", nullable = false, columnDefinition = "int default 30")
     private Integer expiryWarningDays = 30;
 
     // Getters and Setters

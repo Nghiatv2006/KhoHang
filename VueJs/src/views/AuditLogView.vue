@@ -30,6 +30,13 @@ const ACTION_LABELS: Record<string, string> = {
   'CANCEL':        'Hủy phiếu',
   'SPAM_WARNING':  '⚠️ Cảnh báo SPAM',
   'LOCK_ACCOUNT':  '🔒 Khóa tài khoản',
+  'Tạo lô hàng mới': 'Tạo lô hàng mới',
+  'Nhập thêm hàng':  'Nhập thêm hàng',
+  'Sửa cảnh báo HSD':'Sửa cảnh báo HSD',
+  'Xóa lô hàng':     'Xóa lô hàng',
+  'Tạo chi nhánh':   'Tạo chi nhánh',
+  'Cập nhật chi nhánh':'Cập nhật chi nhánh',
+  'Xóa chi nhánh':   'Xóa chi nhánh',
 }
 
 const ACTION_OPTIONS = Object.entries(ACTION_LABELS).map(([value, label]) => ({ value, label }))

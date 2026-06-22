@@ -21,8 +21,10 @@ public class AuditLogServiceImpl implements AuditLogService {
 
     // ─── Hằng số cho Anti-Spam ──────────────────────────────────────────────
     private static final int SPAM_WINDOW_MINUTES = 30;     // Cửa sổ thời gian đếm spam
-    private static final int SPAM_WARN_THRESHOLD = 4;      // Lần thứ 4: Cắm cờ đỏ
-    private static final int SPAM_BAN_THRESHOLD = 5;       // Lần thứ 5: Bắt đầu phạt
+    // TODO (DEV MODE): Đã nới lỏng giới hạn để thuận tiện cho quá trình code/test. 
+    // Mốc cũ là 4 và 5. Hãy đổi lại khi đưa dự án lên Production!
+    private static final int SPAM_WARN_THRESHOLD = 9999;   // Lần thứ 9999: Cắm cờ đỏ
+    private static final int SPAM_BAN_THRESHOLD = 10000;   // Lần thứ 10000: Bắt đầu phạt
     private static final int BAN_LEVEL1_MINUTES = 5;       // Phạt lần 1: 5 phút
     private static final int BAN_LEVEL2_MINUTES = 20;      // Phạt lần 2: 20 phút
     private static final int BAN_LEVEL3_HOURS = 24;        // Phạt lần 3: 24 giờ
@@ -61,6 +63,14 @@ public class AuditLogServiceImpl implements AuditLogService {
 
         // Bước 2: Đếm số lần login/logout trong 30 phút qua
         LocalDateTime windowStart = LocalDateTime.now().minusMinutes(SPAM_WINDOW_MINUTES);
+
+        // [CƠ CHẾ AUTO-RESET] Lấy công chuộc tội
+        // Nếu user có thao tác làm việc thật (thêm, sửa, xoá...) thì xóa bỏ án tích spam trước đó
+        LocalDateTime lastGoodAction = auditLogRepository.findLastLegitimateActionTime(user.getId());
+        if (lastGoodAction != null && lastGoodAction.isAfter(windowStart)) {
+            windowStart = lastGoodAction;
+        }
+
         long count = auditLogRepository.countLoginLogoutSince(user.getId(), windowStart);
 
         if (count >= SPAM_BAN_THRESHOLD - 1) {
@@ -145,6 +155,13 @@ public class AuditLogServiceImpl implements AuditLogService {
      */
     private void handleSpamEscalation(User user) {
         LocalDateTime dayStart = LocalDateTime.now().minusHours(24);
+
+        // [CƠ CHẾ AUTO-RESET] Xóa án tích mức phạt nếu có hành động hợp lệ
+        LocalDateTime lastGoodAction = auditLogRepository.findLastLegitimateActionTime(user.getId());
+        if (lastGoodAction != null && lastGoodAction.isAfter(dayStart)) {
+            dayStart = lastGoodAction;
+        }
+
         long spamCount = auditLogRepository.countSpamWarningsSince(user.getId(), dayStart);
 
         // Ghi log cảnh báo đỏ

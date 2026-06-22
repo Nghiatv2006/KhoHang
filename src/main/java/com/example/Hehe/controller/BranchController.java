@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import com.example.Hehe.service.AuditLogService;
 
 import java.util.List;
 import java.util.Map;
@@ -21,10 +22,12 @@ public class BranchController {
 
     private final BranchRepository branchRepository;
     private final UserRepository userRepository;
+    private final AuditLogService auditLogService;
 
-    public BranchController(BranchRepository branchRepository, UserRepository userRepository) {
+    public BranchController(BranchRepository branchRepository, UserRepository userRepository, AuditLogService auditLogService) {
         this.branchRepository = branchRepository;
         this.userRepository = userRepository;
+        this.auditLogService = auditLogService;
     }
 
     @GetMapping
@@ -105,6 +108,8 @@ public class BranchController {
                 branchRepository.demoteOtherHeadBranches(savedBranch.getId());
             }
             
+            auditLogService.logAction(currentUser, "Tạo chi nhánh", "branches", savedBranch.getId().toString(), "Tạo chi nhánh mới: '" + savedBranch.getName() + "'");
+            
             return ResponseEntity.ok(convertToResponse(savedBranch));
         } catch (Exception ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
@@ -150,6 +155,7 @@ public class BranchController {
             Branch branch = branchRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh với ID: " + id));
 
+            String details = "";
             if (currentUser.getRole() != UserRole.ADMIN) {
                 // Kiểm tra xem MANAGER/STAFF có cố tình chỉnh sửa thông tin khác không
                 if (requestBody.getName() != null && !requestBody.getName().trim().equals(branch.getName())) {
@@ -165,12 +171,37 @@ public class BranchController {
                             .body(Map.of("message", "Bạn chỉ có quyền thay đổi ngưỡng tồn kho tối thiểu."));
                 }
                 
+                if (!branch.getLowStockThreshold().equals(requestBody.getLowStockThreshold())) {
+                    details = String.format("Cập nhật ngưỡng tồn kho chi nhánh '%s' (%d -> %d)", branch.getName(), branch.getLowStockThreshold(), requestBody.getLowStockThreshold());
+                }
                 branch.setLowStockThreshold(requestBody.getLowStockThreshold());
             } else {
                 // ADMIN cập nhật đầy đủ thông tin
                 if (branchRepository.existsByNameAndIdNot(requestBody.getName().trim(), id)) {
                     return ResponseEntity.badRequest().body(Map.of("message", "Tên chi nhánh '" + requestBody.getName().trim() + "' đã tồn tại."));
                 }
+                
+                StringBuilder diff = new StringBuilder();
+                if (!branch.getName().equals(requestBody.getName().trim())) {
+                    diff.append(String.format("Tên ('%s' -> '%s'), ", branch.getName(), requestBody.getName().trim()));
+                }
+                if (!branch.getAddress().equals(requestBody.getAddress().trim())) {
+                    diff.append(String.format("Địa chỉ ('%s' -> '%s'), ", branch.getAddress(), requestBody.getAddress().trim()));
+                }
+                if (!branch.getTaxCode().equals(requestBody.getTaxCode().trim())) {
+                    diff.append(String.format("MST ('%s' -> '%s'), ", branch.getTaxCode(), requestBody.getTaxCode().trim()));
+                }
+                if (!branch.getLowStockThreshold().equals(requestBody.getLowStockThreshold())) {
+                    diff.append(String.format("Ngưỡng tồn kho (%d -> %d), ", branch.getLowStockThreshold(), requestBody.getLowStockThreshold()));
+                }
+                if (requestBody.getIsHead() != null && !requestBody.getIsHead().equals(branch.getIsHead())) {
+                    diff.append(String.format("Trụ sở chính (%s -> %s), ", branch.getIsHead() ? "Có" : "Không", requestBody.getIsHead() ? "Có" : "Không"));
+                }
+                
+                if (diff.length() > 0) {
+                    details = String.format("Cập nhật chi nhánh '%s': %s", branch.getName(), diff.substring(0, diff.length() - 2));
+                }
+                
                 branch.setName(requestBody.getName().trim());
                 branch.setAddress(requestBody.getAddress().trim());
                 branch.setLowStockThreshold(requestBody.getLowStockThreshold());
@@ -184,6 +215,10 @@ public class BranchController {
             
             if (Boolean.TRUE.equals(updatedBranch.getIsHead())) {
                 branchRepository.demoteOtherHeadBranches(updatedBranch.getId());
+            }
+            
+            if (!details.isEmpty()) {
+                auditLogService.logAction(currentUser, "Cập nhật chi nhánh", "branches", updatedBranch.getId().toString(), details);
             }
             
             return ResponseEntity.ok(convertToResponse(updatedBranch));
@@ -212,7 +247,10 @@ public class BranchController {
                 return ResponseEntity.badRequest().body(Map.of("message", "Không được phép xóa chi nhánh tổng."));
             }
 
+            String branchName = branch.getName();
             branchRepository.delete(branch);
+            auditLogService.logAction(currentUser, "Xóa chi nhánh", "branches", id.toString(), "Xóa chi nhánh: '" + branchName + "'");
+            
             return ResponseEntity.ok(Map.of("message", "Xóa chi nhánh thành công."));
         } catch (DataIntegrityViolationException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", "Chi nhánh đã phát sinh dữ liệu giao dịch hoặc có nhân sự/sản phẩm liên kết, không thể xóa."));

@@ -25,7 +25,7 @@ public class StocktakeDetail {
     @Column(name = "exp_date", nullable = false)
     private LocalDate expirationDate = LocalDate.of(1970, 1, 1);
 
-    @Column(name = "batch_code", nullable = false, length = 100)
+    @Column(name = "batch_code", nullable = false, length = 100, columnDefinition = "varchar(100) default 'DEFAULT_BATCH'")
     private String batchCode = "DEFAULT_BATCH";
 
     @Column(name = "expected_quantity", nullable = false)

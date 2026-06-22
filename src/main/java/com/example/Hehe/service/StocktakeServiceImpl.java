@@ -22,8 +22,6 @@ public class StocktakeServiceImpl implements StocktakeService {
     private final StocktakeRepository stocktakeRepository;
     private final StocktakeDetailRepository stocktakeDetailRepository;
     private final InventoryRepository inventoryRepository;
-    private final BranchRepository branchRepository;
-    private final ProductRepository productRepository;
     private final ReceiptRepository receiptRepository;
 
     @PersistenceContext
@@ -32,14 +30,10 @@ public class StocktakeServiceImpl implements StocktakeService {
     public StocktakeServiceImpl(StocktakeRepository stocktakeRepository,
                                 StocktakeDetailRepository stocktakeDetailRepository,
                                 InventoryRepository inventoryRepository,
-                                BranchRepository branchRepository,
-                                ProductRepository productRepository,
                                 ReceiptRepository receiptRepository) {
         this.stocktakeRepository = stocktakeRepository;
         this.stocktakeDetailRepository = stocktakeDetailRepository;
         this.inventoryRepository = inventoryRepository;
-        this.branchRepository = branchRepository;
-        this.productRepository = productRepository;
         this.receiptRepository = receiptRepository;
     }
 
