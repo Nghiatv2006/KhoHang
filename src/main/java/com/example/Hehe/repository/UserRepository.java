@@ -21,6 +21,10 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     
     boolean existsByEmailAndIdNot(String email, Integer id);
 
+    boolean existsByPhone(String phone);
+    
+    boolean existsByPhoneAndIdNot(String phone, Integer id);
+
     @Query("SELECT u FROM User u WHERE " +
            "(:pattern IS NULL OR LOWER(u.username) LIKE :pattern " +
            "OR LOWER(u.fullName) LIKE :pattern " +

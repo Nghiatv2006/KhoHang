@@ -122,50 +122,25 @@ public class ReceiptServiceImpl implements ReceiptService {
             Branch targetBranch = (request.getType() == ReceiptType.IMPORT) ? r.getDestBranch() : r.getSourceBranch();
             if (targetBranch == null) targetBranch = currentUser.getBranch();
             
-            Customer customer;
-            if (targetBranch != null) {
-                final Branch finalBranch = targetBranch;
-                if (request.getCustomerPhone() != null && !request.getCustomerPhone().trim().isEmpty()) {
-                    customer = customerRepository.findByBranchIdAndNameAndContactInfo(targetBranch.getId(), cName, request.getCustomerPhone().trim()).orElseGet(() -> {
-                        Customer newC = new Customer();
-                        newC.setName(cName);
-                        newC.setContactInfo(request.getCustomerPhone().trim());
-                        newC.setStatus("ACTIVE");
-                        newC.setDebt(java.math.BigDecimal.ZERO);
-                        newC.setBranch(finalBranch);
-                        return customerRepository.save(newC);
-                    });
+            Customer customer = null;
+            if (request.getCustomerPhone() != null && !request.getCustomerPhone().trim().isEmpty()) {
+                customer = customerRepository.findFirstByContactInfo(request.getCustomerPhone().trim()).orElse(null);
+            }
+            if (customer == null) {
+                if (targetBranch != null) {
+                    customer = customerRepository.findFirstByBranchIdAndName(targetBranch.getId(), cName).orElse(null);
                 } else {
-                    customer = customerRepository.findByBranchIdAndName(targetBranch.getId(), cName).orElseGet(() -> {
-                        Customer newC = new Customer();
-                        newC.setName(cName);
-                        newC.setStatus("ACTIVE");
-                        newC.setDebt(java.math.BigDecimal.ZERO);
-                        newC.setBranch(finalBranch);
-                        return customerRepository.save(newC);
-                    });
+                    customer = customerRepository.findFirstByName(cName).orElse(null);
                 }
-            } else {
-                if (request.getCustomerPhone() != null && !request.getCustomerPhone().trim().isEmpty()) {
-                    customer = customerRepository.findByNameAndContactInfo(cName, request.getCustomerPhone().trim()).orElseGet(() -> {
-                        Customer newC = new Customer();
-                        newC.setName(cName);
-                        newC.setContactInfo(request.getCustomerPhone().trim());
-                        newC.setStatus("ACTIVE");
-                        newC.setDebt(java.math.BigDecimal.ZERO);
-                        newC.setBranch(null);
-                        return customerRepository.save(newC);
-                    });
-                } else {
-                    customer = customerRepository.findByName(cName).orElseGet(() -> {
-                        Customer newC = new Customer();
-                        newC.setName(cName);
-                        newC.setStatus("ACTIVE");
-                        newC.setDebt(java.math.BigDecimal.ZERO);
-                        newC.setBranch(null);
-                        return customerRepository.save(newC);
-                    });
-                }
+            }
+            if (customer == null) {
+                Customer newC = new Customer();
+                newC.setName(cName);
+                newC.setContactInfo(request.getCustomerPhone() != null ? request.getCustomerPhone().trim() : null);
+                newC.setStatus("ACTIVE");
+                newC.setDebt(java.math.BigDecimal.ZERO);
+                newC.setBranch(targetBranch);
+                customer = customerRepository.save(newC);
             }
             r.setCustomerId(customer.getId());
         }
@@ -450,6 +425,42 @@ public class ReceiptServiceImpl implements ReceiptService {
         }
 
         r.setStatus(ReceiptStatus.COMPLETED);
+        // Tạo khách hàng nếu là xuất bán và có thông tin
+        if (r.getType() == ReceiptType.EXPORT && r.getCustomerName() != null && !r.getCustomerName().trim().isEmpty()) {
+            String cName = r.getCustomerName().trim();
+            
+            Integer branchIdToUse = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
+            if (r.getSourceBranch() != null) {
+                branchIdToUse = r.getSourceBranch().getId();
+            }
+            final Integer finalBranchId = branchIdToUse;
+
+            Customer customer = null;
+            if (r.getCustomerPhone() != null && !r.getCustomerPhone().trim().isEmpty()) {
+                customer = customerRepository.findFirstByContactInfo(r.getCustomerPhone().trim()).orElse(null);
+            }
+            if (customer == null) {
+                customer = customerRepository.findByNameAndBranchId(cName, finalBranchId).stream().findFirst().orElse(null);
+            }
+            if (customer == null) {
+                Customer newC = new Customer();
+                newC.setName(cName);
+                newC.setContactInfo(r.getCustomerPhone() != null ? r.getCustomerPhone().trim() : null);
+                newC.setStatus("ACTIVE");
+                newC.setDebt(java.math.BigDecimal.ZERO);
+                if (finalBranchId != null) {
+                    newC.setBranch(branchRepository.findById(finalBranchId).orElse(null));
+                }
+                customer = customerRepository.save(newC);
+            } else {
+                if (r.getCustomerPhone() != null && !r.getCustomerPhone().trim().isEmpty() && (customer.getContactInfo() == null || customer.getContactInfo().trim().isEmpty())) {
+                    customer.setContactInfo(r.getCustomerPhone().trim());
+                    customerRepository.save(customer);
+                }
+            }
+
+            r.setCustomerId(customer.getId());
+        }
         if (r.getType() == ReceiptType.TRANSFER) {
             r.setPaymentStatus("IN_TRANSIT");
         }
@@ -457,6 +468,9 @@ public class ReceiptServiceImpl implements ReceiptService {
             updateInventory(r.getType(), r.getSourceBranch(), r.getDestBranch(), d, false);
         }
         updateCustomerDebt(r, true, false, false);
+        if ("PAID".equals(r.getPaymentStatus()) || "Đã thanh toán".equals(r.getPaymentStatus())) {
+            updateCustomerDebt(r, false, false, true);
+        }
         
         receiptRepository.save(r);
         return new ReceiptResponse(r);

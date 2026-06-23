@@ -57,6 +57,13 @@ public class CustomerServiceImpl implements CustomerService {
         if (request.getName() == null || request.getName().trim().isEmpty()) {
             throw new RuntimeException("Tên khách hàng không được để trống.");
         }
+        
+        if (request.getContactInfo() != null && !request.getContactInfo().trim().isEmpty()) {
+            String phone = request.getContactInfo().trim();
+            if (customerRepository.findFirstByContactInfo(phone).isPresent()) {
+                throw new RuntimeException("Số điện thoại đã tồn tại trong hệ thống. Vui lòng sử dụng số khác.");
+            }
+        }
 
         Customer customer = new Customer();
         customer.setName(request.getName().trim());
@@ -85,6 +92,14 @@ public class CustomerServiceImpl implements CustomerService {
 
         if (request.getName() == null || request.getName().trim().isEmpty()) {
             throw new RuntimeException("Tên khách hàng không được để trống.");
+        }
+        
+        if (request.getContactInfo() != null && !request.getContactInfo().trim().isEmpty()) {
+            String phone = request.getContactInfo().trim();
+            java.util.Optional<Customer> existing = customerRepository.findFirstByContactInfo(phone);
+            if (existing.isPresent() && !existing.get().getId().equals(id)) {
+                throw new RuntimeException("Số điện thoại đã tồn tại trong hệ thống. Vui lòng sử dụng số khác.");
+            }
         }
 
         customer.setName(request.getName().trim());
