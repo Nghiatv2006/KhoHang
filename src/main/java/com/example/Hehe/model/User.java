@@ -36,7 +36,7 @@ public class User {
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     private UserStatus status = UserStatus.ACTIVE;
 
-    @Column(name = "email", unique = true, length = 255)
+    @Column(name = "email", length = 255)
     private String email;
 
     @Column(name = "created_at", insertable = false, updatable = false)

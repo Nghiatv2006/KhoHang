@@ -97,14 +97,11 @@ public class UserServiceImpl implements UserService {
             throw new RuntimeException("Tên đăng nhập '" + request.getUsername().trim() + "' đã tồn tại.");
         }
 
-        // Kiểm tra trùng email (nếu gửi lên)
+        // Kiểm tra định dạng email (nếu gửi lên)
         if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
             String email = request.getEmail().trim();
             if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
                 throw new RuntimeException("Định dạng email không hợp lệ.");
-            }
-            if (userRepository.existsByEmail(email)) {
-                throw new RuntimeException("Email '" + email + "' đã được sử dụng.");
             }
         }
 
@@ -209,14 +206,11 @@ public class UserServiceImpl implements UserService {
             user.setUsername(request.getUsername().trim());
         }
 
-        // Sửa Email: kiểm tra trùng lặp
+        // Sửa Email: kiểm tra định dạng
         if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
             String email = request.getEmail().trim();
             if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
                 throw new RuntimeException("Định dạng email không hợp lệ.");
-            }
-            if (userRepository.existsByEmailAndIdNot(email, id)) {
-                throw new RuntimeException("Email '" + email + "' đã được sử dụng.");
             }
             user.setEmail(email);
         } else {
