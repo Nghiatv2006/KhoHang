@@ -20,12 +20,13 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
         @Param("pattern") String pattern,
         @Param("status") String status
     );
-    java.util.Optional<Customer> findByName(String name);
+    java.util.Optional<Customer> findFirstByName(String name);
 
     @Query("SELECT c FROM Customer c WHERE c.name = :name AND ((c.branch.id = :branchId) OR (:branchId IS NULL AND c.branch IS NULL))")
-    java.util.Optional<Customer> findByNameAndBranchId(@Param("name") String name, @Param("branchId") Integer branchId);
+    List<Customer> findByNameAndBranchId(@Param("name") String name, @Param("branchId") Integer branchId);
 
-    java.util.Optional<Customer> findByBranchIdAndName(Integer branchId, String name);
-    java.util.Optional<Customer> findByBranchIdAndNameAndContactInfo(Integer branchId, String name, String contactInfo);
-    java.util.Optional<Customer> findByNameAndContactInfo(String name, String contactInfo);
+    java.util.Optional<Customer> findFirstByBranchIdAndName(Integer branchId, String name);
+    java.util.Optional<Customer> findFirstByBranchIdAndNameAndContactInfo(Integer branchId, String name, String contactInfo);
+    java.util.Optional<Customer> findFirstByNameAndContactInfo(String name, String contactInfo);
+    java.util.Optional<Customer> findFirstByContactInfo(String contactInfo);
 }

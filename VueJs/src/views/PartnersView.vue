@@ -28,8 +28,9 @@ const filteredCustomers = computed(() => {
   const kw = cSearch.value.toLowerCase()
   return list.filter(c =>
     c.name?.toLowerCase().includes(kw) ||
+    c.contactInfo?.toLowerCase().includes(kw) ||
     c.email?.toLowerCase().includes(kw) ||
-    c.contactInfo?.toLowerCase().includes(kw)
+    c.taxCode?.toLowerCase().includes(kw)
   )
 })
 
@@ -86,7 +87,7 @@ async function saveCustomer() {
   if (!cForm.name?.trim()) { toast.error('Tên khách hàng là bắt buộc.'); return }
   cSaving.value = true
   try {
-    const payload = { name: cForm.name.trim(), email: cForm.email, contactInfo: cForm.phone, address: cForm.address, taxCode: cForm.taxCode }
+    const payload = { name: cForm.name.trim(), contactInfo: cForm.phone, email: cForm.email, taxCode: cForm.taxCode, address: cForm.address }
     const res = editingC.value
       ? await api.put(`/api/customers/${editingC.value.id}`, payload)
       : await api.post('/api/customers', payload)
@@ -300,9 +301,9 @@ function formatCurrency(val: any) {
                       <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Trạng thái phiếu</div>
                       <StatusBadge :value="cSelectedReceipt.status" type="status" />
                     </div>
-                    <div class="text-right">
+                    <div v-if="cSelectedReceipt.type === 'EXPORT'">
                       <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Thanh toán</div>
-                      <span class="px-2.5 py-1 rounded-md text-[11px] font-bold" :class="cSelectedReceipt.paymentStatus === 'PAID' ? 'bg-[#05b171]/10 text-[#05b171]' : 'bg-[#ea4f52]/10 text-[#ea4f52]'">
+                      <span :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-bold', cSelectedReceipt.paymentStatus === 'PAID' ? 'bg-green-50 text-green-600' : 'bg-amber-50 text-amber-600']">
                         {{ cSelectedReceipt.paymentStatus === 'PAID' ? 'Đã thanh toán' : 'Chưa thanh toán' }}
                       </span>
                     </div>

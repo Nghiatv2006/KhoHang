@@ -112,6 +112,9 @@ public class UserServiceImpl implements UserService {
             if (!cleanPhone.matches("^(0|\\+84|84)[0-9]{9,11}$")) {
                 throw new RuntimeException("Số điện thoại không hợp lệ (phải bắt đầu bằng 0, 84 hoặc +84 và gồm 10-12 chữ số).");
             }
+            if (userRepository.existsByPhone(cleanPhone)) {
+                throw new RuntimeException("Số điện thoại '" + cleanPhone + "' đã được sử dụng bởi nhân viên khác.");
+            }
         }
 
         User user = new User();
@@ -226,6 +229,9 @@ public class UserServiceImpl implements UserService {
             String phone = request.getPhone().trim().replaceAll("[-. ]", "");
             if (!phone.matches("^(0|\\+84|84)[0-9]{9,11}$")) {
                 throw new RuntimeException("Số điện thoại không hợp lệ (phải bắt đầu bằng 0, 84 hoặc +84 và gồm 10-12 chữ số).");
+            }
+            if (userRepository.existsByPhoneAndIdNot(phone, id)) {
+                throw new RuntimeException("Số điện thoại '" + phone + "' đã được sử dụng bởi nhân viên khác.");
             }
             user.setPhone(phone);
         } else {

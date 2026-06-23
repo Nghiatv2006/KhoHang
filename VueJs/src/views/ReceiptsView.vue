@@ -352,11 +352,15 @@ function getAvailableProductsForRow(index: number) {
 function onProductChange(row: DetailRow) {
   const p = products.value.find(x => x.id === Number(row.productId))
   if (p) {
+    row.quantity = 1 // Reset quantity to 1 when changing to a valid product
     row.price = Number(p.price) || 0
     if (!p.hasExpiry) {
       row.manufacturingDate = '1970-01-01'
       row.expirationDate = '1970-01-01'
     }
+  } else {
+    row.quantity = 0 // Reset to 0 if no product is selected
+    row.price = 0
   }
   constrainQuantity(row)
 }
@@ -1007,7 +1011,7 @@ function getCustomerName(receipt: any) {
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Ngày tạo</div>
                 <div class="font-semibold text-[#364a63]">{{ formatDateTime(selectedReceipt.createdAt) }}</div>
               </div>
-              <div>
+              <div v-if="selectedReceipt.type === 'EXPORT'">
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Thanh toán</div>
                 <span :class="['inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold', paymentStatusClass(selectedReceipt.paymentStatus)]">
                   {{ paymentStatusLabel(selectedReceipt.paymentStatus) }}
@@ -1221,8 +1225,9 @@ function getCustomerName(receipt: any) {
                         <div>
                           <label class="block text-xs text-[#8094ae] mb-1">Số lượng <span class="text-red-500">*</span></label>
                           <div class="relative">
-                            <input v-model.number="d.quantity" type="number" min="1" @input="constrainQuantity(d)" @blur="onQuantityBlur(d)" @keypress="(e) => { if(!/[0-9]/.test(e.key)) e.preventDefault() }"
-                              class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none pr-12" />
+                            <input v-model.number="d.quantity" type="number" min="1" @input="constrainQuantity(d)" @blur="onQuantityBlur(d)" @keydown="(e) => { if(['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault() }"
+                              :disabled="!d.productId"
+                              class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none pr-12 disabled:bg-gray-50 disabled:cursor-not-allowed" />
                             <span v-if="(createForm.type === 'IMPORT' && createForm.sourceBranchId === createForm.destBranchId) || createForm.type === 'ADJUST_IN'" class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[#8094ae] font-bold">
                               / {{ getGlobalQuantity(d.productId) }}
                             </span>
@@ -1233,8 +1238,8 @@ function getCustomerName(receipt: any) {
                         </div>
                         <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
                           <label class="block text-xs text-[#8094ae] mb-1">Đơn giá</label>
-                          <input v-model.number="d.price" type="number" min="0"
-                            class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
+                          <input v-model.number="d.price" type="number" min="0" readonly
+                            class="w-full h-9 px-3 border border-[#e2e8f0] bg-gray-50 rounded-lg text-sm outline-none cursor-not-allowed text-[#8094ae]" />
                         </div>
                         <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
                           <label class="block text-xs text-[#8094ae] mb-1">Thành tiền</label>

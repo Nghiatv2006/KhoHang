@@ -7,6 +7,8 @@ public class CustomerSaveRequest {
     private String contactInfo;
     private String address;
     private BigDecimal debt;
+    private String email;
+    private String taxCode;
 
     public CustomerSaveRequest() {}
 
@@ -25,6 +27,22 @@ public class CustomerSaveRequest {
 
     public void setContactInfo(String contactInfo) {
         this.contactInfo = contactInfo;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getTaxCode() {
+        return taxCode;
+    }
+
+    public void setTaxCode(String taxCode) {
+        this.taxCode = taxCode;
     }
 
     public String getAddress() {
