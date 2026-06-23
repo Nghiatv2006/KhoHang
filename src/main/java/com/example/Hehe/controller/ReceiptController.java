@@ -56,7 +56,12 @@ public class ReceiptController {
     }
 
     @PostMapping("/{id}/confirm-transfer")
-    public ResponseEntity<ReceiptResponse> confirmTransfer(@PathVariable Integer id, @RequestBody java.util.Map<String, Object> payload, @AuthenticationPrincipal User currentUser) {
-        return ResponseEntity.ok(receiptService.confirmTransfer(id, payload, currentUser));
+    public ResponseEntity<ReceiptResponse> confirmTransfer(@PathVariable Integer id, @RequestBody java.util.Map<String, Object> payload, @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(receiptService.confirmTransfer(id, payload, user));
+    }
+
+    @PostMapping("/{id}/confirm-stocktake")
+    public ResponseEntity<ReceiptResponse> confirmStocktake(@PathVariable Integer id, @RequestBody java.util.Map<String, Object> payload, @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(receiptService.confirmStocktake(id, payload, user));
     }
 }

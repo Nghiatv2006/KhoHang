@@ -11,17 +11,33 @@ const isManager = computed(() => user.value?.role === 'MANAGER')
 const canApprove = computed(() => isAdmin.value || isManager.value)
 
 function canApproveReceipt(r: any) {
-  if (r.status !== 'DRAFT') return false;
-  if (isAdmin.value) return true;
-  
-  const isCrossBranchImport = r.type === 'IMPORT' && r.sourceBranchId !== r.destBranchId;
-  if (isCrossBranchImport) {
-      if (isManager.value && r.sourceBranchId === user.value?.branchId) return true;
+  if (r.status === 'DRAFT') {
+      if (isAdmin.value) return true;
+      
+      const isCrossBranchImport = r.type === 'IMPORT' && r.sourceBranchId !== r.destBranchId;
+      if (isCrossBranchImport) {
+          if (isManager.value && (r.sourceBranchId === user.value?.branchId || r.destBranchId === user.value?.branchId)) return true;
+          return false;
+      }
+      
+      if (isManager.value && r.createdByRole === 'STAFF') return true;
       return false;
   }
-  
-  if (isManager.value && r.createdByRole === 'STAFF') return true;
+  if (r.status === 'PENDING_ADMIN' && r.type === 'IMPORT') {
+      if (isAdmin.value) return true;
+      return false;
+  }
   return false;
+}
+
+function approveReceiptText(r: any) {
+    if (r.type === 'IMPORT' && r.status === 'DRAFT' && isManager.value && !isAdmin.value) {
+        return "Duyệt (Gửi Admin)";
+    }
+    if (r.type === 'IMPORT' && r.status === 'PENDING_ADMIN' && isAdmin.value) {
+        return "Chấp nhận nhập kho";
+    }
+    return "Phê duyệt";
 }
 
 function canCancelReceipt(r: any) {
@@ -635,6 +651,69 @@ async function submitConfirmTransfer() {
   }
 }
 
+
+
+// ──────────────────────────────────────────────────────────────
+// CONFIRM STOCKTAKE MODAL
+// ──────────────────────────────────────────────────────────────
+const showStocktakeModal = ref(false)
+const stocktakeReceipt = ref<any>(null)
+const stocktakeItems = ref<{ receiptDetailId: number; productName: string; sentQty: number; actualQuantity: number; shortfallReason?: string }[]>([])
+const submittingStocktake = ref(false)
+
+function canConfirmStocktake(receipt: any) {
+  if (receipt.type !== 'IMPORT') return false
+  if (receipt.status !== 'PENDING_STOCKTAKE') return false
+  if (isAdmin.value) return true;
+  return receipt.destBranchId === user.value?.branchId
+}
+
+function openStocktakeModal(receipt: any) {
+  stocktakeReceipt.value = receipt
+  stocktakeItems.value = (receipt.details || []).map((d: any) => ({
+    receiptDetailId: d.id,
+    productName: d.productName,
+    sentQty: d.quantity,
+    actualQuantity: d.quantity,
+    shortfallReason: ''
+  }))
+  showStocktakeModal.value = true
+}
+
+async function submitConfirmStocktake() {
+  if (submittingStocktake.value) return
+  if (stocktakeItems.value.some(i => i.actualQuantity < 0)) {
+    toast.error('Số lượng thực tế không được âm.'); return
+  }
+  if (stocktakeItems.value.some(i => i.actualQuantity < i.sentQty && (!i.shortfallReason || i.shortfallReason.trim() === ''))) {
+    toast.error('Vui lòng nhập đầy đủ lý do cho các sản phẩm bị hao hụt.'); return
+  }
+  submittingStocktake.value = true
+  try {
+    const payload = {
+      items: stocktakeItems.value.map(i => ({
+        receiptDetailId: i.receiptDetailId,
+        actualQuantity: i.actualQuantity,
+        shortfallReason: i.actualQuantity < i.sentQty ? i.shortfallReason : null
+      }))
+    }
+    const res = await api.post(`/api/receipts/${stocktakeReceipt.value.id}/confirm-stocktake`, payload)
+    if (res.ok) {
+      toast.success('Xác nhận kiểm kê thành công! Hàng đã được cộng vào kho.')
+      showStocktakeModal.value = false
+      showDetail.value = false
+      await loadData()
+    } else {
+      const err = await res.json()
+      toast.error(err.message || 'Lỗi khi xác nhận kiểm kê.')
+    }
+  } catch (e: any) {
+    toast.error('Lỗi kết nối: ' + e.message)
+  } finally {
+    submittingStocktake.value = false
+  }
+}
+
 // ──────────────────────────────────────────────────────────────
 // HELPERS
 // ──────────────────────────────────────────────────────────────
@@ -672,10 +751,21 @@ function typeClass(t: string) {
 function statusClass(s: string) {
   const map: Record<string, string> = {
     DRAFT: 'bg-yellow-100 text-yellow-700 border border-yellow-300',
+    PENDING_ADMIN: 'bg-blue-100 text-blue-700 border border-blue-300',
+    PENDING_STOCKTAKE: 'bg-purple-100 text-purple-700 border border-purple-300',
     COMPLETED: 'bg-green-100 text-green-700 border border-green-300',
     CANCELLED: 'bg-red-100 text-red-600 border border-red-300'
   }
   return map[s] || 'bg-gray-100 text-gray-600'
+}
+
+function statusLabel(s: string) {
+  if (s === 'DRAFT') return '⏳ Chờ duyệt';
+  if (s === 'PENDING_ADMIN') return '🛡️ Chờ Admin';
+  if (s === 'PENDING_STOCKTAKE') return '📦 Chờ kiểm kê';
+  if (s === 'COMPLETED') return '✅ Đã duyệt';
+  if (s === 'CANCELLED') return '❌ Đã hủy';
+  return s;
 }
 function paymentStatusLabel(p: string) {
   const map: Record<string, string> = {
@@ -895,7 +985,7 @@ function getCustomerName(receipt: any) {
               <td class="px-5 py-4">
                 <div class="flex flex-col gap-1">
                   <span :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-bold', statusClass(r.status)]">
-                    {{ r.status === 'DRAFT' ? '⏳ Chờ duyệt' : r.status === 'COMPLETED' ? '✅ Đã duyệt' : '❌ Đã hủy' }}
+                    {{ statusLabel(r.status) }}
                   </span>
                   <span v-if="r.paymentStatus === 'RECEIVED'" :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold mt-1', paymentStatusClass(r.paymentStatus)]">
                     📦 Đã nhận hàng
@@ -985,7 +1075,7 @@ function getCustomerName(receipt: any) {
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Trạng thái</div>
                 <div class="flex flex-col items-start gap-1">
                   <span :class="['inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold', statusClass(selectedReceipt.status)]">
-                    {{ selectedReceipt.status === 'DRAFT' ? '⏳ Chờ duyệt' : selectedReceipt.status === 'COMPLETED' ? '✅ Đã duyệt' : '❌ Đã hủy' }}
+                    {{ statusLabel(selectedReceipt.status) }}
                   </span>
                   <span v-if="selectedReceipt.paymentStatus === 'RECEIVED'" :class="['inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold', paymentStatusClass(selectedReceipt.paymentStatus)]">
                     📦 Đã nhận hàng
@@ -1070,36 +1160,53 @@ function getCustomerName(receipt: any) {
                 </table>
               </div>
             </div>
-          </div>
 
-          <!-- Actions -->
-          <div class="px-6 py-4 border-t border-[#f1f5f9] flex items-center justify-between gap-3 bg-[#f8f9fa]/50">
-            <button @click="showDetail = false" class="px-5 py-2.5 border border-[#e2e8f0] bg-white rounded-xl font-semibold text-[#364a63] text-sm transition-all hover:bg-[#f1f5f9]">
-              Đóng
-            </button>
-            <div class="flex gap-2">
-              <button v-if="selectedReceipt.status === 'DRAFT' && canApprove"
-                @click="cancelReceipt(selectedReceipt)"
-                class="px-5 py-2.5 bg-red-50 border border-red-200 text-red-600 rounded-xl font-bold text-sm hover:bg-red-500 hover:text-white transition-all">
-                <i class="fas fa-times mr-2"></i>Hủy phiếu
+            <!-- Approve & Cancel actions -->
+            <div v-if="canApproveReceipt(selectedReceipt)" class="mt-8 pt-5 border-t flex flex-wrap gap-4">
+              <button @click="approveReceipt(selectedReceipt)" :disabled="approvingId === selectedReceipt.id"
+                class="px-5 py-2.5 bg-[#10b981] hover:bg-[#059669] text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-check-circle" v-if="approvingId !== selectedReceipt.id"></i>
+                <i class="fas fa-spinner fa-spin" v-else></i> 
+                {{ approveReceiptText(selectedReceipt) }}
               </button>
-              <button v-if="canApproveReceipt(selectedReceipt)"
-                @click="approveReceipt(selectedReceipt)"
-                :disabled="approvingId === selectedReceipt.id"
-                class="px-5 py-2.5 bg-[#4361ee] text-white rounded-xl font-bold text-sm hover:bg-[#3a0ca3] transition-all disabled:opacity-60 flex items-center gap-2">
-                <i class="fas fa-check-circle"></i>Phê duyệt
+              <button @click="cancelReceipt(selectedReceipt)" v-if="canCancelReceipt(selectedReceipt)"
+                class="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-ban"></i> Hủy phiếu
               </button>
-              <button v-if="selectedReceipt.type === 'EXPORT' && selectedReceipt.status === 'COMPLETED' && (selectedReceipt.paymentStatus === 'UNPAID' || selectedReceipt.paymentStatus === 'Chưa thanh toán') && canApprove"
-                @click="markAsPaid(selectedReceipt)"
-                :disabled="markingPaidId === selectedReceipt.id"
-                class="px-5 py-2.5 bg-emerald-500 text-white rounded-xl font-bold text-sm hover:bg-emerald-600 transition-all disabled:opacity-60 flex items-center gap-2">
-                <i class="fas fa-hand-holding-usd"></i>Xác nhận thanh toán
+            </div>
+            <div v-else-if="canCancelReceipt(selectedReceipt)" class="mt-8 pt-5 border-t flex gap-4">
+              <button @click="cancelReceipt(selectedReceipt)"
+                class="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-ban"></i> Hủy phiếu
               </button>
-              <button v-if="canConfirmTransfer(selectedReceipt)"
-                @click="openConfirmTransferModal(selectedReceipt)"
-                class="px-5 py-2.5 bg-sky-500 text-white rounded-xl font-bold text-sm hover:bg-sky-600 transition-all flex items-center gap-2">
-                <i class="fas fa-truck-loading"></i>Xác nhận nhận hàng
+            </div>
+
+            <!-- Mark as Paid -->
+            <div v-if="selectedReceipt.status === 'COMPLETED' && (selectedReceipt.type === 'EXPORT' || selectedReceipt.type === 'IMPORT') && (selectedReceipt.paymentStatus === 'UNPAID' || selectedReceipt.paymentStatus === 'Chưa thanh toán')" class="mt-8 pt-5 border-t">
+              <button @click="markAsPaid(selectedReceipt)" :disabled="markingPaidId === selectedReceipt.id"
+                class="px-5 py-2.5 bg-[#f59e0b] hover:bg-[#d97706] text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-hand-holding-usd" v-if="markingPaidId !== selectedReceipt.id"></i>
+                <i class="fas fa-spinner fa-spin" v-else></i>
+                Xác nhận Đã Thanh Toán
               </button>
+              <p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle"></i> Công nợ khách hàng sẽ được cấn trừ tương ứng khi xác nhận.</p>
+            </div>
+
+            <!-- Confirm Receive (Transfer) -->
+            <div v-if="canConfirmTransfer(selectedReceipt)" class="mt-8 pt-5 border-t">
+              <button @click="openConfirmTransferModal(selectedReceipt)"
+                class="px-5 py-2.5 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-box-open"></i> Xác nhận Nhận Hàng & Cộng Kho
+              </button>
+            </div>
+
+            <!-- Confirm Stocktake (Import) -->
+            <div v-if="canConfirmStocktake(selectedReceipt)" class="mt-8 pt-5 border-t">
+              <button @click="openStocktakeModal(selectedReceipt)"
+                class="px-5 py-2.5 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-boxes"></i> Thực hiện Kiểm kê & Chấp nhận
+              </button>
+              <p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle"></i> Vui lòng đếm lại thực tế hàng hóa tại kho trước khi xác nhận cộng kho.</p>
             </div>
           </div>
         </div>
@@ -1286,11 +1393,77 @@ function getCustomerName(receipt: any) {
     </Teleport>
 
     <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- STOCKTAKE MODAL (IMPORT) -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <Teleport to="body">
+      <div v-if="showStocktakeModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden">
+          <!-- Header -->
+          <div class="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-purple-500 to-fuchsia-400 text-white">
+            <div>
+              <div class="text-xs font-bold opacity-70 uppercase">Kiểm kê & Nhập kho</div>
+              <div class="font-bold text-lg">Phiếu: {{ stocktakeReceipt?.code }}</div>
+            </div>
+            <button @click="showStocktakeModal = false" class="w-9 h-9 flex items-center justify-center rounded-xl bg-white/20 hover:bg-white/30 transition-all">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+
+          <div class="p-6 space-y-4">
+            <div class="bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-purple-700">
+              <i class="fas fa-info-circle mr-2"></i>
+              Nhập <strong>số lượng thực đếm</strong> tại kho. Nếu có hao hụt, vui lòng ghi rõ lý do để đối soát. Hàng hóa sẽ được cộng vào kho tương ứng với số lượng thực đếm.
+            </div>
+
+            <div class="space-y-3 custom-scrollbar max-h-[50vh] overflow-y-auto">
+              <div v-for="item in stocktakeItems" :key="item.receiptDetailId"
+                class="border border-[#e2e8f0] rounded-xl p-4">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-semibold text-sm text-[#364a63]">{{ item.productName }}</span>
+                  <span class="text-xs text-[#8094ae]">Số trên phiếu: <strong>{{ item.sentQty }}</strong></span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <label class="text-xs text-[#8094ae] whitespace-nowrap">Thực đếm:</label>
+                  <input v-model.number="item.actualQuantity" type="number" :min="0" :max="item.sentQty"
+                    class="flex-1 h-9 px-3 border rounded-lg text-sm focus:ring-2 focus:ring-purple-400/20 focus:border-purple-400 outline-none"
+                    :class="item.actualQuantity < item.sentQty ? 'border-amber-400 bg-amber-50' : 'border-[#e2e8f0]'" />
+                  <span v-if="item.actualQuantity < item.sentQty"
+                    class="text-xs font-bold text-amber-600 whitespace-nowrap">
+                    ⚠️ Hao hụt: {{ item.sentQty - item.actualQuantity }}
+                  </span>
+                  <span v-else class="text-xs font-bold text-green-600 whitespace-nowrap">✅ Đủ</span>
+                </div>
+                <div v-if="item.actualQuantity < item.sentQty" class="mt-3 bg-red-50 p-3 rounded-lg border border-red-100 flex items-start gap-3">
+                  <label class="text-xs font-bold text-red-600 whitespace-nowrap mt-2">Lý do <span class="text-red-500">*</span></label>
+                  <input v-model="item.shortfallReason" type="text" placeholder="VD: Hư hỏng, thiếu hàng..."
+                    class="flex-1 h-9 px-3 border border-red-200 rounded-lg text-sm focus:ring-2 focus:ring-red-400/20 focus:border-red-400 outline-none bg-white" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="px-6 py-4 border-t border-[#f1f5f9] flex justify-end gap-3 bg-[#f8f9fa]/50">
+            <button @click="showStocktakeModal = false"
+              class="px-5 py-2.5 border border-[#e2e8f0] bg-white rounded-xl font-semibold text-[#364a63] text-sm hover:bg-[#f1f5f9] transition-all">
+              Đóng
+            </button>
+            <button @click="submitConfirmStocktake" :disabled="submittingStocktake"
+              class="px-6 py-2.5 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-60 flex items-center gap-2">
+              <i class="fas fa-spinner fa-spin" v-if="submittingStocktake"></i>
+              <i class="fas fa-boxes" v-else></i>
+              Xác nhận Kiểm kê
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
     <!-- CONFIRM TRANSFER MODAL -->
     <!-- ═══════════════════════════════════════════════════════════ -->
     <Teleport to="body">
       <div v-if="showConfirmModal && confirmingReceipt"
-        class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
+        class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden">
           <!-- Header -->
           <div class="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-sky-500 to-teal-400 text-white">
