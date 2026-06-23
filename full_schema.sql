@@ -38,8 +38,12 @@ CREATE TABLE customers (
     contact_info VARCHAR(255),
     address TEXT,
     debt NUMERIC(15, 2) NOT NULL DEFAULT 0.00,
+    email VARCHAR(255),
+    tax_code VARCHAR(50),
     status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    branch_id INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_customer_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE RESTRICT
 );
 
 -- Bảng Người dùng (Users)
