@@ -188,6 +188,13 @@ public class ReceiptServiceImpl implements ReceiptService {
             ReceiptDetail d = new ReceiptDetail();
             d.setReceipt(r);
             Product p = productRepository.findById(dReq.getProductId()).orElseThrow(() -> new RuntimeException("Product not found"));
+            
+            if (p.getHasExpiry() && dReq.getManufacturingDate() != null && dReq.getExpirationDate() != null) {
+                if (dReq.getManufacturingDate().isAfter(dReq.getExpirationDate())) {
+                    throw new RuntimeException("Hạn sử dụng không hợp lệ (Ngày sản xuất không được lớn hơn Hạn sử dụng).");
+                }
+            }
+            
             d.setProduct(p);
             d.setManufacturingDate(dReq.getManufacturingDate());
             d.setExpirationDate(dReq.getExpirationDate());
@@ -425,42 +432,6 @@ public class ReceiptServiceImpl implements ReceiptService {
         }
 
         r.setStatus(ReceiptStatus.COMPLETED);
-        // Tạo khách hàng nếu là xuất bán và có thông tin
-        if (r.getType() == ReceiptType.EXPORT && r.getCustomerName() != null && !r.getCustomerName().trim().isEmpty()) {
-            String cName = r.getCustomerName().trim();
-            
-            Integer branchIdToUse = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
-            if (r.getSourceBranch() != null) {
-                branchIdToUse = r.getSourceBranch().getId();
-            }
-            final Integer finalBranchId = branchIdToUse;
-
-            Customer customer = null;
-            if (r.getCustomerPhone() != null && !r.getCustomerPhone().trim().isEmpty()) {
-                customer = customerRepository.findFirstByContactInfo(r.getCustomerPhone().trim()).orElse(null);
-            }
-            if (customer == null) {
-                customer = customerRepository.findByNameAndBranchId(cName, finalBranchId).stream().findFirst().orElse(null);
-            }
-            if (customer == null) {
-                Customer newC = new Customer();
-                newC.setName(cName);
-                newC.setContactInfo(r.getCustomerPhone() != null ? r.getCustomerPhone().trim() : null);
-                newC.setStatus("ACTIVE");
-                newC.setDebt(java.math.BigDecimal.ZERO);
-                if (finalBranchId != null) {
-                    newC.setBranch(branchRepository.findById(finalBranchId).orElse(null));
-                }
-                customer = customerRepository.save(newC);
-            } else {
-                if (r.getCustomerPhone() != null && !r.getCustomerPhone().trim().isEmpty() && (customer.getContactInfo() == null || customer.getContactInfo().trim().isEmpty())) {
-                    customer.setContactInfo(r.getCustomerPhone().trim());
-                    customerRepository.save(customer);
-                }
-            }
-
-            r.setCustomerId(customer.getId());
-        }
         if (r.getType() == ReceiptType.TRANSFER) {
             r.setPaymentStatus("IN_TRANSIT");
         }
