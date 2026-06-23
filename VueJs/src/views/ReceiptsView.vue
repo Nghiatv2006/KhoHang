@@ -282,7 +282,8 @@ function onTypeChange() {
     createForm.value.sourceBranchId = user.value?.branchId || headBranch.value?.id || ''
     createForm.value.destBranchId = ''
   }
-  createForm.value.details.forEach(d => constrainQuantity(d))
+  // Reset products when changing type to avoid stale/out-of-stock products
+  createForm.value.details = [{ productId: '', manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 }]
 }
 
 const sourceInventories = ref<any[]>([])
