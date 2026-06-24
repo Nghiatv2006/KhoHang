@@ -12,20 +12,11 @@ const canApprove = computed(() => isAdmin.value || isManager.value)
 
 function canApproveReceipt(r: any) {
   if (r.status === 'DRAFT') {
+      if (r.type === 'EXPORT' && isAdmin.value && r.sourceBranchId !== 1) return false;
       if (isAdmin.value) return true;
-      
-      const isCrossBranchImport = r.type === 'IMPORT' && r.sourceBranchId !== r.destBranchId;
-      if (isCrossBranchImport) {
-          if (isManager.value && (r.sourceBranchId === user.value?.branchId || r.destBranchId === user.value?.branchId)) return true;
-          return false;
+      if (isManager.value) {
+          if (r.sourceBranchId === user.value?.branchId || r.destBranchId === user.value?.branchId) return true;
       }
-      
-      if (r.type === 'TRANSFER') {
-          if (isManager.value && r.sourceBranchId === user.value?.branchId) return true;
-          return false;
-      }
-      
-      if (isManager.value && r.createdByRole === 'STAFF') return true;
       return false;
   }
   if (r.status === 'PENDING_ADMIN') {
@@ -61,6 +52,7 @@ function approveReceiptText(r: any) {
 function canCancelReceipt(r: any) {
   if (r.status !== 'DRAFT' && r.status !== 'PENDING_ADMIN' && r.status !== 'PENDING_STOCKTAKE') return false;
   if (r.status === 'PENDING_STOCKTAKE' && r.type !== 'IMPORT' && r.type !== 'TRANSFER') return false;
+  if (r.type === 'EXPORT' && isAdmin.value && r.sourceBranchId !== 1) return false;
   if (isAdmin.value) return true;
   if (!isManager.value) return false;
   
@@ -193,7 +185,7 @@ const headBranch = computed(() => branches.value.find(b => b.isHead) || branches
 // ──────────────────────────────────────────────────────────────
 // STATS
 // ──────────────────────────────────────────────────────────────
-const statDraft = computed(() => receipts.value.filter(r => canApproveReceipt(r)).length)
+const statDraft = computed(() => receipts.value.filter(r => r.status === 'DRAFT').length)
 const statCompleted = computed(() => receipts.value.filter(r => r.status === 'COMPLETED').length)
 const statCancelled = computed(() => receipts.value.filter(r => r.status === 'CANCELLED').length)
 
@@ -415,14 +407,30 @@ function onProductChange(row: DetailRow) {
 
 function getBatchesForProduct(productId: number | string | null) {
   if (!productId) return []
-  if (createForm.value.type === 'ADJUST_IN' || createForm.value.type === 'IMPORT') {
+  if (createForm.value.type === 'ADJUST_IN' || (createForm.value.type === 'IMPORT' && !createForm.value.sourceBranchId)) {
     const uniqueBatches = new Map()
     globalInventories.value.filter(inv => inv.productId === Number(productId)).forEach(inv => {
-      if (!uniqueBatches.has(inv.batchCode)) uniqueBatches.set(inv.batchCode, inv)
+      if (!uniqueBatches.has(inv.batchCode)) {
+        uniqueBatches.set(inv.batchCode, { ...inv })
+      } else {
+        const existing = uniqueBatches.get(inv.batchCode)
+        existing.quantity += inv.quantity
+      }
     })
     return Array.from(uniqueBatches.values())
   }
-  return sourceInventories.value.filter(inv => inv.productId === Number(productId) && inv.quantity > 0)
+  return sourceInventories.value
+    .filter(inv => inv.productId === Number(productId) && inv.quantity > 0)
+    .map(inv => {
+      const pendingQty = receipts.value
+        .filter(r => r.status === 'DRAFT' && r.sourceBranchId === createForm.value.sourceBranchId && 
+                (['EXPORT', 'TRANSFER', 'ADJUST_OUT'].includes(r.type) || 
+                 (r.type === 'IMPORT' && r.sourceBranchId !== r.destBranchId)))
+        .flatMap(r => r.details || [])
+        .filter(d => Number(d.productId) === Number(productId) && d.batchCode === inv.batchCode)
+        .reduce((sum, d) => sum + Number(d.quantity), 0);
+      return { ...inv, quantity: Math.max(0, inv.quantity - pendingQty) };
+    });
 }
 
 function onBatchChange(row: DetailRow) {
@@ -727,7 +735,7 @@ const submittingStocktake = ref(false)
 function canConfirmStocktake(receipt: any) {
   if (receipt.type !== 'IMPORT' && receipt.type !== 'TRANSFER') return false
   if (receipt.status !== 'PENDING_STOCKTAKE') return false
-  if (isAdmin.value) return true;
+  if (isAdmin.value) return false;
   return receipt.destBranchId === user.value?.branchId
 }
 
@@ -1208,34 +1216,39 @@ function getCustomerName(receipt: any) {
                       <th class="px-4 py-2.5 text-left font-bold">Sản phẩm</th>
                       <th class="px-4 py-2.5 text-center font-bold">NSX</th>
                       <th class="px-4 py-2.5 text-center font-bold">HSD</th>
-                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type === 'TRANSFER' && selectedReceipt.paymentStatus === 'RECEIVED'">SL Gửi</th>
-                      <th class="px-4 py-2.5 text-right font-bold text-teal-600" v-if="selectedReceipt.type === 'TRANSFER' && selectedReceipt.paymentStatus === 'RECEIVED'">SL Nhận</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.status === 'COMPLETED' && selectedReceipt.details?.some(x => x.receivedQuantity !== null)">SL Gửi</th>
+                      <th class="px-4 py-2.5 text-right font-bold text-teal-600" v-if="selectedReceipt.status === 'COMPLETED' && selectedReceipt.details?.some(x => x.receivedQuantity !== null)">SL Nhận</th>
                       <th class="px-4 py-2.5 text-right font-bold" v-else>SL</th>
-                      <th class="px-4 py-2.5 text-right font-bold">Đơn giá</th>
-                      <th class="px-4 py-2.5 text-right font-bold">Thành tiền</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Đơn giá</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Thành tiền</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-[#f1f5f9]">
                     <tr v-for="d in selectedReceipt.details" :key="d.id" class="hover:bg-[#f8f9fa]/50">
-                      <td class="px-4 py-3 font-semibold text-[#364a63]">{{ d.productName }}</td>
+                      <td class="px-4 py-3">
+                        <div class="font-semibold text-[#364a63]">{{ d.productName }}</div>
+                        <div v-if="d.receivedQuantity !== null && d.receivedQuantity < d.quantity" class="text-[11px] text-red-500 font-normal mt-1 flex items-start gap-1">
+                          <i class="fas fa-exclamation-circle mt-0.5"></i>
+                          <span>Lý do hao hụt: {{ d.shortfallReason }}</span>
+                        </div>
+                      </td>
                       <td class="px-4 py-3 text-center text-[#8094ae]">{{ formatDate(d.manufacturingDate) }}</td>
                       <td class="px-4 py-3 text-center text-[#8094ae]">{{ formatDate(d.expirationDate) }}</td>
-                      <td class="px-4 py-3 text-right font-bold" v-if="selectedReceipt.type === 'TRANSFER' && selectedReceipt.paymentStatus === 'RECEIVED'">{{ d.quantity }}</td>
-                      <td class="px-4 py-3 text-right font-bold text-teal-600" v-if="selectedReceipt.type === 'TRANSFER' && selectedReceipt.paymentStatus === 'RECEIVED'">
+                      <td class="px-4 py-3 text-right font-bold" v-if="d.receivedQuantity !== null && selectedReceipt.status === 'COMPLETED'">{{ d.quantity }}</td>
+                      <td class="px-4 py-3 text-right font-bold text-teal-600" v-if="d.receivedQuantity !== null && selectedReceipt.status === 'COMPLETED'">
                         {{ d.receivedQuantity !== null ? d.receivedQuantity : d.quantity }}
-                        <span v-if="d.receivedQuantity !== null && d.receivedQuantity < d.quantity" class="text-xs text-amber-500 block" :title="d.shortfallReason">
+                        <span v-if="d.receivedQuantity !== null && d.receivedQuantity < d.quantity" class="text-xs text-amber-500 block">
                           (-{{ d.quantity - d.receivedQuantity }})
-                          <br/><span class="text-[10px] text-red-400 font-normal">Lý do: {{ d.shortfallReason }}</span>
                         </span>
                       </td>
                       <td class="px-4 py-3 text-right font-bold" v-else>{{ d.quantity }}</td>
-                      <td class="px-4 py-3 text-right">{{ formatVND(d.price) }}</td>
-                      <td class="px-4 py-3 text-right font-bold text-[#4361ee]">{{ formatVND(d.quantity * d.price) }}</td>
+                      <td class="px-4 py-3 text-right" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">{{ formatVND(d.price) }}</td>
+                      <td class="px-4 py-3 text-right font-bold text-[#4361ee]" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">{{ formatVND(d.quantity * d.price) }}</td>
                     </tr>
                   </tbody>
-                  <tfoot>
+                  <tfoot v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">
                     <tr class="bg-[#f8f9fa]">
-                      <td :colspan="(selectedReceipt.type === 'TRANSFER' && selectedReceipt.paymentStatus === 'RECEIVED') ? 6 : 5" class="px-4 py-2.5 text-right font-bold text-[#8094ae] text-xs uppercase">Tổng cộng</td>
+                      <td :colspan="(selectedReceipt.status === 'COMPLETED' && selectedReceipt.details?.some(x => x.receivedQuantity !== null)) ? 6 : 5" class="px-4 py-2.5 text-right font-bold text-[#8094ae] text-xs uppercase">Tổng cộng</td>
                       <td class="px-4 py-2.5 text-right font-extrabold text-[#4361ee]">
                         {{ formatVND((selectedReceipt.details || []).reduce((s: number, d: any) => s + d.quantity * d.price, 0)) }}
                       </td>
@@ -1266,7 +1279,7 @@ function getCustomerName(receipt: any) {
             </div>
 
             <!-- Mark as Paid -->
-            <div v-if="selectedReceipt.status === 'COMPLETED' && (selectedReceipt.type === 'EXPORT' || selectedReceipt.type === 'IMPORT') && (selectedReceipt.paymentStatus === 'UNPAID' || selectedReceipt.paymentStatus === 'Chưa thanh toán')" class="mt-8 pt-5 border-t">
+            <div v-if="selectedReceipt.status === 'COMPLETED' && selectedReceipt.type === 'EXPORT' && (selectedReceipt.paymentStatus === 'UNPAID' || selectedReceipt.paymentStatus === 'Chưa thanh toán')" class="mt-8 pt-5 border-t">
               <button @click="markAsPaid(selectedReceipt)" :disabled="markingPaidId === selectedReceipt.id"
                 class="px-5 py-2.5 bg-[#f59e0b] hover:bg-[#d97706] text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
                 <i class="fas fa-hand-holding-usd" v-if="markingPaidId !== selectedReceipt.id"></i>
@@ -1370,7 +1383,7 @@ function getCustomerName(receipt: any) {
               </div>
 
               <div class="grid grid-cols-2 gap-4">
-                <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
+                <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'" class="col-span-2 sm:col-span-1">
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Trạng thái thanh toán</label>
                   <select v-model="createForm.paymentStatus"
                     class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
@@ -1378,10 +1391,13 @@ function getCustomerName(receipt: any) {
                     <option value="PAID">Đã thanh toán</option>
                   </select>
                 </div>
-                <div>
-                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Ghi chú</label>
-                  <input v-model="createForm.description" type="text" maxlength="500" placeholder="Ghi chú (tuỳ chọn)..."
-                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
+                <div class="col-span-2">
+                  <div class="flex justify-between items-center mb-1.5">
+                    <label class="block text-xs font-bold text-[#8094ae] uppercase">Ghi chú</label>
+                    <span class="text-[10px] text-[#8094ae]">{{ createForm.description?.length || 0 }}/500</span>
+                  </div>
+                  <textarea v-model="createForm.description" maxlength="500" placeholder="Ghi chú (tuỳ chọn)..."
+                    class="w-full h-20 p-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none resize-y"></textarea>
                 </div>
               </div>
 

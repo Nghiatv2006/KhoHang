@@ -42,6 +42,7 @@ public class ReceiptServiceImpl implements ReceiptService {
         if (currentUser.getRole() == UserRole.ADMIN) {
             return receiptRepository.findAll().stream()
                     .filter(r -> !(r.getStatus() == ReceiptStatus.DRAFT && r.getCreatedBy() != null && r.getCreatedBy().getRole() == UserRole.STAFF))
+                    .filter(r -> !(r.getType() == ReceiptType.EXPORT && r.getSourceBranch() != null && r.getSourceBranch().getId() != 1))
                     .map(ReceiptResponse::new)
                     .collect(Collectors.toList());
         }
@@ -265,6 +266,12 @@ public class ReceiptServiceImpl implements ReceiptService {
         Receipt r = receiptRepository.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
         if (r.getStatus() == ReceiptStatus.CANCELLED) throw new RuntimeException("Receipt is already cancelled.");
         
+        if (currentUser.getRole() == UserRole.ADMIN) {
+            if (r.getType() == ReceiptType.EXPORT && r.getSourceBranch() != null && r.getSourceBranch().getId() != 1) {
+                throw new RuntimeException("Admin chỉ quản lý phiếu xuất bán của Chi nhánh tổng.");
+            }
+        }
+        
         // ADMIN can cancel any, MANAGER can cancel their own branch's
         if (currentUser.getRole() != UserRole.ADMIN) {
             Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
@@ -381,7 +388,11 @@ public class ReceiptServiceImpl implements ReceiptService {
         
         Customer customer = customerRepository.findById(r.getCustomerId()).orElse(null);
         if (customer != null) {
-            customer.setDebt(customer.getDebt().add(delta));
+            java.math.BigDecimal newDebt = customer.getDebt().add(delta);
+            if (newDebt.compareTo(java.math.BigDecimal.ZERO) < 0) {
+                newDebt = java.math.BigDecimal.ZERO;
+            }
+            customer.setDebt(newDebt);
             customerRepository.save(customer);
         }
     }
@@ -461,18 +472,9 @@ public class ReceiptServiceImpl implements ReceiptService {
             throw new RuntimeException("Nhân viên không có quyền duyệt phiếu.");
         }
         
-        if (r.getType() != ReceiptType.IMPORT && r.getType() != ReceiptType.TRANSFER) {
-            User creator = r.getCreatedBy();
-            if (creator != null) {
-                if (creator.getRole() == UserRole.STAFF) {
-                    if (currentUser.getRole() != UserRole.MANAGER) {
-                        throw new RuntimeException("Chỉ Quản lý mới được quyền duyệt phiếu của Nhân viên.");
-                    }
-                } else if (creator.getRole() == UserRole.MANAGER) {
-                    if (currentUser.getRole() != UserRole.ADMIN) {
-                        throw new RuntimeException("Chỉ Admin mới được quyền duyệt phiếu của Quản lý.");
-                    }
-                }
+        if (currentUser.getRole() == UserRole.ADMIN) {
+            if (r.getType() == ReceiptType.EXPORT && r.getSourceBranch() != null && r.getSourceBranch().getId() != 1) {
+                throw new RuntimeException("Admin chỉ quản lý phiếu xuất bán của Chi nhánh tổng.");
             }
         }
 
