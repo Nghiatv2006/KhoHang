@@ -44,27 +44,61 @@ try {
     $null = Get-Command psql -ErrorAction Stop
     $hasPsql = $true
 } catch {
-    $resolvedPaths = @()
-    # Tim theo wildcard voi cac duong dan Program Files pho bien
-    $resolvedPaths += Resolve-Path "C:\Program Files\PostgreSQL\*\bin\psql.exe" -ErrorAction SilentlyContinue
-    $resolvedPaths += Resolve-Path "C:\Program Files (x86)\PostgreSQL\*\bin\psql.exe" -ErrorAction SilentlyContinue
-    $resolvedPaths += Resolve-Path "D:\Program Files\PostgreSQL\*\bin\psql.exe" -ErrorAction SilentlyContinue
-    $resolvedPaths += Resolve-Path "D:\PostgreSQL\*\bin\psql.exe" -ErrorAction SilentlyContinue
-    
-    # Kiem tra truc tiep mot so thu muc khac
-    $directPaths = @(
-        "D:\PostgreSQL\bin\psql.exe",
-        "D:\Database\PostgreSQL\bin\psql.exe"
-    )
-    foreach ($p in $directPaths) {
-        if (Test-Path $p) {
-            $resolvedPaths += [PSCustomObject]@{ Path = $p }
+    Write-Host "Dang tim kiem cong cu psql tren he thong..." -ForegroundColor Gray
+    $foundPsql = $null
+
+    # Cach 1: Tim qua dich vu PostgreSQL dang chay
+    $pgService = Get-WmiObject win32_service -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "postgresql*" -or $_.DisplayName -like "*postgres*" } | Select-Object -First 1
+    if ($pgService -and $pgService.PathName) {
+        if ($pgService.PathName -match '\"?([^\"]*\\bin)\\pg_ctl\.exe') {
+            $binDir = $matches[1]
+            $testPath = Join-Path $binDir "psql.exe"
+            if (Test-Path $testPath) {
+                $foundPsql = $testPath
+            }
         }
     }
 
-    if ($resolvedPaths.Count -gt 0) {
-        $psqlPath = $resolvedPaths[0].Path
+    # Cach 2: Tim qua Registry
+    if (-not $foundPsql) {
+        $regPaths = Get-ChildItem -Path "HKLM:\SOFTWARE\PostgreSQL\Installations" -ErrorAction SilentlyContinue
+        if ($regPaths) {
+            foreach ($reg in $regPaths) {
+                $baseDir = (Get-ItemProperty $reg.PSPath -Name "BaseDirectory" -ErrorAction SilentlyContinue).BaseDirectory
+                if ($baseDir) {
+                    $testPath = Join-Path $baseDir "bin\psql.exe"
+                    if (Test-Path $testPath) {
+                        $foundPsql = $testPath
+                        break
+                    }
+                }
+            }
+        }
+    }
+
+    # Cach 3: Quet cac thu muc mac dinh hoac thuong dung (du phong)
+    if (-not $foundPsql) {
+        $commonPaths = @(
+            "C:\Program Files\PostgreSQL\*\bin\psql.exe",
+            "C:\Program Files (x86)\PostgreSQL\*\bin\psql.exe",
+            "D:\Program Files\PostgreSQL\*\bin\psql.exe",
+            "D:\PostgreSQL\*\bin\psql.exe",
+            "E:\Program Files\PostgreSQL\*\bin\psql.exe",
+            "C:\xampp\pgsql\bin\psql.exe"
+        )
+        foreach ($pattern in $commonPaths) {
+            $resolved = Resolve-Path $pattern -ErrorAction SilentlyContinue
+            if ($resolved) {
+                $foundPsql = $resolved[0].Path
+                break
+            }
+        }
+    }
+
+    if ($foundPsql) {
+        $psqlPath = $foundPsql
         $hasPsql = $true
+        Write-Host "Da tim thay psql tai: $psqlPath" -ForegroundColor Green
     }
 }
 
