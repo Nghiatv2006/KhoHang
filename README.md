@@ -79,21 +79,35 @@ WareHub là giải pháp quản lý kho hàng tập trung và phân phối hàng
 
 Để tiết kiệm tài nguyên hệ thống (RAM/CPU) khi phát triển và không phải mở các IDE nặng như IntelliJ IDEA, dự án cung cấp bộ script chạy nhanh bằng file batch (`.bat`) trên Windows.
 
-Bộ script khởi động dự án bao gồm:
-1. **`run_warehub.bat`** (ở thư mục gốc): Script chính điều khiển, mở song song Backend và Frontend trong 2 cửa sổ CMD riêng biệt.
-2. **`run_backend.bat`**: Script khởi chạy Spring Boot (tự động nạp cấu hình từ `.env` thông qua PowerShell và gán JDK 17).
-3. **`run_frontend.bat`**: Script chạy Vite dev server cho Frontend VueJS.
+Bộ script điều khiển dự án bao gồm:
+1. **`init_db.bat`** (ở thư mục gốc): Tự động xin quyền Admin, kiểm tra và bật dịch vụ PostgreSQL, tạo cơ sở dữ liệu `warehouse_db` và nạp toàn bộ cấu trúc bảng cùng dữ liệu mẫu.
+2. **`run_warehub.bat`** (ở thư mục gốc): Script chính khởi chạy, tự động mở song song Backend và Frontend trong 2 cửa sổ CMD riêng biệt.
+3. **`run_backend.bat`**: Script khởi chạy Spring Boot (tự động nạp cấu hình từ `.env` thông qua PowerShell và gán JDK 17).
+4. **`run_frontend.bat`**: Script tích hợp menu lựa chọn tải tài nguyên (`npm install`) hoặc chạy Vite dev server cho Frontend VueJS.
 
-### Các bước thực hiện:
-1. **Tạo Shortcut ra Desktop (Khuyên dùng)**: 
-   * Click chuột phải vào file **`run_warehub.bat`** trong thư mục dự án gốc.
-   * Chọn **Send to** -> **Desktop (create shortcut)**.
-   * Shortcut ngoài Desktop sẽ tự động ghi nhớ đường dẫn dự án và hoạt động ở mọi máy mà không cần chỉnh sửa code.
-2. **Kích hoạt**: Click đúp chuột vào Shortcut vừa tạo ngoài Desktop.
-3. **Trải nghiệm**:
-   * Cửa sổ CMD Backend sẽ khởi động Spring Boot trên cổng `8080`.
-   * Cửa sổ CMD Frontend sẽ chạy Vite dev server trên cổng `3000` (hoặc `3001`).
-   * Truy cập `http://localhost:3000` trên trình duyệt để sử dụng ứng dụng.
+### Quy trình khởi chạy dự án từng bước:
+
+#### Bước 1: Cấu hình biến môi trường (`.env`)
+* Sao chép file `.env.example` thành `.env` (nếu chưa có) và cập nhật thông số kết nối Database của máy bạn (nếu khác với cấu hình mặc định là `postgres` / mật khẩu `123456`).
+
+#### Bước 2: Khởi tạo Cơ sở dữ liệu
+* Click đúp chuột vào file **`init_db.bat`** ở thư mục gốc.
+* Hệ thống sẽ hiện hộp thoại xin quyền Admin để tự động kiểm tra trạng thái dịch vụ PostgreSQL:
+  * Nếu PostgreSQL đang tắt, script sẽ tự động khởi chạy dịch vụ này lên.
+  * Tự động tạo cơ sở dữ liệu `warehouse_db` (nếu chưa có).
+  * Tự động chuyển bảng mã sang UTF-8 và chạy các tệp `full_schema.sql` và `seed_data.sql` để tạo cấu trúc và dữ liệu mẫu.
+
+#### Bước 3: Tải tài nguyên Frontend (Chỉ cần chạy ở lần đầu tiên)
+* Click đúp chuột vào file **`run_frontend.bat`** ở thư mục gốc.
+* Nhập phím **`1`** và ấn Enter để thực hiện tải tài nguyên (`npm install`).
+* Sau khi quá trình tải tài nguyên hoàn tất, ấn phím bất kỳ để quay lại menu chính và nhập **`3`** để thoát cửa sổ này.
+
+#### Bước 4: Khởi động ứng dụng
+* Click đúp vào file **`run_warehub.bat`** ở thư mục gốc để khởi động đồng thời cả Backend và Frontend.
+* **Mẹo (Tùy chọn)**: Để tiện dụng, bạn có thể click chuột phải vào file **`run_warehub.bat`** -> chọn **Send to** -> **Desktop (create shortcut)** để bật nhanh từ màn hình chính.
+* Truy cập `http://localhost:3000` (hoặc `http://localhost:3001` tùy theo log hiển thị ở Frontend) trên trình duyệt để sử dụng hệ thống.
+
+---
 
 ---
 

@@ -4,7 +4,7 @@
 -- ==============================================================================
 
 -- DROP TABLE & TYPE (Dùng để reset nhanh database)
-DROP TABLE IF EXISTS audit_logs, stocktake_details, stocktakes, receipt_details, receipts, inventories, products, users, customers, categories, branches CASCADE;
+DROP TABLE IF EXISTS audit_logs, stocktake_details, stocktakes, receipt_details, receipts, inventories, products, users, customers, categories, branches, password_reset_otps CASCADE;
 DROP TYPE IF EXISTS user_role, user_status, receipt_type, receipt_status, stocktake_status CASCADE;
 
 -- 1. ENUM TYPES
@@ -64,6 +64,17 @@ CREATE TABLE users (
     CONSTRAINT chk_user_branch CHECK (role = 'ADMIN' OR branch_id IS NOT NULL)
 );
 
+-- Bảng OTP Khôi phục mật khẩu (Password Reset OTPs)
+CREATE TABLE password_reset_otps (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(100) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    otp_code VARCHAR(6) NOT NULL,
+    expiry_time TIMESTAMP NOT NULL,
+    used BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Bảng Sản phẩm (Products)
 CREATE TABLE products (
     id SERIAL PRIMARY KEY,
@@ -78,6 +89,7 @@ CREATE TABLE products (
     image_url VARCHAR(500),
     mfg_date DATE DEFAULT '1970-01-01',
     exp_date DATE DEFAULT '1970-01-01',
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_product_category FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT,
     CONSTRAINT chk_product_dates CHECK (exp_date >= mfg_date)
@@ -197,3 +209,8 @@ CREATE INDEX idx_audit_logs_branch_id  ON audit_logs (branch_id);
 CREATE INDEX idx_audit_logs_user_id    ON audit_logs (user_id);
 CREATE INDEX idx_audit_logs_action     ON audit_logs (action);
 CREATE INDEX idx_audit_logs_created_at ON audit_logs (created_at DESC);
+
+-- Indexes cho Password Reset OTPs
+CREATE INDEX idx_password_reset_otps_username ON password_reset_otps (username);
+CREATE INDEX idx_password_reset_otps_email ON password_reset_otps (email);
+

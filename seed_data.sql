@@ -3,7 +3,7 @@
 -- Lưu ý: Hãy chạy toàn bộ schema.sql trước khi chạy file này.
 -- ==============================================================================
 
-TRUNCATE audit_logs, stocktake_details, stocktakes, receipt_details, receipts, inventories, products, users, customers, categories, branches RESTART IDENTITY CASCADE;
+TRUNCATE audit_logs, stocktake_details, stocktakes, receipt_details, receipts, inventories, products, users, customers, categories, branches, password_reset_otps RESTART IDENTITY CASCADE;
 
 -- ==============================================================================
 -- 2. DỮ LIỆU DANH MỤC
@@ -23,9 +23,9 @@ INSERT INTO categories (name) VALUES
 ('Thực phẩm đóng gói');
 
 -- Thêm Khách hàng (Customers)
-INSERT INTO customers (name, contact_info, address, debt) VALUES
-('Nguyễn Văn A', '0912223334', 'Ba Đình, Hà Nội', 5000000),
-('Trần Thị B', '0933445566', 'Quận 3, TP.HCM', 12500000);
+INSERT INTO customers (name, contact_info, address, debt, email, tax_code, branch_id) VALUES
+('Nguyễn Văn A', '0912223334', 'Ba Đình, Hà Nội', 5000000.00, 'nguyenvana@example.com', '0101234567', 1),
+('Trần Thị B', '0933445566', 'Quận 3, TP.HCM', 12500000.00, 'tranthib@example.com', '0207654321', 2);
 
 
 -- ==============================================================================
