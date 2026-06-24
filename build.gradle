@@ -29,7 +29,7 @@ dependencies {
 	implementation 'org.apache.poi:poi-ooxml:5.2.3'
 	
 	// PostgreSQL Driver
-	runtimeOnly 'org.postgresql:postgresql'
+	implementation 'org.postgresql:postgresql'
 	
 	// JWT Libraries
 	implementation 'io.jsonwebtoken:jjwt-api:0.11.5'

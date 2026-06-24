@@ -22,7 +22,8 @@ CREATE TABLE branches (
     address TEXT NOT NULL,
     low_stock_threshold INT NOT NULL DEFAULT 5,
     is_head BOOLEAN NOT NULL DEFAULT FALSE,
-    tax_code VARCHAR(50)
+    tax_code VARCHAR(50),
+    is_locked BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- Bảng Danh mục sản phẩm (Categories)
@@ -213,4 +214,18 @@ CREATE INDEX idx_audit_logs_created_at ON audit_logs (created_at DESC);
 -- Indexes cho Password Reset OTPs
 CREATE INDEX idx_password_reset_otps_username ON password_reset_otps (username);
 CREATE INDEX idx_password_reset_otps_email ON password_reset_otps (email);
+
+-- Bảng Sao lưu dữ liệu (Backups)
+CREATE TABLE backups (
+    id SERIAL PRIMARY KEY,
+    branch_id INT REFERENCES branches(id) ON DELETE CASCADE,
+    filename VARCHAR(255) NOT NULL,
+    filepath VARCHAR(500) NOT NULL,
+    file_size BIGINT NOT NULL,
+    backup_type VARCHAR(50) NOT NULL, -- 'AUTO', 'MANUAL'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by INT REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_backups_branch_id ON backups (branch_id);
 

@@ -660,7 +660,7 @@ function formatDateTime(dateTimeStr: string) {
 
         <!-- Add Product to Head Branch -->
         <button 
-          v-if="activeTab === 'head' && (isAdmin || userIsAtHeadBranch)"
+          v-if="activeTab === 'head' && (isAdmin || (userIsAtHeadBranch && user?.role !== 'STAFF'))"
           @click="openCreateInventoryModal" 
           class="h-[42px] bg-[#4361ee] hover:bg-[#3a0ca3] text-white px-5 rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-2"
         >
@@ -1229,16 +1229,17 @@ function formatDateTime(dateTimeStr: string) {
               <div v-if="selectedInv.hasExpiry" class="flex justify-between py-1 items-center group/warning">
                 <span class="text-[#8094ae] font-semibold flex items-center gap-1">
                   Cảnh báo hết hạn trước
-                  <i class="fas fa-pen text-[10px] text-slate-300 group-hover/warning:text-[#4361ee] transition-colors"></i>
+                  <i v-if="user?.role !== 'STAFF'" class="fas fa-pen text-[10px] text-slate-300 group-hover/warning:text-[#4361ee] transition-colors"></i>
                 </span>
                 <div class="flex items-center gap-1.5">
                   <input 
                     v-model="selectedInv.expiryWarningDays" 
                     type="number" 
                     min="1"
+                    :disabled="user?.role === 'STAFF'"
                     @blur="updateExpiryWarning(selectedInv)"
                     @keyup.enter="($event.target as any).blur()"
-                    class="w-14 h-7 px-1 text-right border border-[#e2e8f0] bg-[#f8f9fa] hover:bg-white focus:bg-white rounded text-sm font-bold text-[#4361ee] focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all shadow-sm"
+                    class="w-14 h-7 px-1 text-right border border-[#e2e8f0] bg-[#f8f9fa] hover:bg-white focus:bg-white rounded text-sm font-bold text-[#4361ee] focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                   <span class="text-xs font-bold text-[#364a63]">ngày</span>
                 </div>
@@ -1284,6 +1285,7 @@ function formatDateTime(dateTimeStr: string) {
           <!-- Footer -->
           <div class="p-6 border-t border-[#f1f5f9] bg-[#f8fafc] flex gap-3">
             <button 
+              v-if="user?.role !== 'STAFF'"
               class="h-11 px-4 bg-white border border-[#ea4f52] hover:bg-[#ea4f52] text-[#ea4f52] hover:text-white rounded-xl text-sm font-bold transition-all shadow-sm group" 
               title="Xoá dòng tồn kho này"
               @click="deleteInventory"
@@ -1297,6 +1299,7 @@ function formatDateTime(dateTimeStr: string) {
               Đóng
             </button>
             <button 
+              v-if="user?.role !== 'STAFF'"
               class="flex-1 h-11 bg-[#05b171] hover:bg-[#04965f] text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2"
               @click="openAddStockModal"
             >

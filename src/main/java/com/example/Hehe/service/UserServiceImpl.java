@@ -61,12 +61,32 @@ public class UserServiceImpl implements UserService {
         // Lấy tất cả user thoả mãn từ khoá/role/status (bỏ qua branchId từ query UI)
         List<User> users = userRepository.searchUsers(pattern, filterRole, null, filterStatus);
 
-        // Cách ly dữ liệu hoàn toàn bằng Java Stream:
-        // Chỉ giữ lại những người dùng có branchId trùng với isolatedBranchId của người đang đăng nhập.
-        // Những user nào trong DB chưa có branch (như tài khoản admin cũ), ta quy ước họ thuộc chi nhánh tổng.
+        // Cách ly dữ liệu theo vai trò nghiệp vụ:
+        // - ADMIN: thấy bản thân + nhân viên chi nhánh mình + các manager ở chi nhánh con (isHead != true)
+        // - MANAGER: thấy nhân viên thuộc chi nhánh của mình
+        // - STAFF: không có quyền (đã chặn ở trên)
         users = users.stream().filter(u -> {
-            Integer targetUserBranchId = u.getBranch() != null ? u.getBranch().getId() : headBranchId;
-            return isolatedBranchId != null && isolatedBranchId.equals(targetUserBranchId);
+            if (currentUser.getRole() == UserRole.ADMIN) {
+                // Thấy bản thân
+                if (u.getId().equals(currentUser.getId())) {
+                    return true;
+                }
+                // Nhân viên chi nhánh mình
+                Integer targetUserBranchId = u.getBranch() != null ? u.getBranch().getId() : headBranchId;
+                if (isolatedBranchId != null && isolatedBranchId.equals(targetUserBranchId)) {
+                    return true;
+                }
+                // Các manager ở chi nhánh con
+                if (u.getRole() == UserRole.MANAGER && u.getBranch() != null && !Boolean.TRUE.equals(u.getBranch().getIsHead())) {
+                    return true;
+                }
+                return false;
+            } else if (currentUser.getRole() == UserRole.MANAGER) {
+                // Thấy nhân viên thuộc chi nhánh của mình
+                Integer targetUserBranchId = u.getBranch() != null ? u.getBranch().getId() : headBranchId;
+                return isolatedBranchId != null && isolatedBranchId.equals(targetUserBranchId);
+            }
+            return false;
         }).collect(Collectors.toList());
 
         return users.stream()

@@ -2,6 +2,10 @@
 title WareHub Backend
 cd /d "%~dp0"
 
+:: Ep buoc Java luon su dung IPv4 de tranh loi ket noi Mail Server (smtp.gmail.com)
+set "_JAVA_OPTIONS=-Djava.net.preferIPv4Stack=true"
+
+
 :loop
 echo Dang nap cau hinh thong minh tu .env...
 if exist "%TEMP%\set_env.bat" del "%TEMP%\set_env.bat"

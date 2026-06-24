@@ -251,15 +251,23 @@ Kiểm kê kho là nghiệp vụ định kỳ để đối chiếu và sửa sai
 
 ## 11. NGHIỆP VỤ SAO LƯU & PHỤC HỒI (WEB-BASED BACKUP & RESTORE)
 
-Chức năng sao lưu và phục hồi được thực hiện trực tiếp từ trình duyệt. **Chỉ `MANAGER` mới có quyền thực hiện**, phạm vi giới hạn trong dữ liệu của chi nhánh mình.
+Chức năng sao lưu và phục hồi được thực hiện trực tiếp từ giao diện Web. **Chỉ `MANAGER` (Quản lý chi nhánh) mới có quyền thực hiện**, và chỉ giới hạn trong vùng dữ liệu của chi nhánh đó.
 
-*   **Sao lưu dữ liệu (Backup):**
-    *   Manager kích hoạt chức năng sao lưu trên giao diện.
-    *   Hệ thống backend truy vấn dữ liệu chi nhánh X (tồn kho, phiếu kho, kiểm kê, khách hàng), serialize thành file JSON hoặc SQL và kích hoạt tải xuống qua trình duyệt.
-*   **Phục hồi dữ liệu (Restore):**
-    *   Manager tải lên file sao lưu (.json hoặc .sql) từ máy tính qua form giao diện Web.
-    *   Backend nhận file, phân tích dữ liệu và nạp đè vào PostgreSQL trong một transaction bảo mật.
-    *   Hệ thống chỉ cho phép phục hồi dữ liệu thuộc chi nhánh X, không được ghi đè dữ liệu chi nhánh khác.
+### 11.1. Giải pháp Bảo mật & An toàn dữ liệu
+Để chống rò rỉ và chỉnh sửa trái phép, hệ thống áp dụng:
+*   **Mã hoá AES-256-GCM:** Xuất file định dạng `.wbk` (nhị phân). Người dùng không thể đọc trộm file bằng trình soạn thảo văn bản.
+*   **Chống giả mạo HMAC-SHA256:** File bị chỉnh sửa dù chỉ 1 byte sẽ bị hệ thống phát hiện và từ chối khôi phục.
+*   **Lock Chi Nhánh (Is_Locked):** Tạm khóa toàn bộ giao dịch nhập/xuất kho của nhân viên trong lúc đang nạp lại dữ liệu, tránh xung đột.
+*   **Database Transaction:** Nạp dữ liệu theo cơ chế "Được ăn cả, ngã về không". Nếu cúp điện giữa chừng, dữ liệu cũ tự Rollback, không lo hỏng DB.
+
+### 11.2. Quy trình Hoạt động
+*   **Sao lưu (Backup):** 
+    *   Gom toàn bộ: Tồn kho, phiếu kho, khách hàng, và **tài khoản nhân viên**.
+    *   Gồm 2 loại: **Thủ công** (Manager tải file `.wbk` về máy) và **Tự động** (Lưu trên server mỗi đêm, dọn rác sau 14 ngày).
+*   **Phục hồi (Restore):**
+    *   Hệ thống kiểm tra `MAGIC HEADER`, giải mã và nạp đè dữ liệu.
+    *   **Ràng buộc:** File của chi nhánh nào chỉ được khôi phục cho chi nhánh đó.
+*   **Truy vết (Audit Log):** Mọi thao tác tải file hay khôi phục đều bị ghi cứng vào Nhật ký hệ thống, không thể xóa.
 
 ---
 

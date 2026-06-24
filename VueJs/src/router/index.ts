@@ -49,6 +49,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/UsersView.vue'),
       },
       {
+        path: '/backup-restore',
+        name: 'BackupRestore',
+        component: () => import('../views/BackupRestoreView.vue'),
+      },
+      {
         path: '/branches',
         name: 'Branches',
         component: () => import('../views/BranchesView.vue'),
@@ -103,6 +108,22 @@ router.beforeEach((to, _from, next) => {
     const hasCrud = user && user.role === 'ADMIN'
     if (!hasCrud) {
       next('/global-inventory')
+    } else {
+      next()
+    }
+  } else if (to.path === '/users') {
+    // Chỉ ADMIN và MANAGER mới được vào Users
+    const canView = user && ['ADMIN', 'MANAGER'].includes(user.role)
+    if (!canView) {
+      next('/dashboard')
+    } else {
+      next()
+    }
+  } else if (to.path === '/backup-restore') {
+    // ADMIN và MANAGER đều được vào Backup & Restore
+    const canView = user && ['ADMIN', 'MANAGER'].includes(user.role)
+    if (!canView) {
+      next('/dashboard')
     } else {
       next()
     }

@@ -41,3 +41,7 @@ out/
 run_backend.bat
 run_frontend.bat
 run_warehub.bat
+
+
+### Uploads & Backups ###
+uploads/
