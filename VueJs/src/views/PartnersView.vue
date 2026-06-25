@@ -149,7 +149,7 @@ async function loadCustomers() {
 function handleDebtInput() {
   if (cDebtAmount.value && cDebtTarget.value) {
     let val = Number(cDebtAmount.value);
-    const maxDebt = cDebtTarget.value.debt || 0;
+    const maxDebt = Math.max(0, cDebtTarget.value.debt || 0);
     if (val < 0 && Math.abs(val) > maxDebt) {
       cDebtAmount.value = -maxDebt;
     }
@@ -190,9 +190,6 @@ function formatCurrency(val: any) {
             <option value="INACTIVE">Ngừng hoạt động</option>
           </select>
         </div>
-        <button v-if="isManager" class="bg-[#4361ee] text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-sm flex items-center gap-2" @click="openAddC">
-          <i class="fas fa-plus"></i> Thêm Khách hàng
-        </button>
       </div>
 
       <!-- Table -->
@@ -224,7 +221,7 @@ function formatCurrency(val: any) {
               </td>
               <td class="p-4 text-right first:rounded-l-xl last:rounded-r-xl">
                 <span :class="['font-bold font-mono', (c.debt ?? 0) > 0 ? 'text-[#f4bd0e]' : 'text-[#8094ae]']">
-                  {{ formatCurrency(c.debt ?? 0) }}
+                  {{ formatCurrency(Math.max(0, c.debt ?? 0)) }}
                 </span>
               </td>
               <td class="p-4 text-center first:rounded-l-xl last:rounded-r-xl"><StatusBadge :value="c.status" type="status" /></td>
@@ -387,7 +384,7 @@ function formatCurrency(val: any) {
         <div class="bg-[#f8f9fa] rounded-xl px-5 py-4 border border-[#e2e8f0]">
           <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wider">Khách hàng</div>
           <div class="font-bold text-[#364a63] text-lg mt-1">{{ cDebtTarget?.name }}</div>
-          <div class="text-sm font-mono mt-2" :class="(cDebtTarget?.debt ?? 0) > 0 ? 'text-[#f4bd0e]' : 'text-[#05b171]'">Nợ hiện tại: {{ formatCurrency(cDebtTarget?.debt ?? 0) }}</div>
+          <div class="text-sm font-mono mt-2" :class="(cDebtTarget?.debt ?? 0) > 0 ? 'text-[#f4bd0e]' : 'text-[#05b171]'">Nợ hiện tại: {{ formatCurrency(Math.max(0, cDebtTarget?.debt ?? 0)) }}</div>
         </div>
         <div>
           <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số tiền điều chỉnh (VNĐ)</label>

@@ -126,24 +126,23 @@ public class CustomerServiceImpl implements CustomerService {
         Customer customer = customerRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy khách hàng với ID: " + id));
 
-        // Kiểm tra xem đối tác đã có giao dịch phát sinh chưa (phiếu kho liên kết)
-        Number count = (Number) entityManager.createNativeQuery(
-                "SELECT COUNT(*) FROM receipts WHERE customer_id = ?")
-                .setParameter(1, id)
-                .getSingleResult();
-        if (count != null && count.longValue() > 0) {
-            throw new RuntimeException("Đối tác đã phát sinh giao dịch trong hệ thống, không thể xóa. Vui lòng chuyển trạng thái sang NGỪNG HOẠT ĐỘNG (INACTIVE).");
+        if (!"INACTIVE".equals(customer.getStatus())) {
+            throw new RuntimeException("Chỉ có thể xóa khách hàng sau khi đã chuyển trạng thái sang NGỪNG HOẠT ĐỘNG (INACTIVE).");
         }
 
         try {
+            entityManager.createNativeQuery("UPDATE receipts SET customer_id = NULL WHERE customer_id = ?")
+                    .setParameter(1, id)
+                    .executeUpdate();
+
             customerRepository.delete(customer);
             
             // Ghi audit log
             logAudit(currentUser.getId(), "DELETE_CUSTOMER", "customers",
                     id.toString(),
                     "Xóa khách hàng: " + customer.getName());
-        } catch (DataIntegrityViolationException ex) {
-            throw new RuntimeException("Đối tác đã phát sinh giao dịch trong hệ thống, không thể xóa. Vui lòng chuyển trạng thái sang NGỪNG HOẠT ĐỘNG (INACTIVE).");
+        } catch (Exception ex) {
+            throw new RuntimeException("Lỗi khi xóa khách hàng: " + ex.getMessage());
         }
     }
 
@@ -153,6 +152,11 @@ public class CustomerServiceImpl implements CustomerService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy khách hàng với ID: " + id));
 
         String newStatus = "ACTIVE".equals(customer.getStatus()) ? "INACTIVE" : "ACTIVE";
+        
+        if ("INACTIVE".equals(newStatus) && customer.getDebt() != null && customer.getDebt().compareTo(BigDecimal.ZERO) > 0) {
+            throw new RuntimeException("Không thể ngừng hoạt động khách hàng khi khách hàng vẫn còn nợ.");
+        }
+
         customer.setStatus(newStatus);
 
         Customer savedCustomer = customerRepository.save(customer);

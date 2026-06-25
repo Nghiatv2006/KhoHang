@@ -11,26 +11,59 @@ const isManager = computed(() => user.value?.role === 'MANAGER')
 const canApprove = computed(() => isAdmin.value || isManager.value)
 
 function canApproveReceipt(r: any) {
-  if (r.status !== 'DRAFT') return false;
-  if (isAdmin.value) return true;
-  
-  const isCrossBranchImport = r.type === 'IMPORT' && r.sourceBranchId !== r.destBranchId;
-  if (isCrossBranchImport) {
-      if (isManager.value && r.sourceBranchId === user.value?.branchId) return true;
+  if (r.status === 'DRAFT') {
+      if (r.type === 'EXPORT' && isAdmin.value && r.sourceBranchId !== 1) return false;
+      if (isAdmin.value) return true;
+      if (isManager.value) {
+          if (r.sourceBranchId === user.value?.branchId || r.destBranchId === user.value?.branchId) return true;
+      }
       return false;
   }
-  
-  if (isManager.value && r.createdByRole === 'STAFF') return true;
+  if (r.status === 'PENDING_ADMIN') {
+      if (r.type === 'IMPORT') {
+          if (isAdmin.value) return true;
+          return false;
+      }
+      if (r.type === 'TRANSFER') {
+          if (isAdmin.value) return true;
+          if (isManager.value && r.destBranchId === user.value?.branchId) return true;
+          return false;
+      }
+  }
   return false;
 }
 
+function approveReceiptText(r: any) {
+    if (r.type === 'IMPORT' && r.status === 'DRAFT' && isManager.value && !isAdmin.value) {
+        return "Duyệt (Gửi Admin)";
+    }
+    if (r.type === 'IMPORT' && r.status === 'PENDING_ADMIN' && isAdmin.value) {
+        return "Chấp nhận nhập kho";
+    }
+    if (r.type === 'TRANSFER' && r.status === 'DRAFT') {
+        return "Duyệt (Gửi Manager chi nhánh đích)";
+    }
+    if (r.type === 'TRANSFER' && r.status === 'PENDING_ADMIN') {
+        return "Duyệt điều chuyển";
+    }
+    return "Phê duyệt";
+}
+
 function canCancelReceipt(r: any) {
-  if (r.status !== 'DRAFT') return false;
+  if (r.status !== 'DRAFT' && r.status !== 'PENDING_ADMIN' && r.status !== 'PENDING_STOCKTAKE') return false;
+  if (r.status === 'PENDING_STOCKTAKE' && r.type !== 'IMPORT' && r.type !== 'TRANSFER') return false;
+  if (r.type === 'EXPORT' && isAdmin.value && r.sourceBranchId !== 1) return false;
   if (isAdmin.value) return true;
   if (!isManager.value) return false;
   
+  if (r.status === 'PENDING_STOCKTAKE') return false;
+  
   const isCrossBranchImport = r.type === 'IMPORT' && r.sourceBranchId !== r.destBranchId;
   if (isCrossBranchImport) {
+      return r.sourceBranchId === user.value?.branchId || r.destBranchId === user.value?.branchId;
+  }
+  
+  if (r.type === 'TRANSFER') {
       return r.sourceBranchId === user.value?.branchId || r.destBranchId === user.value?.branchId;
   }
   
@@ -44,6 +77,7 @@ const receipts = ref<any[]>([])
 const products = ref<any[]>([])
 const branches = ref<any[]>([])
 const customers = ref<any[]>([])
+const inventories = ref<any[]>([])
 const loading = ref(true)
 
 // ──────────────────────────────────────────────────────────────
@@ -130,7 +164,7 @@ async function loadData() {
       api.get('/api/receipts'),
       api.get('/api/products'),
       api.get('/api/branches'),
-      api.get('/api/customers'),
+      api.get('/api/customers')
     ])
     if (rRes.ok) receipts.value = await rRes.json()
     if (pRes.ok) products.value = await pRes.json()
@@ -153,7 +187,7 @@ const headBranch = computed(() => branches.value.find(b => b.isHead) || branches
 // ──────────────────────────────────────────────────────────────
 // STATS
 // ──────────────────────────────────────────────────────────────
-const statDraft = computed(() => receipts.value.filter(r => canApproveReceipt(r)).length)
+const statDraft = computed(() => receipts.value.filter(r => r.status === 'DRAFT').length)
 const statCompleted = computed(() => receipts.value.filter(r => r.status === 'COMPLETED').length)
 const statCancelled = computed(() => receipts.value.filter(r => r.status === 'CANCELLED').length)
 
@@ -235,6 +269,8 @@ function onCustomerInput() {
 
 interface DetailRow {
   productId: number | ''
+  batchCode: string
+  isNewBatch?: boolean
   manufacturingDate: string
   expirationDate: string
   quantity: number
@@ -252,14 +288,14 @@ function openCreateModal() {
     customerPhone: '',
     paymentStatus: 'UNPAID',
     description: '',
-    details: [{ productId: '', manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 }]
+    details: [{ productId: '', batchCode: '', isNewBatch: false, manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 }]
   }
   onTypeChange()
   showCreateModal.value = true
 }
 
 function addDetailRow() {
-  createForm.value.details.push({ productId: '', manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 })
+  createForm.value.details.push({ productId: '', batchCode: '', isNewBatch: false, manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 })
 }
 
 function removeDetailRow(index: number) {
@@ -352,16 +388,59 @@ function getAvailableProductsForRow(index: number) {
 
 function onProductChange(row: DetailRow) {
   const p = products.value.find(x => x.id === Number(row.productId))
+  row.batchCode = ''
+  row.isNewBatch = false
   if (p) {
     row.quantity = 1 // Reset quantity to 1 when changing to a valid product
     row.price = Number(p.price) || 0
     if (!p.hasExpiry) {
       row.manufacturingDate = '1970-01-01'
       row.expirationDate = '1970-01-01'
+    } else {
+      row.manufacturingDate = ''
+      row.expirationDate = ''
     }
   } else {
     row.quantity = 0 // Reset to 0 if no product is selected
     row.price = 0
+  }
+  constrainQuantity(row)
+}
+
+function getBatchesForProduct(productId: number | string | null) {
+  if (!productId) return []
+  if (createForm.value.type === 'ADJUST_IN' || (createForm.value.type === 'IMPORT' && !createForm.value.sourceBranchId)) {
+    const uniqueBatches = new Map()
+    globalInventories.value.filter(inv => inv.productId === Number(productId)).forEach(inv => {
+      if (!uniqueBatches.has(inv.batchCode)) {
+        uniqueBatches.set(inv.batchCode, { ...inv })
+      } else {
+        const existing = uniqueBatches.get(inv.batchCode)
+        existing.quantity += inv.quantity
+      }
+    })
+    return Array.from(uniqueBatches.values())
+  }
+  return sourceInventories.value
+    .filter(inv => inv.productId === Number(productId) && inv.quantity > 0)
+    .map(inv => {
+      const pendingQty = receipts.value
+        .filter(r => r.status === 'DRAFT' && r.sourceBranchId === createForm.value.sourceBranchId && 
+                (['EXPORT', 'TRANSFER', 'ADJUST_OUT'].includes(r.type) || 
+                 (r.type === 'IMPORT' && r.sourceBranchId !== r.destBranchId)))
+        .flatMap(r => r.details || [])
+        .filter(d => Number(d.productId) === Number(productId) && d.batchCode === inv.batchCode)
+        .reduce((sum, d) => sum + Number(d.quantity), 0);
+      return { ...inv, quantity: Math.max(0, inv.quantity - pendingQty) };
+    });
+}
+
+function onBatchChange(row: DetailRow) {
+  if (!row.batchCode) return
+  const inv = globalInventories.value.find(x => x.productId === Number(row.productId) && x.batchCode === row.batchCode)
+  if (inv) {
+    if (inv.manufacturingDate && inv.manufacturingDate !== '1970-01-01') row.manufacturingDate = inv.manufacturingDate
+    if (inv.expirationDate && inv.expirationDate !== '1970-01-01') row.expirationDate = inv.expirationDate
   }
   constrainQuantity(row)
 }
@@ -372,15 +451,23 @@ const selectedProductHasExpiry = (row: DetailRow) => {
   return p?.hasExpiry ?? false
 }
 
-function getMaxQuantity(productId: number | string | null) {
-  if (!productId) return null
+function getMaxQuantity(row: DetailRow) {
+  if (!row.productId) return null
   if (createForm.value.type === 'ADJUST_IN') return null
   if (!createForm.value.sourceBranchId) return null
   if (createForm.value.type === 'IMPORT' && createForm.value.sourceBranchId === createForm.value.destBranchId) return null
   
-  const totalQty = sourceInventories.value
-    .filter(x => x.productId === Number(productId))
-    .reduce((sum, inv) => sum + inv.quantity, 0)
+  if (!row.isNewBatch && !row.batchCode) return null;
+
+  let totalQty = 0;
+  if (row.batchCode && !row.isNewBatch) {
+    const inv = sourceInventories.value.find(x => x.productId === Number(row.productId) && x.batchCode === row.batchCode)
+    totalQty = inv ? inv.quantity : 0;
+  } else {
+    totalQty = sourceInventories.value
+      .filter(x => x.productId === Number(row.productId))
+      .reduce((sum, inv) => sum + inv.quantity, 0)
+  }
 
   // Trừ đi số lượng đang nằm trong các phiếu nháp chờ xuất/điều chuyển
   const pendingQty = receipts.value
@@ -388,23 +475,28 @@ function getMaxQuantity(productId: number | string | null) {
             (['EXPORT', 'TRANSFER', 'ADJUST_OUT'].includes(r.type) || 
              (r.type === 'IMPORT' && r.sourceBranchId !== r.destBranchId)))
     .flatMap(r => r.details || [])
-    .filter(d => Number(d.productId) === Number(productId))
+    .filter(d => Number(d.productId) === Number(row.productId) && (!row.batchCode || d.batchCode === row.batchCode))
     .reduce((sum, d) => sum + Number(d.quantity), 0)
 
   return Math.max(0, totalQty - pendingQty)
 }
 
-function getGlobalQuantity(productId: number | string | null) {
-  if (!productId) return 0
+function getGlobalQuantity(row: DetailRow) {
+  if (!row.productId) return null;
+  if (!row.isNewBatch && !row.batchCode) return null;
+  if (row.batchCode && !row.isNewBatch) {
+    const inv = globalInventories.value.find(x => x.productId === Number(row.productId) && x.batchCode === row.batchCode)
+    return inv ? inv.quantity : 0
+  }
   return globalInventories.value
-    .filter(x => x.productId === Number(productId))
+    .filter(x => x.productId === Number(row.productId))
     .reduce((sum, inv) => sum + inv.quantity, 0)
 }
 
 function constrainQuantity(d: DetailRow) {
   if (d.quantity === null || d.quantity === undefined || (d.quantity as any) === '') return;
   if (createForm.value.type === 'ADJUST_IN' || (createForm.value.type === 'IMPORT' && createForm.value.sourceBranchId === createForm.value.destBranchId)) return;
-  const max = getMaxQuantity(d.productId)
+  const max = getMaxQuantity(d)
   if (max !== null) {
     if (max === 0) {
       d.quantity = 0
@@ -420,7 +512,7 @@ function onQuantityBlur(d: DetailRow) {
   }
   if (createForm.value.type === 'ADJUST_IN' || (createForm.value.type === 'IMPORT' && createForm.value.sourceBranchId === createForm.value.destBranchId)) return;
   
-  const max = getMaxQuantity(d.productId)
+  const max = getMaxQuantity(d)
   if (max !== null && max === 0) {
     d.quantity = 0;
   }
@@ -430,8 +522,8 @@ async function submitCreateDraft() {
   if (submittingCreate.value) return
   if (!createForm.value.sourceBranchId && createForm.value.type !== 'IMPORT') { toast.error('Vui lòng chọn loại phiếu.'); return }
   const f = createForm.value
-  if (f.details.some(d => !d.productId || d.quantity <= 0)) {
-    toast.error('Vui lòng điền đầy đủ sản phẩm và số lượng hợp lệ.')
+  if (f.details.some(d => !d.productId || d.quantity <= 0 || !d.batchCode?.trim())) {
+    toast.error('Vui lòng điền đầy đủ sản phẩm, lô sản xuất và số lượng hợp lệ.')
     return
   }
   if (f.type === 'EXPORT') {
@@ -447,7 +539,7 @@ async function submitCreateDraft() {
 
   const isConstrained = f.type !== 'ADJUST_IN' && !(f.type === 'IMPORT' && f.sourceBranchId === f.destBranchId)
   if (isConstrained && f.details.some(d => {
-    const max = getMaxQuantity(d.productId)
+    const max = getMaxQuantity(d)
     return max !== null && d.quantity > max
   })) {
     toast.error('Số lượng vượt quá tồn kho hiện tại.')
@@ -465,6 +557,7 @@ async function submitCreateDraft() {
     description: f.description,
     details: f.details.map(d => ({
       productId: Number(d.productId),
+      batchCode: d.batchCode,
       quantity: d.quantity,
       price: d.price,
       manufacturingDate: d.manufacturingDate || '1970-01-01',
@@ -635,6 +728,69 @@ async function submitConfirmTransfer() {
   }
 }
 
+
+
+// ──────────────────────────────────────────────────────────────
+// CONFIRM STOCKTAKE MODAL
+// ──────────────────────────────────────────────────────────────
+const showStocktakeModal = ref(false)
+const stocktakeReceipt = ref<any>(null)
+const stocktakeItems = ref<{ receiptDetailId: number; productName: string; sentQty: number; actualQuantity: number; shortfallReason?: string }[]>([])
+const submittingStocktake = ref(false)
+
+function canConfirmStocktake(receipt: any) {
+  if (receipt.type !== 'IMPORT' && receipt.type !== 'TRANSFER') return false
+  if (receipt.status !== 'PENDING_STOCKTAKE') return false
+  if (user.value?.role !== 'STAFF') return false;
+  return receipt.destBranchId === user.value?.branchId
+}
+
+function openStocktakeModal(receipt: any) {
+  stocktakeReceipt.value = receipt
+  stocktakeItems.value = (receipt.details || []).map((d: any) => ({
+    receiptDetailId: d.id,
+    productName: d.productName,
+    sentQty: d.quantity,
+    actualQuantity: d.quantity,
+    shortfallReason: ''
+  }))
+  showStocktakeModal.value = true
+}
+
+async function submitConfirmStocktake() {
+  if (submittingStocktake.value) return
+  if (stocktakeItems.value.some(i => i.actualQuantity < 0)) {
+    toast.error('Số lượng thực tế không được âm.'); return
+  }
+  if (stocktakeItems.value.some(i => i.actualQuantity < i.sentQty && (!i.shortfallReason || i.shortfallReason.trim() === ''))) {
+    toast.error('Vui lòng nhập đầy đủ lý do cho các sản phẩm bị hao hụt.'); return
+  }
+  submittingStocktake.value = true
+  try {
+    const payload = {
+      items: stocktakeItems.value.map(i => ({
+        receiptDetailId: i.receiptDetailId,
+        actualQuantity: i.actualQuantity,
+        shortfallReason: i.actualQuantity < i.sentQty ? i.shortfallReason : null
+      }))
+    }
+    const res = await api.post(`/api/receipts/${stocktakeReceipt.value.id}/confirm-stocktake`, payload)
+    if (res.ok) {
+      toast.success('Xác nhận kiểm kê thành công! Hàng đã được cộng vào kho.')
+      showStocktakeModal.value = false
+      showDetail.value = false
+      await loadData()
+    } else {
+      const err = await res.json()
+      toast.error(err.message || 'Lỗi khi xác nhận kiểm kê.')
+    }
+  } catch (e: any) {
+    toast.error('Lỗi kết nối: ' + e.message)
+  } finally {
+    submittingStocktake.value = false
+  }
+}
+
 // ──────────────────────────────────────────────────────────────
 // HELPERS
 // ──────────────────────────────────────────────────────────────
@@ -669,13 +825,50 @@ function typeClass(t: string) {
   }
   return map[t] || 'bg-gray-100 text-gray-600'
 }
-function statusClass(s: string) {
+function statusClass(r: any) {
+  const s = r?.status;
+  if (r?.type === 'TRANSFER' && s === 'PENDING_ADMIN') {
+    if (r.sourceBranchId === user.value?.branchId) {
+      return 'bg-green-100 text-green-700 border border-green-300';
+    }
+    return 'bg-orange-100 text-orange-700 border border-orange-300';
+  }
+  if ((s === 'PENDING_ADMIN' || s === 'PENDING_STOCKTAKE') && r?.type === 'TRANSFER') {
+    return 'bg-orange-100 text-orange-700 border border-orange-300';
+  }
   const map: Record<string, string> = {
     DRAFT: 'bg-yellow-100 text-yellow-700 border border-yellow-300',
+    PENDING_ADMIN: 'bg-blue-100 text-blue-700 border border-blue-300',
+    PENDING_STOCKTAKE: 'bg-purple-100 text-purple-700 border border-purple-300',
     COMPLETED: 'bg-green-100 text-green-700 border border-green-300',
     CANCELLED: 'bg-red-100 text-red-600 border border-red-300'
   }
   return map[s] || 'bg-gray-100 text-gray-600'
+}
+
+function statusLabel(r: any) {
+  const s = r?.status;
+  if (s === 'DRAFT') return '⏳ Chờ duyệt';
+  if (s === 'PENDING_ADMIN') {
+    if (r?.type === 'TRANSFER') {
+      if (r.sourceBranchId === user.value?.branchId) return '✅ Đã duyệt';
+      if (r.destBranchId === user.value?.branchId) {
+        if (isManager.value) return '⏳ Chờ duyệt';
+        return '🛡️ Chờ Manager';
+      }
+      return '🛡️ Chờ Manager';
+    }
+    return '🛡️ Chờ Admin';
+  }
+  if (s === 'PENDING_STOCKTAKE') {
+    if (r?.type === 'TRANSFER' && r.sourceBranchId === user.value?.branchId) {
+      return '✅ Đã duyệt'; // Cũng hiện đã duyệt cho bên gửi khi chờ kiểm kê
+    }
+    return '📦 Chờ kiểm kê';
+  }
+  if (s === 'COMPLETED') return '✅ Đã duyệt';
+  if (s === 'CANCELLED') return '❌ Đã hủy';
+  return s;
 }
 function paymentStatusLabel(p: string) {
   const map: Record<string, string> = {
@@ -694,14 +887,9 @@ function paymentStatusClass(p: string) {
   return map[p] || ''
 }
 
-// Can the current user confirm transfer for this receipt?
+// Can the current user confirm transfer for this receipt? (Deprecated, use confirmStocktake instead)
 function canConfirmTransfer(receipt: any) {
-  if (receipt.type !== 'TRANSFER') return false
-  if (receipt.status !== 'COMPLETED') return false
-  if (receipt.paymentStatus !== 'IN_TRANSIT') return false
-  // Must be dest branch (admin also blocked if not in dest branch)
-  return receipt.destBranchId === user.value?.branchId
-  return receipt.destBranchId === user.value?.branchId
+  return false;
 }
 
 function getCustomerName(receipt: any) {
@@ -894,8 +1082,8 @@ function getCustomerName(receipt: any) {
               </td>
               <td class="px-5 py-4">
                 <div class="flex flex-col gap-1">
-                  <span :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-bold', statusClass(r.status)]">
-                    {{ r.status === 'DRAFT' ? '⏳ Chờ duyệt' : r.status === 'COMPLETED' ? '✅ Đã duyệt' : '❌ Đã hủy' }}
+                  <span :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-bold', statusClass(r)]">
+                    {{ statusLabel(r) }}
                   </span>
                   <span v-if="r.paymentStatus === 'RECEIVED'" :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold mt-1', paymentStatusClass(r.paymentStatus)]">
                     📦 Đã nhận hàng
@@ -984,8 +1172,8 @@ function getCustomerName(receipt: any) {
               <div>
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Trạng thái</div>
                 <div class="flex flex-col items-start gap-1">
-                  <span :class="['inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold', statusClass(selectedReceipt.status)]">
-                    {{ selectedReceipt.status === 'DRAFT' ? '⏳ Chờ duyệt' : selectedReceipt.status === 'COMPLETED' ? '✅ Đã duyệt' : '❌ Đã hủy' }}
+                  <span :class="['inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold', statusClass(selectedReceipt)]">
+                    {{ statusLabel(selectedReceipt) }}
                   </span>
                   <span v-if="selectedReceipt.paymentStatus === 'RECEIVED'" :class="['inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold', paymentStatusClass(selectedReceipt.paymentStatus)]">
                     📦 Đã nhận hàng
@@ -1034,34 +1222,39 @@ function getCustomerName(receipt: any) {
                       <th class="px-4 py-2.5 text-left font-bold">Sản phẩm</th>
                       <th class="px-4 py-2.5 text-center font-bold">NSX</th>
                       <th class="px-4 py-2.5 text-center font-bold">HSD</th>
-                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type === 'TRANSFER' && selectedReceipt.paymentStatus === 'RECEIVED'">SL Gửi</th>
-                      <th class="px-4 py-2.5 text-right font-bold text-teal-600" v-if="selectedReceipt.type === 'TRANSFER' && selectedReceipt.paymentStatus === 'RECEIVED'">SL Nhận</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.status === 'COMPLETED' && selectedReceipt.details?.some(x => x.receivedQuantity !== null)">SL Gửi</th>
+                      <th class="px-4 py-2.5 text-right font-bold text-teal-600" v-if="selectedReceipt.status === 'COMPLETED' && selectedReceipt.details?.some(x => x.receivedQuantity !== null)">SL Nhận</th>
                       <th class="px-4 py-2.5 text-right font-bold" v-else>SL</th>
-                      <th class="px-4 py-2.5 text-right font-bold">Đơn giá</th>
-                      <th class="px-4 py-2.5 text-right font-bold">Thành tiền</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Đơn giá</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Thành tiền</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-[#f1f5f9]">
                     <tr v-for="d in selectedReceipt.details" :key="d.id" class="hover:bg-[#f8f9fa]/50">
-                      <td class="px-4 py-3 font-semibold text-[#364a63]">{{ d.productName }}</td>
+                      <td class="px-4 py-3">
+                        <div class="font-semibold text-[#364a63]">{{ d.productName }}</div>
+                        <div v-if="d.receivedQuantity !== null && d.receivedQuantity < d.quantity" class="text-[11px] text-red-500 font-normal mt-1 flex items-start gap-1">
+                          <i class="fas fa-exclamation-circle mt-0.5"></i>
+                          <span>Lý do hao hụt: {{ d.shortfallReason }}</span>
+                        </div>
+                      </td>
                       <td class="px-4 py-3 text-center text-[#8094ae]">{{ formatDate(d.manufacturingDate) }}</td>
                       <td class="px-4 py-3 text-center text-[#8094ae]">{{ formatDate(d.expirationDate) }}</td>
-                      <td class="px-4 py-3 text-right font-bold" v-if="selectedReceipt.type === 'TRANSFER' && selectedReceipt.paymentStatus === 'RECEIVED'">{{ d.quantity }}</td>
-                      <td class="px-4 py-3 text-right font-bold text-teal-600" v-if="selectedReceipt.type === 'TRANSFER' && selectedReceipt.paymentStatus === 'RECEIVED'">
+                      <td class="px-4 py-3 text-right font-bold" v-if="d.receivedQuantity !== null && selectedReceipt.status === 'COMPLETED'">{{ d.quantity }}</td>
+                      <td class="px-4 py-3 text-right font-bold text-teal-600" v-if="d.receivedQuantity !== null && selectedReceipt.status === 'COMPLETED'">
                         {{ d.receivedQuantity !== null ? d.receivedQuantity : d.quantity }}
-                        <span v-if="d.receivedQuantity !== null && d.receivedQuantity < d.quantity" class="text-xs text-amber-500 block" :title="d.shortfallReason">
+                        <span v-if="d.receivedQuantity !== null && d.receivedQuantity < d.quantity" class="text-xs text-amber-500 block">
                           (-{{ d.quantity - d.receivedQuantity }})
-                          <br/><span class="text-[10px] text-red-400 font-normal">Lý do: {{ d.shortfallReason }}</span>
                         </span>
                       </td>
                       <td class="px-4 py-3 text-right font-bold" v-else>{{ d.quantity }}</td>
-                      <td class="px-4 py-3 text-right">{{ formatVND(d.price) }}</td>
-                      <td class="px-4 py-3 text-right font-bold text-[#4361ee]">{{ formatVND(d.quantity * d.price) }}</td>
+                      <td class="px-4 py-3 text-right" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">{{ formatVND(d.price) }}</td>
+                      <td class="px-4 py-3 text-right font-bold text-[#4361ee]" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">{{ formatVND(d.quantity * d.price) }}</td>
                     </tr>
                   </tbody>
-                  <tfoot>
+                  <tfoot v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">
                     <tr class="bg-[#f8f9fa]">
-                      <td :colspan="(selectedReceipt.type === 'TRANSFER' && selectedReceipt.paymentStatus === 'RECEIVED') ? 6 : 5" class="px-4 py-2.5 text-right font-bold text-[#8094ae] text-xs uppercase">Tổng cộng</td>
+                      <td :colspan="(selectedReceipt.status === 'COMPLETED' && selectedReceipt.details?.some(x => x.receivedQuantity !== null)) ? 6 : 5" class="px-4 py-2.5 text-right font-bold text-[#8094ae] text-xs uppercase">Tổng cộng</td>
                       <td class="px-4 py-2.5 text-right font-extrabold text-[#4361ee]">
                         {{ formatVND((selectedReceipt.details || []).reduce((s: number, d: any) => s + d.quantity * d.price, 0)) }}
                       </td>
@@ -1070,36 +1263,53 @@ function getCustomerName(receipt: any) {
                 </table>
               </div>
             </div>
-          </div>
 
-          <!-- Actions -->
-          <div class="px-6 py-4 border-t border-[#f1f5f9] flex items-center justify-between gap-3 bg-[#f8f9fa]/50">
-            <button @click="showDetail = false" class="px-5 py-2.5 border border-[#e2e8f0] bg-white rounded-xl font-semibold text-[#364a63] text-sm transition-all hover:bg-[#f1f5f9]">
-              Đóng
-            </button>
-            <div class="flex gap-2">
-              <button v-if="selectedReceipt.status === 'DRAFT' && canApprove"
-                @click="cancelReceipt(selectedReceipt)"
-                class="px-5 py-2.5 bg-red-50 border border-red-200 text-red-600 rounded-xl font-bold text-sm hover:bg-red-500 hover:text-white transition-all">
-                <i class="fas fa-times mr-2"></i>Hủy phiếu
+            <!-- Approve & Cancel actions -->
+            <div v-if="canApproveReceipt(selectedReceipt)" class="mt-8 pt-5 border-t flex flex-wrap gap-4">
+              <button @click="approveReceipt(selectedReceipt)" :disabled="approvingId === selectedReceipt.id"
+                class="px-5 py-2.5 bg-[#10b981] hover:bg-[#059669] text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-check-circle" v-if="approvingId !== selectedReceipt.id"></i>
+                <i class="fas fa-spinner fa-spin" v-else></i> 
+                {{ approveReceiptText(selectedReceipt) }}
               </button>
-              <button v-if="canApproveReceipt(selectedReceipt)"
-                @click="approveReceipt(selectedReceipt)"
-                :disabled="approvingId === selectedReceipt.id"
-                class="px-5 py-2.5 bg-[#4361ee] text-white rounded-xl font-bold text-sm hover:bg-[#3a0ca3] transition-all disabled:opacity-60 flex items-center gap-2">
-                <i class="fas fa-check-circle"></i>Phê duyệt
+              <button @click="cancelReceipt(selectedReceipt)" v-if="canCancelReceipt(selectedReceipt)"
+                class="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-ban"></i> Hủy phiếu
               </button>
-              <button v-if="selectedReceipt.type === 'EXPORT' && selectedReceipt.status === 'COMPLETED' && (selectedReceipt.paymentStatus === 'UNPAID' || selectedReceipt.paymentStatus === 'Chưa thanh toán') && canApprove"
-                @click="markAsPaid(selectedReceipt)"
-                :disabled="markingPaidId === selectedReceipt.id"
-                class="px-5 py-2.5 bg-emerald-500 text-white rounded-xl font-bold text-sm hover:bg-emerald-600 transition-all disabled:opacity-60 flex items-center gap-2">
-                <i class="fas fa-hand-holding-usd"></i>Xác nhận thanh toán
+            </div>
+            <div v-else-if="canCancelReceipt(selectedReceipt)" class="mt-8 pt-5 border-t flex gap-4">
+              <button @click="cancelReceipt(selectedReceipt)"
+                class="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-ban"></i> Hủy phiếu
               </button>
-              <button v-if="canConfirmTransfer(selectedReceipt)"
-                @click="openConfirmTransferModal(selectedReceipt)"
-                class="px-5 py-2.5 bg-sky-500 text-white rounded-xl font-bold text-sm hover:bg-sky-600 transition-all flex items-center gap-2">
-                <i class="fas fa-truck-loading"></i>Xác nhận nhận hàng
+            </div>
+
+            <!-- Mark as Paid -->
+            <div v-if="selectedReceipt.status === 'COMPLETED' && selectedReceipt.type === 'EXPORT' && (selectedReceipt.paymentStatus === 'UNPAID' || selectedReceipt.paymentStatus === 'Chưa thanh toán')" class="mt-8 pt-5 border-t">
+              <button @click="markAsPaid(selectedReceipt)" :disabled="markingPaidId === selectedReceipt.id"
+                class="px-5 py-2.5 bg-[#f59e0b] hover:bg-[#d97706] text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-hand-holding-usd" v-if="markingPaidId !== selectedReceipt.id"></i>
+                <i class="fas fa-spinner fa-spin" v-else></i>
+                Xác nhận Đã Thanh Toán
               </button>
+              <p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle"></i> Công nợ khách hàng sẽ được cấn trừ tương ứng khi xác nhận.</p>
+            </div>
+
+            <!-- Confirm Receive (Transfer) -->
+            <div v-if="canConfirmTransfer(selectedReceipt)" class="mt-8 pt-5 border-t">
+              <button @click="openConfirmTransferModal(selectedReceipt)"
+                class="px-5 py-2.5 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-box-open"></i> Xác nhận Nhận Hàng & Cộng Kho
+              </button>
+            </div>
+
+            <!-- Confirm Stocktake (Import) -->
+            <div v-if="canConfirmStocktake(selectedReceipt)" class="mt-8 pt-5 border-t">
+              <button @click="openStocktakeModal(selectedReceipt)"
+                class="px-5 py-2.5 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-boxes"></i> Thực hiện Kiểm kê & Chấp nhận
+              </button>
+              <p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle"></i> Vui lòng đếm lại thực tế hàng hóa tại kho trước khi xác nhận cộng kho.</p>
             </div>
           </div>
         </div>
@@ -1179,7 +1389,7 @@ function getCustomerName(receipt: any) {
               </div>
 
               <div class="grid grid-cols-2 gap-4">
-                <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
+                <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'" class="col-span-2 sm:col-span-1">
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Trạng thái thanh toán</label>
                   <select v-model="createForm.paymentStatus"
                     class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
@@ -1187,10 +1397,13 @@ function getCustomerName(receipt: any) {
                     <option value="PAID">Đã thanh toán</option>
                   </select>
                 </div>
-                <div>
-                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Ghi chú</label>
-                  <input v-model="createForm.description" type="text" maxlength="500" placeholder="Ghi chú (tuỳ chọn)..."
-                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
+                <div class="col-span-2">
+                  <div class="flex justify-between items-center mb-1.5">
+                    <label class="block text-xs font-bold text-[#8094ae] uppercase">Ghi chú</label>
+                    <span class="text-[10px] text-[#8094ae]">{{ createForm.description?.length || 0 }}/500</span>
+                  </div>
+                  <textarea v-model="createForm.description" maxlength="500" placeholder="Ghi chú (tuỳ chọn)..."
+                    class="w-full h-20 p-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none resize-y"></textarea>
                 </div>
               </div>
 
@@ -1213,53 +1426,87 @@ function getCustomerName(receipt: any) {
                         <i class="fas fa-times text-xs"></i>
                       </button>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label class="block text-xs text-[#8094ae] mb-1">Sản phẩm <span class="text-red-500">*</span></label>
-                        <select v-model="d.productId" @change="onProductChange(d)"
-                          class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none bg-white">
-                          <option value="">-- Chọn sản phẩm --</option>
-                          <option v-for="p in getAvailableProductsForRow(idx)" :key="p.id" :value="p.id">{{ p.name }} ({{ p.sku }})</option>
-                        </select>
-                      </div>
-                      <div :class="(createForm.type === 'IMPORT' || createForm.type === 'TRANSFER') ? 'grid grid-cols-1 gap-2' : 'grid grid-cols-3 gap-2'">
-                        <div>
-                          <label class="block text-xs text-[#8094ae] mb-1">Số lượng <span class="text-red-500">*</span></label>
-                          <div class="relative">
-                            <input v-model.number="d.quantity" type="number" min="1" @input="constrainQuantity(d)" @blur="onQuantityBlur(d)" @keydown="(e) => { if(['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault() }"
-                              :disabled="!d.productId"
-                              class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none pr-12 disabled:bg-gray-50 disabled:cursor-not-allowed" />
-                            <span v-if="(createForm.type === 'IMPORT' && createForm.sourceBranchId === createForm.destBranchId) || createForm.type === 'ADJUST_IN'" class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[#8094ae] font-bold">
-                              / {{ getGlobalQuantity(d.productId) }}
-                            </span>
-                            <span v-else-if="getMaxQuantity(d.productId) !== null" class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[#8094ae] font-bold">
-                              / {{ getMaxQuantity(d.productId) }}
-                            </span>
-                          </div>
+                    <div class="space-y-4">
+                      <!-- Sản phẩm & Lô sản xuất (Chiếm toàn bộ chiều ngang) -->
+                      <div class="grid grid-cols-12 gap-4">
+                        <div class="col-span-12 lg:col-span-6">
+                          <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Sản phẩm <span class="text-red-500">*</span></label>
+                          <select v-model="d.productId" @change="onProductChange(d)"
+                            class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none bg-white">
+                            <option value="">-- Chọn sản phẩm --</option>
+                            <option v-for="p in getAvailableProductsForRow(idx)" :key="p.id" :value="p.id">{{ p.name }} ({{ p.sku }})</option>
+                          </select>
                         </div>
-                        <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
-                          <label class="block text-xs text-[#8094ae] mb-1">Đơn giá</label>
-                          <input v-model.number="d.price" type="number" min="0" readonly
-                            class="w-full h-9 px-3 border border-[#e2e8f0] bg-gray-50 rounded-lg text-sm outline-none cursor-not-allowed text-[#8094ae]" />
-                        </div>
-                        <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
-                          <label class="block text-xs text-[#8094ae] mb-1">Thành tiền</label>
-                          <div class="w-full h-9 px-3 border border-transparent flex items-center text-sm font-bold text-[#4361ee] truncate">
-                            {{ formatVND(d.quantity * (d.price || 0)) }}
+                        
+                        <div class="col-span-12 lg:col-span-6" v-if="d.productId">
+                          <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Lô sản xuất <span class="text-red-500">*</span></label>
+                          <div class="flex gap-2">
+                            <select v-if="!d.isNewBatch" v-model="d.batchCode" @change="onBatchChange(d)"
+                              class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none bg-white">
+                              <option value="">-- Chọn lô --</option>
+                              <option v-for="b in getBatchesForProduct(d.productId)" :key="b.batchCode" :value="b.batchCode">
+                                {{ b.batchCode }} (Tồn: {{ b.quantity }})
+                              </option>
+                            </select>
+                            <input v-else v-model="d.batchCode" type="text" placeholder="Nhập mã lô mới..."
+                              class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium outline-none focus:border-[#4361ee]" />
+                            
+                            <button v-if="createForm.type === 'IMPORT' && createForm.sourceBranchId === createForm.destBranchId" @click="d.isNewBatch = !d.isNewBatch; d.batchCode = ''" 
+                                    class="px-3 h-10 border border-[#e2e8f0] rounded-xl text-xs font-bold bg-white hover:bg-gray-50 whitespace-nowrap shadow-sm transition-all text-[#364a63]">
+                              <i :class="d.isNewBatch ? 'fas fa-list text-[#4361ee] mr-1' : 'fas fa-plus text-[#10b981] mr-1'"></i> {{ d.isNewBatch ? 'Chọn lô có sẵn' : 'Tạo lô mới' }}
+                            </button>
                           </div>
                         </div>
                       </div>
-                    </div>
-                    <div v-if="selectedProductHasExpiry(d)" class="grid grid-cols-2 gap-3">
-                      <div>
-                        <label class="block text-xs text-[#8094ae] mb-1">Ngày sản xuất (NSX)</label>
-                        <input v-model="d.manufacturingDate" type="date"
-                          class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
-                      </div>
-                      <div>
-                        <label class="block text-xs text-[#8094ae] mb-1">Hạn sử dụng (HSD)</label>
-                        <input v-model="d.expirationDate" type="date"
-                          class="w-full h-9 px-3 border border-[#e2e8f0] rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
+
+                      <!-- Thông tin Số lượng, Tiền & NSX/HSD (Nhóm trong khung nền xám nhạt để dễ nhìn) -->
+                      <div v-if="d.productId" class="p-4 bg-[#f8f9fa] rounded-xl border border-[#e2e8f0] space-y-4">
+                        <!-- Row 1: Số lượng, Đơn giá, Thành tiền -->
+                        <div :class="(createForm.type === 'IMPORT' || createForm.type === 'TRANSFER') ? 'grid grid-cols-1' : 'grid grid-cols-3 gap-5'">
+                          <div>
+                            <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Số lượng <span class="text-red-500">*</span></label>
+                            <div class="flex items-center h-10 bg-white border border-[#e2e8f0] rounded-xl overflow-hidden focus-within:border-[#4361ee] focus-within:ring-2 focus-within:ring-[#4361ee]/20">
+                              <input v-model.number="d.quantity" type="number" min="1" @input="constrainQuantity(d)" @blur="onQuantityBlur(d)" @keydown="(e) => { if(['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault() }"
+                                :disabled="!d.productId || (!d.isNewBatch && !d.batchCode)"
+                                class="w-full h-full px-3 text-sm font-bold outline-none disabled:bg-gray-100 disabled:text-gray-400 bg-transparent" />
+                              <div v-if="((createForm.type === 'IMPORT' && createForm.sourceBranchId === createForm.destBranchId) || createForm.type === 'ADJUST_IN') && getGlobalQuantity(d) !== null" 
+                                   class="px-3 h-full flex items-center bg-gray-50 border-l border-[#e2e8f0] text-xs font-bold text-[#8094ae] whitespace-nowrap">
+                                / {{ getGlobalQuantity(d) }}
+                              </div>
+                              <div v-else-if="getMaxQuantity(d) !== null" 
+                                   class="px-3 h-full flex items-center bg-gray-50 border-l border-[#e2e8f0] text-xs font-bold text-[#8094ae] whitespace-nowrap">
+                                / {{ getMaxQuantity(d) }}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
+                            <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Đơn giá</label>
+                            <input v-model.number="d.price" type="number" min="0" readonly
+                              class="w-full h-10 px-3 border border-[#e2e8f0] bg-gray-100 rounded-xl text-sm font-bold outline-none cursor-not-allowed text-[#8094ae]" />
+                          </div>
+                          
+                          <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
+                            <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Thành tiền</label>
+                            <div class="w-full h-10 px-3 border border-transparent flex items-center text-sm font-bold text-[#4361ee] bg-[#eef2ff] rounded-xl overflow-x-auto whitespace-nowrap hide-scrollbar">
+                              {{ formatVND(d.quantity * (d.price || 0)) }}
+                            </div>
+                          </div>
+                        </div>
+
+                        <!-- Row 2: NSX, HSD -->
+                        <div v-if="selectedProductHasExpiry(d) && (d.isNewBatch || d.batchCode)" class="grid grid-cols-2 gap-5 pt-4 border-t border-[#e2e8f0]">
+                          <div>
+                            <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Ngày sản xuất</label>
+                            <input v-model="d.manufacturingDate" type="date" :disabled="!d.isNewBatch"
+                              class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-gray-100 disabled:text-gray-500" />
+                          </div>
+                          <div>
+                            <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Hạn sử dụng</label>
+                            <input v-model="d.expirationDate" type="date" :disabled="!d.isNewBatch"
+                              class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-gray-100 disabled:text-gray-500" />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1286,11 +1533,77 @@ function getCustomerName(receipt: any) {
     </Teleport>
 
     <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- STOCKTAKE MODAL (IMPORT) -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <Teleport to="body">
+      <div v-if="showStocktakeModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden">
+          <!-- Header -->
+          <div class="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-purple-500 to-fuchsia-400 text-white">
+            <div>
+              <div class="text-xs font-bold opacity-70 uppercase">Kiểm kê & Nhập kho</div>
+              <div class="font-bold text-lg">Phiếu: {{ stocktakeReceipt?.code }}</div>
+            </div>
+            <button @click="showStocktakeModal = false" class="w-9 h-9 flex items-center justify-center rounded-xl bg-white/20 hover:bg-white/30 transition-all">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+
+          <div class="p-6 space-y-4">
+            <div class="bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-purple-700">
+              <i class="fas fa-info-circle mr-2"></i>
+              Nhập <strong>số lượng thực đếm</strong> tại kho. Nếu có hao hụt, vui lòng ghi rõ lý do để đối soát. Hàng hóa sẽ được cộng vào kho tương ứng với số lượng thực đếm.
+            </div>
+
+            <div class="space-y-3 custom-scrollbar max-h-[50vh] overflow-y-auto">
+              <div v-for="item in stocktakeItems" :key="item.receiptDetailId"
+                class="border border-[#e2e8f0] rounded-xl p-4">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-semibold text-sm text-[#364a63]">{{ item.productName }}</span>
+                  <span class="text-xs text-[#8094ae]">Số trên phiếu: <strong>{{ item.sentQty }}</strong></span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <label class="text-xs text-[#8094ae] whitespace-nowrap">Thực đếm:</label>
+                  <input v-model.number="item.actualQuantity" type="number" :min="0" :max="item.sentQty"
+                    class="flex-1 h-9 px-3 border rounded-lg text-sm focus:ring-2 focus:ring-purple-400/20 focus:border-purple-400 outline-none"
+                    :class="item.actualQuantity < item.sentQty ? 'border-amber-400 bg-amber-50' : 'border-[#e2e8f0]'" />
+                  <span v-if="item.actualQuantity < item.sentQty"
+                    class="text-xs font-bold text-amber-600 whitespace-nowrap">
+                    ⚠️ Hao hụt: {{ item.sentQty - item.actualQuantity }}
+                  </span>
+                  <span v-else class="text-xs font-bold text-green-600 whitespace-nowrap">✅ Đủ</span>
+                </div>
+                <div v-if="item.actualQuantity < item.sentQty" class="mt-3 bg-red-50 p-3 rounded-lg border border-red-100 flex items-start gap-3">
+                  <label class="text-xs font-bold text-red-600 whitespace-nowrap mt-2">Lý do <span class="text-red-500">*</span></label>
+                  <input v-model="item.shortfallReason" type="text" placeholder="VD: Hư hỏng, thiếu hàng..."
+                    class="flex-1 h-9 px-3 border border-red-200 rounded-lg text-sm focus:ring-2 focus:ring-red-400/20 focus:border-red-400 outline-none bg-white" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="px-6 py-4 border-t border-[#f1f5f9] flex justify-end gap-3 bg-[#f8f9fa]/50">
+            <button @click="showStocktakeModal = false"
+              class="px-5 py-2.5 border border-[#e2e8f0] bg-white rounded-xl font-semibold text-[#364a63] text-sm hover:bg-[#f1f5f9] transition-all">
+              Đóng
+            </button>
+            <button @click="submitConfirmStocktake" :disabled="submittingStocktake"
+              class="px-6 py-2.5 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-60 flex items-center gap-2">
+              <i class="fas fa-spinner fa-spin" v-if="submittingStocktake"></i>
+              <i class="fas fa-boxes" v-else></i>
+              Xác nhận Kiểm kê
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
     <!-- CONFIRM TRANSFER MODAL -->
     <!-- ═══════════════════════════════════════════════════════════ -->
     <Teleport to="body">
       <div v-if="showConfirmModal && confirmingReceipt"
-        class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
+        class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden">
           <!-- Header -->
           <div class="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-sky-500 to-teal-400 text-white">
