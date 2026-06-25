@@ -620,7 +620,7 @@ onMounted(() => {
       <div class="warning-banner warning-banner--teal">
         <div class="warning-banner__icon"><i class="fas fa-info-circle"></i></div>
         <div class="warning-banner__text">
-          Phục hồi System Config sẽ <strong>UPSERT</strong> lại danh mục, sản phẩm và chi nhánh.
+          Phục hồi System Config sẽ <strong>UPSERT</strong> lại danh mục, sản phẩm, chi nhánh và nhân viên.
           Dữ liệu giao dịch kho của từng chi nhánh <em>không bị ảnh hưởng</em>.
         </div>
       </div>
@@ -645,7 +645,7 @@ onMounted(() => {
             </div>
             <p class="card__desc">
               Gom toàn bộ <strong>chi nhánh</strong>, <strong>danh mục</strong>,
-              <strong>sản phẩm</strong> và <strong>tài khoản Admin</strong>,
+              <strong>sản phẩm</strong> và <strong>tài khoản người dùng (Admin & Nhân viên)</strong>,
               ký <strong>HMAC-SHA256</strong> và mã hoá <strong>AES-256-GCM</strong>.
               File <code>.wbk</code> không thể đọc bằng text editor.
             </p>
@@ -819,7 +819,7 @@ onMounted(() => {
                 </template>
                 <div class="modal__info-row">
                   <span class="modal__info-label">Phạm vi</span>
-                  <span class="modal__info-value">Branches · Categories · Products · Admin Users</span>
+                  <span class="modal__info-value">Branches · Categories · Products · Users (Admin & Staff)</span>
                 </div>
               </div>
               <div class="modal__alert modal__alert--warning">
