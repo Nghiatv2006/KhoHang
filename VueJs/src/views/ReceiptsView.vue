@@ -131,13 +131,11 @@ const filteredReceipts = computed(() => {
     }
   }
   if (searchKeyword.value.trim()) {
-    const kw = searchKeyword.value.toLowerCase()
-    result = result.filter(r =>
-      r.code?.toLowerCase().includes(kw) ||
-      r.createdByName?.toLowerCase().includes(kw) ||
-      r.sourceBranchName?.toLowerCase().includes(kw) ||
-      r.destBranchName?.toLowerCase().includes(kw)
-    )
+    const kw = searchKeyword.value.trim().toLowerCase()
+    result = result.filter(r => {
+      const code = (r.code || '').toLowerCase()
+      return code.includes(kw)
+    })
   }
   if (filterStartDate.value) {
     const start = new Date(filterStartDate.value).setHours(0, 0, 0, 0)
@@ -278,7 +276,7 @@ interface DetailRow {
 }
 
 function openCreateModal() {
-  const defaultType = (user.value?.branchId !== headBranch.value?.id) ? 'IMPORT' : 'EXPORT';
+  const defaultType = (user.value?.branchId !== headBranch.value?.id && !isManager.value) ? 'IMPORT' : 'EXPORT';
   createForm.value = {
     type: defaultType,
     sourceBranchId: user.value?.branchId || headBranch.value?.id || '',
@@ -980,7 +978,7 @@ function getCustomerName(receipt: any) {
           <!-- Tìm kiếm đa năng -->
           <div class="lg:col-span-2 relative">
             <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae] text-sm"></i>
-            <input v-model="searchKeyword" type="text" placeholder="Tìm kiếm mã phiếu, người lập, chi nhánh..."
+            <input v-model="searchKeyword" type="text" placeholder="Tìm kiếm theo mã phiếu..."
               class="w-full h-11 pl-10 pr-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all" />
           </div>
           <!-- Lọc loại phiếu -->
@@ -1098,7 +1096,9 @@ function getCustomerName(receipt: any) {
                 <span class="text-[#364a63] font-medium" v-else>{{ r.destBranchName || '—' }}</span>
               </td>
               <td class="px-5 py-4">
-                <span class="text-[#8094ae]">{{ r.createdByName }}</span>
+                <div class="text-[#8094ae]">{{ r.createdByName }}</div>
+                <div v-if="r.stocktakeByName" class="text-xs text-purple-600 mt-1 font-semibold" title="Người kiểm kê"><i class="fas fa-clipboard-check"></i> {{ r.stocktakeByName }}</div>
+                <div v-else-if="r.status === 'COMPLETED' && (r.type === 'IMPORT' || r.type === 'TRANSFER') && r.createdByRole === 'STAFF'" class="text-xs text-purple-600 mt-1 font-semibold opacity-60" title="Người kiểm kê (Dữ liệu cũ)"><i class="fas fa-clipboard-check"></i> {{ r.createdByName }}</div>
               </td>
               <td class="px-5 py-4">
                 <span class="text-[#8094ae] text-xs">{{ formatDateTime(r.createdAt) }}</span>
@@ -1116,6 +1116,12 @@ function getCustomerName(receipt: any) {
                     class="w-8 h-8 flex items-center justify-center rounded-lg bg-green-50 hover:bg-green-500 hover:text-white text-green-600 transition-all disabled:opacity-50"
                     title="Phê duyệt">
                     <i class="fas fa-check text-xs"></i>
+                  </button>
+                  <button v-if="canConfirmStocktake(r)"
+                    @click.stop="openStocktakeModal(r)"
+                    class="w-8 h-8 flex items-center justify-center rounded-lg bg-purple-50 hover:bg-purple-500 hover:text-white text-purple-600 transition-all"
+                    title="Thực hiện kiểm kê">
+                    <i class="fas fa-boxes text-xs"></i>
                   </button>
                   <button v-if="canCancelReceipt(r)"
                     @click.stop="cancelReceipt(r)"
@@ -1195,6 +1201,8 @@ function getCustomerName(receipt: any) {
               <div>
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Người lập</div>
                 <div class="font-semibold text-[#364a63]">{{ selectedReceipt.createdByName }}</div>
+                <div v-if="selectedReceipt.stocktakeByName" class="text-xs text-purple-600 font-bold mt-1 flex items-center gap-1.5" title="Người kiểm kê"><i class="fas fa-clipboard-check"></i> Kiểm kê: {{ selectedReceipt.stocktakeByName }}</div>
+                <div v-else-if="selectedReceipt.status === 'COMPLETED' && (selectedReceipt.type === 'IMPORT' || selectedReceipt.type === 'TRANSFER') && selectedReceipt.createdByRole === 'STAFF'" class="text-xs text-purple-600 font-bold mt-1 flex items-center gap-1.5 opacity-60" title="Người kiểm kê (Dữ liệu cũ)"><i class="fas fa-clipboard-check"></i> Kiểm kê: {{ selectedReceipt.createdByName }}</div>
               </div>
               <div>
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Ngày tạo</div>
@@ -1348,7 +1356,7 @@ function getCustomerName(receipt: any) {
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Loại phiếu <span class="text-red-500">*</span></label>
                   <select v-model="createForm.type" @change="onTypeChange"
                     class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
-                    <option value="IMPORT" v-if="user?.branchId !== headBranch?.id">📥 Nhập kho</option>
+                    <option value="IMPORT" v-if="user?.branchId !== headBranch?.id && !isManager">📥 Nhập kho</option>
                     <option value="EXPORT">📤 Xuất bán</option>
                     <option value="TRANSFER">🔄 Điều chuyển</option>
                   </select>

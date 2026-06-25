@@ -40,9 +40,16 @@ public class ReceiptServiceImpl implements ReceiptService {
     @Transactional(readOnly = true)
     public List<ReceiptResponse> getAllReceipts(User currentUser) {
         if (currentUser.getRole() == UserRole.ADMIN) {
+            Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
             return receiptRepository.findAll().stream()
-                    .filter(r -> !(r.getStatus() == ReceiptStatus.DRAFT && r.getCreatedBy() != null && r.getCreatedBy().getRole() == UserRole.STAFF))
-                    .filter(r -> !(r.getType() == ReceiptType.EXPORT && r.getSourceBranch() != null && r.getSourceBranch().getId() != 1))
+                    .filter(r -> {
+                        if (r.getType() == ReceiptType.IMPORT && r.getStatus() == ReceiptStatus.DRAFT) {
+                            boolean isMyBranch = myBranchId != null && r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId);
+                            boolean isCreator = r.getCreatedBy() != null && r.getCreatedBy().getId().equals(currentUser.getId());
+                            return isMyBranch || isCreator;
+                        }
+                        return true;
+                    })
                     .map(ReceiptResponse::new)
                     .collect(Collectors.toList());
         }
@@ -50,7 +57,6 @@ public class ReceiptServiceImpl implements ReceiptService {
         Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
         if (myBranchId == null) throw new RuntimeException("Bạn chưa thuộc chi nhánh nào.");
 
-        // MANAGER / STAFF can see receipts related to their branch
         List<Receipt> all = receiptRepository.findAll();
         return all.stream()
                 .filter(r -> {
@@ -58,12 +64,14 @@ public class ReceiptServiceImpl implements ReceiptService {
                                               (r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId));
                     if (!relatedToBranch) return false;
                     
-                    if (r.getStatus() == ReceiptStatus.DRAFT && r.getCreatedBy() != null && r.getCreatedBy().getRole() == UserRole.STAFF) {
-                        if (currentUser.getRole() == UserRole.STAFF) {
-                            return r.getCreatedBy().getId().equals(currentUser.getId());
-                        }
-                        // MANAGER can see it
+                    if (currentUser.getRole() == UserRole.STAFF) {
+                        boolean isMyReceipt = r.getCreatedBy() != null && r.getCreatedBy().getId().equals(currentUser.getId());
+                        boolean isIncoming = (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.TRANSFER) 
+                                             && r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId)
+                                             && (r.getStatus() == ReceiptStatus.PENDING_STOCKTAKE || r.getStatus() == ReceiptStatus.COMPLETED);
+                        return isMyReceipt || isIncoming;
                     }
+                    
                     return true;
                 })
                 .map(ReceiptResponse::new)
@@ -74,7 +82,16 @@ public class ReceiptServiceImpl implements ReceiptService {
     @Transactional(readOnly = true)
     public ReceiptResponse getReceiptById(Integer id, User currentUser) {
         Receipt r = receiptRepository.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
-        // Check permission
+        if (currentUser.getRole() == UserRole.ADMIN) {
+            if (r.getType() == ReceiptType.IMPORT && r.getStatus() == ReceiptStatus.DRAFT) {
+                Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
+                boolean isMyBranch = myBranchId != null && r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId);
+                boolean isCreator = r.getCreatedBy() != null && r.getCreatedBy().getId().equals(currentUser.getId());
+                if (!isMyBranch && !isCreator) {
+                    throw new RuntimeException("Phiếu nhập kho này chưa được quản lý chi nhánh duyệt.");
+                }
+            }
+        }
         if (currentUser.getRole() != UserRole.ADMIN) {
             Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
             if (myBranchId == null) throw new RuntimeException("Bạn chưa thuộc chi nhánh nào.");
@@ -82,6 +99,16 @@ public class ReceiptServiceImpl implements ReceiptService {
             boolean hasPerm = (r.getSourceBranch() != null && r.getSourceBranch().getId().equals(myBranchId)) ||
                               (r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId));
             if (!hasPerm) throw new RuntimeException("Bạn không có quyền xem phiếu này.");
+            
+            if (currentUser.getRole() == UserRole.STAFF) {
+                boolean isMyReceipt = r.getCreatedBy() != null && r.getCreatedBy().getId().equals(currentUser.getId());
+                boolean isIncoming = (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.TRANSFER) 
+                                     && r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId)
+                                     && (r.getStatus() == ReceiptStatus.PENDING_STOCKTAKE || r.getStatus() == ReceiptStatus.COMPLETED);
+                if (!isMyReceipt && !isIncoming) {
+                    throw new RuntimeException("Bạn không có quyền xem phiếu này.");
+                }
+            }
         }
         return new ReceiptResponse(r);
     }
@@ -92,11 +119,30 @@ public class ReceiptServiceImpl implements ReceiptService {
         List<Receipt> receipts = receiptRepository.findByCustomerId(customerId);
         return receipts.stream()
                 .filter(r -> {
-                    if (currentUser.getRole() == UserRole.ADMIN) return true;
+                    if (currentUser.getRole() == UserRole.ADMIN) {
+                        if (r.getType() == ReceiptType.IMPORT && r.getStatus() == ReceiptStatus.DRAFT) {
+                            Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
+                            boolean isMyBranch = myBranchId != null && r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId);
+                            boolean isCreator = r.getCreatedBy() != null && r.getCreatedBy().getId().equals(currentUser.getId());
+                            return isMyBranch || isCreator;
+                        }
+                        return true;
+                    }
                     Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
                     if (myBranchId == null) return false;
-                    return (r.getSourceBranch() != null && r.getSourceBranch().getId().equals(myBranchId)) ||
-                           (r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId));
+                    boolean relatedToBranch = (r.getSourceBranch() != null && r.getSourceBranch().getId().equals(myBranchId)) ||
+                                              (r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId));
+                    if (!relatedToBranch) return false;
+                    
+                    if (currentUser.getRole() == UserRole.STAFF) {
+                        boolean isMyReceipt = r.getCreatedBy() != null && r.getCreatedBy().getId().equals(currentUser.getId());
+                        boolean isIncoming = (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.TRANSFER) 
+                                             && r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId)
+                                             && (r.getStatus() == ReceiptStatus.PENDING_STOCKTAKE || r.getStatus() == ReceiptStatus.COMPLETED);
+                        return isMyReceipt || isIncoming;
+                    }
+                    
+                    return true;
                 })
                 .map(ReceiptResponse::new)
                 .collect(Collectors.toList());
@@ -188,6 +234,10 @@ public class ReceiptServiceImpl implements ReceiptService {
         if (currentUser.getRole() != UserRole.ADMIN) {
             Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
             if (myBranchId == null) throw new RuntimeException("Bạn chưa thuộc chi nhánh nào.");
+
+            if (request.getType() == ReceiptType.IMPORT && currentUser.getRole() == UserRole.MANAGER) {
+                throw new RuntimeException("Manager không được phép tạo phiếu nhập kho, chỉ có Staff mới được phép.");
+            }
 
             if (request.getType() == ReceiptType.IMPORT || request.getType() == ReceiptType.ADJUST_IN) {
                 if (request.getDestBranchId() == null || !request.getDestBranchId().equals(myBranchId)) {
@@ -631,6 +681,7 @@ public class ReceiptServiceImpl implements ReceiptService {
 
         updateCustomerDebt(r, true, false, false);
         r.setStatus(ReceiptStatus.COMPLETED);
+        r.setStocktakeBy(currentUser);
         if (r.getType() == ReceiptType.TRANSFER) {
             r.setPaymentStatus("RECEIVED");
         }

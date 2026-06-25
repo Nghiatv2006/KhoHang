@@ -64,12 +64,7 @@ async function loadCustomerReceipts(id: number) {
   }
 }
 
-function openAddC() { 
-  editingC.value = null; 
-  Object.assign(cForm, { name: '', email: '', phone: '', address: '', taxCode: '' }); 
-  cTab.value = 'info'; 
-  showCModal.value = true 
-}
+// Removed openAddC as per user request
 
 function openEditC(c: any) { 
   editingC.value = c; 
@@ -110,6 +105,10 @@ async function doDeleteC() {
 }
 
 async function toggleCustomer(c: any) {
+  if (c.status === 'ACTIVE' && c.debt > 0) {
+    toast.error('Không thể ngừng hoạt động khi khách hàng vẫn còn nợ.');
+    return;
+  }
   try {
     const res = await api.patch(`/api/customers/${c.id}/toggle-status`, {})
     const data = await res.json()
@@ -236,7 +235,7 @@ function formatCurrency(val: any) {
                   <button class="w-8 h-8 rounded-lg text-[#0ea5e9] bg-white hover:bg-[#e0f2fe] flex items-center justify-center transition-colors cursor-pointer shadow-sm border border-[#e2e8f0]/50" title="Sửa" @click.stop="openEditC(c)">
                     <i class="fas fa-pen text-sm"></i>
                   </button>
-                  <button v-if="isAdmin" class="w-8 h-8 rounded-lg text-[#ea4f52] bg-white hover:bg-[#ffe4e6] flex items-center justify-center transition-colors cursor-pointer shadow-sm border border-[#e2e8f0]/50" title="Xóa" @click.stop="confirmDeleteC(c)">
+                  <button v-if="isAdmin && c.status === 'INACTIVE'" class="w-8 h-8 rounded-lg text-[#ea4f52] bg-white hover:bg-[#ffe4e6] flex items-center justify-center transition-colors cursor-pointer shadow-sm border border-[#e2e8f0]/50" title="Xóa" @click.stop="confirmDeleteC(c)">
                     <i class="fas fa-trash text-sm"></i>
                   </button>
                 </div>

@@ -39,6 +39,10 @@ public class Receipt {
     @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "stocktake_by_id")
+    private User stocktakeBy;
+
     // TODO: Link Customer when Customer entity exists
     @Column(name = "customer_id")
     private Integer customerId;
@@ -81,6 +85,9 @@ public class Receipt {
 
     public User getCreatedBy() { return createdBy; }
     public void setCreatedBy(User createdBy) { this.createdBy = createdBy; }
+
+    public User getStocktakeBy() { return stocktakeBy; }
+    public void setStocktakeBy(User stocktakeBy) { this.stocktakeBy = stocktakeBy; }
 
     public Integer getCustomerId() { return customerId; }
     public void setCustomerId(Integer customerId) { this.customerId = customerId; }
