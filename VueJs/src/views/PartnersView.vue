@@ -190,6 +190,9 @@ function formatCurrency(val: any) {
             <option value="INACTIVE">Ngừng hoạt động</option>
           </select>
         </div>
+        <button v-if="isManager" @click="openAddC" class="h-[42px] px-5 bg-[#4361ee] hover:bg-[#3b51d8] text-white rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm hover:shadow transition-all cursor-pointer">
+          <i class="fas fa-plus"></i> Thêm Khách hàng
+        </button>
       </div>
 
       <!-- Table -->

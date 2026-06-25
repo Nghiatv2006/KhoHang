@@ -8,7 +8,7 @@ const user = ref<any>(JSON.parse(localStorage.getItem('wh_user') || '{}'))
 const isAdmin = computed(() => user.value?.role === 'ADMIN')
 const isManager = computed(() => user.value?.role === 'MANAGER')
 // const isStaff = computed(() => user.value?.role === 'STAFF')
-const canApprove = computed(() => isAdmin.value || isManager.value)
+// const canApprove = computed(() => isAdmin.value || isManager.value)
 
 function canApproveReceipt(r: any) {
   if (r.status === 'DRAFT') {
@@ -77,7 +77,7 @@ const receipts = ref<any[]>([])
 const products = ref<any[]>([])
 const branches = ref<any[]>([])
 const customers = ref<any[]>([])
-const inventories = ref<any[]>([])
+// const inventories = ref<any[]>([])
 const loading = ref(true)
 
 // ──────────────────────────────────────────────────────────────
@@ -198,6 +198,9 @@ const statUnpaid = computed(() => receipts.value.filter(r => r.type === 'EXPORT'
 // ──────────────────────────────────────────────────────────────
 const selectedReceipt = ref<any>(null)
 const showDetail = ref(false)
+const hasReceivedQuantity = computed(() => {
+  return selectedReceipt.value?.details?.some((x: any) => x.receivedQuantity !== null) ?? false
+})
 
 async function openDetail(receipt: any) {
   try {
@@ -319,7 +322,7 @@ function onTypeChange() {
     createForm.value.destBranchId = ''
   }
   // Reset products when changing type to avoid stale/out-of-stock products
-  createForm.value.details = [{ productId: '', manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 }]
+  createForm.value.details = [{ productId: '', batchCode: '', isNewBatch: false, manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 }]
 }
 
 const sourceInventories = ref<any[]>([])
@@ -888,7 +891,7 @@ function paymentStatusClass(p: string) {
 }
 
 // Can the current user confirm transfer for this receipt? (Deprecated, use confirmStocktake instead)
-function canConfirmTransfer(receipt: any) {
+function canConfirmTransfer(_receipt: any) {
   return false;
 }
 
@@ -1222,8 +1225,8 @@ function getCustomerName(receipt: any) {
                       <th class="px-4 py-2.5 text-left font-bold">Sản phẩm</th>
                       <th class="px-4 py-2.5 text-center font-bold">NSX</th>
                       <th class="px-4 py-2.5 text-center font-bold">HSD</th>
-                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.status === 'COMPLETED' && selectedReceipt.details?.some(x => x.receivedQuantity !== null)">SL Gửi</th>
-                      <th class="px-4 py-2.5 text-right font-bold text-teal-600" v-if="selectedReceipt.status === 'COMPLETED' && selectedReceipt.details?.some(x => x.receivedQuantity !== null)">SL Nhận</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.status === 'COMPLETED' && hasReceivedQuantity">SL Gửi</th>
+                      <th class="px-4 py-2.5 text-right font-bold text-teal-600" v-if="selectedReceipt.status === 'COMPLETED' && hasReceivedQuantity">SL Nhận</th>
                       <th class="px-4 py-2.5 text-right font-bold" v-else>SL</th>
                       <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Đơn giá</th>
                       <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Thành tiền</th>
@@ -1254,7 +1257,7 @@ function getCustomerName(receipt: any) {
                   </tbody>
                   <tfoot v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">
                     <tr class="bg-[#f8f9fa]">
-                      <td :colspan="(selectedReceipt.status === 'COMPLETED' && selectedReceipt.details?.some(x => x.receivedQuantity !== null)) ? 6 : 5" class="px-4 py-2.5 text-right font-bold text-[#8094ae] text-xs uppercase">Tổng cộng</td>
+                      <td :colspan="(selectedReceipt.status === 'COMPLETED' && hasReceivedQuantity) ? 6 : 5" class="px-4 py-2.5 text-right font-bold text-[#8094ae] text-xs uppercase">Tổng cộng</td>
                       <td class="px-4 py-2.5 text-right font-extrabold text-[#4361ee]">
                         {{ formatVND((selectedReceipt.details || []).reduce((s: number, d: any) => s + d.quantity * d.price, 0)) }}
                       </td>
