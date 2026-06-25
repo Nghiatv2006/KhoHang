@@ -128,14 +128,18 @@ def main():
     # Cấu trúc: (file_nguon, file_dich)
     tasks = []
     
-    # Activity Diagrams
+    # Activity Diagrams (recursive search for subfolders like diagrams/admin)
     if os.path.exists(DIAGRAMS_DIR):
-        for file in os.listdir(DIAGRAMS_DIR):
-            if file.endswith(".drawio"):
-                input_file = os.path.join(DIAGRAMS_DIR, file)
-                output_name = file[:-7] + ".png"
-                output_file = os.path.join(OUTPUT_DIAGRAMS_DIR, output_name)
-                tasks.append((input_file, output_file, "Activity Diagram"))
+        for root_dir, dirs, files in os.walk(DIAGRAMS_DIR):
+            for file in files:
+                if file.endswith(".drawio"):
+                    input_file = os.path.join(root_dir, file)
+                    rel_path = os.path.relpath(root_dir, DIAGRAMS_DIR)
+                    output_dir = os.path.join(OUTPUT_DIAGRAMS_DIR, rel_path) if rel_path != "." else OUTPUT_DIAGRAMS_DIR
+                    os.makedirs(output_dir, exist_ok=True)
+                    output_name = file[:-7] + ".png"
+                    output_file = os.path.join(output_dir, output_name)
+                    tasks.append((input_file, output_file, "Activity Diagram"))
                 
     # UseCase Diagrams
     if os.path.exists(USECASES_DIR):

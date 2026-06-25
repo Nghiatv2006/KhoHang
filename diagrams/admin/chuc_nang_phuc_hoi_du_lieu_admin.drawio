@@ -1,0 +1,128 @@
+<?xml version="1.0" ?>
+<mxfile host="Electron" type="device">
+  <diagram id="chuc_nang_phuc_hoi_du_lieu_admin-diagram-id" name="Phục hồi Dữ liệu (Admin)">
+    <mxGraphModel dx="2036" dy="1058" grid="1" gridSize="10" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="bg_user" value="" vertex="1" parent="1" style="fillColor=#f2f7fc;strokeColor=none;">
+          <mxGeometry x="40" y="50" width="260" height="680" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_user_header" value="1. Admin" vertex="1" parent="1" style="fillColor=#f5f5f5;strokeColor=#cccccc;fontStyle=1;align=center;whiteSpace=wrap;html=1;">
+          <mxGeometry x="40" y="10" width="260" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_ui" value="" vertex="1" parent="1" style="fillColor=#fffdf0;strokeColor=none;">
+          <mxGeometry x="310" y="50" width="260" height="680" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_ui_header" value="2. Giao diện Frontend" vertex="1" parent="1" style="fillColor=#f5f5f5;strokeColor=#cccccc;fontStyle=1;align=center;whiteSpace=wrap;html=1;">
+          <mxGeometry x="310" y="10" width="260" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_backend" value="" vertex="1" parent="1" style="fillColor=#faf5fc;strokeColor=none;">
+          <mxGeometry x="580" y="50" width="260" height="680" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_backend_header" value="3. Hệ thống Backend" vertex="1" parent="1" style="fillColor=#f5f5f5;strokeColor=#cccccc;fontStyle=1;align=center;whiteSpace=wrap;html=1;">
+          <mxGeometry x="580" y="10" width="260" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_db" value="" vertex="1" parent="1" style="fillColor=#f5faf5;strokeColor=none;">
+          <mxGeometry x="850" y="50" width="260" height="680" as="geometry"/>
+        </mxCell>
+        <mxCell id="bg_db_header" value="4. Cơ sở dữ liệu PostgreSQL" vertex="1" parent="1" style="fillColor=#f5f5f5;strokeColor=#cccccc;fontStyle=1;align=center;whiteSpace=wrap;html=1;">
+          <mxGeometry x="850" y="10" width="260" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="sep1" value="" vertex="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#dddddd;strokeWidth=1.5;">
+          <mxGeometry x="300" y="10" width="1" height="720" as="geometry"/>
+        </mxCell>
+        <mxCell id="sep2" value="" vertex="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#dddddd;strokeWidth=1.5;">
+          <mxGeometry x="570" y="10" width="1" height="720" as="geometry"/>
+        </mxCell>
+        <mxCell id="sep3" value="" vertex="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeColor=#dddddd;strokeWidth=1.5;">
+          <mxGeometry x="840" y="10" width="1" height="720" as="geometry"/>
+        </mxCell>
+        <mxCell id="StartNode" value="" vertex="1" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#000000;strokeColor=none;">
+          <mxGeometry x="155" y="70" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="U1" value="Mở menu Phục hồi dữ liệu" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;">
+          <mxGeometry x="90" y="130" width="160" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="F1" value="Hiển thị vùng tải file .wbk" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;">
+          <mxGeometry x="360" y="130" width="160" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="U2" value="Tải file backup .wbk lên" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;">
+          <mxGeometry x="90" y="210" width="160" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="B1" value="1. Đọc Magic Header 'WHBK' &amp; ENC_VERSION&lt;br/&gt;2. Kiểm tra HMAC, giải mã AES-256-GCM&lt;br/&gt;3. Tạm khóa chi nhánh (is_locked = true)" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;">
+          <mxGeometry x="630" y="210" width="160" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="D1" value="Cập nhật status is_locked = True" vertex="1" parent="1" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.database;whiteSpace=wrap;fillColor=#e8f5e9;strokeColor=#43a047;fontColor=#000000;align=center;">
+          <mxGeometry x="920" y="205" width="160" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="B2_rhombus" value="" vertex="1" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#fb8c00;strokeWidth=2;fontColor=#000000;align=center;">
+          <mxGeometry x="690" y="310" width="40" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="B3_fail" value="Rollback transaction,&lt;br/&gt;mở khóa giao dịch chi nhánh" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;">
+          <mxGeometry x="630" y="380" width="160" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="F_fail" value="Báo lỗi file hỏng/sai chữ ký/sai CN" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#f8d7da;strokeColor=#f5c6cb;strokeWidth=2;fontColor=#721c24;align=center;">
+          <mxGeometry x="360" y="380" width="160" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="B3_success" value="Nạp đè dữ liệu vào các bảng DB,&lt;br/&gt;mở khóa chi nhánh &amp; ghi Audit Log" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;">
+          <mxGeometry x="630" y="470" width="160" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="D2" value="Ghi CSDL PostgreSQL" vertex="1" parent="1" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.database;whiteSpace=wrap;fillColor=#e8f5e9;strokeColor=#43a047;fontColor=#000000;align=center;">
+          <mxGeometry x="920" y="460" width="160" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="F_success" value="Thông báo phục hồi dữ liệu thành công" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#d4edda;strokeColor=#c3e6cb;strokeWidth=2;fontColor=#155724;align=center;">
+          <mxGeometry x="360" y="560" width="160" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="EndNode" value="" vertex="1" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#ffffff;strokeColor=#000000;strokeWidth=2;">
+          <mxGeometry x="425" y="630" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="EndNode_inner" value="" vertex="1" parent="1" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#000000;strokeColor=none;">
+          <mxGeometry x="433.0" y="638.0" width="14" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_0" value="" edge="1" parent="1" source="StartNode" target="U1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;endArrow=classic;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_1" value="" edge="1" parent="1" source="U1" target="F1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;endArrow=classic;exitX=1;exitY=0.5;entryX=0;entryY=0.5;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_2" value="" edge="1" parent="1" source="F1" target="U2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;endArrow=classic;exitX=0;exitY=0.5;entryX=1;entryY=0.5;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_3" value="" edge="1" parent="1" source="U2" target="B1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;endArrow=classic;exitX=1;exitY=0.5;entryX=0;entryY=0.5;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_4" value="" edge="1" parent="1" source="B1" target="D1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;endArrow=classic;exitX=1;exitY=0.5;entryX=0.5;entryY=0;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_5" value="" edge="1" parent="1" source="B1" target="B2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_6" value="" edge="1" parent="1" source="B2" target="B2_rhombus" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_7" value="Sai chữ ký / lỗi" edge="1" parent="1" source="B2_rhombus" target="B3_fail" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_8" value="" edge="1" parent="1" source="B3_fail" target="F_fail" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;endArrow=classic;exitX=0;exitY=0.5;entryX=1;entryY=0.5;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_9" value="Hợp lệ" edge="1" parent="1" source="B2_rhombus" target="B3_success" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;endArrow=classic;exitX=1;exitY=0.5;entryX=0.5;entryY=0;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_10" value="" edge="1" parent="1" source="B3_success" target="D2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;endArrow=classic;exitX=1;exitY=0.5;entryX=0.5;entryY=0;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_11" value="" edge="1" parent="1" source="B3_success" target="F_success" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;endArrow=classic;exitX=0;exitY=0.5;entryX=1;entryY=0.5;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_12" value="" edge="1" parent="1" source="F_success" target="EndNode" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_13" value="" edge="1" parent="1" source="F_fail" target="EndNode" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

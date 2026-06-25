@@ -19,3 +19,9 @@ CREATE TABLE IF NOT EXISTS backups (
 
 -- 3. Tạo index cho backups để tối ưu hóa truy vấn
 CREATE INDEX IF NOT EXISTS idx_backups_branch_id ON backups (branch_id);
+
+
+ALTER TYPE receipt_status ADD VALUE IF NOT EXISTS 'PENDING_ADMIN';
+ALTER TYPE receipt_status ADD VALUE IF NOT EXISTS 'PENDING_STOCKTAKE';
+
+ALTER TABLE receipts ADD COLUMN stocktake_by_id INT REFERENCES users(id);
