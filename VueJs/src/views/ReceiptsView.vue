@@ -236,6 +236,7 @@ const directImportForm = ref({
   categoryId: '' as number | '',
   productId: '' as number | '',
   batchCode: '',
+  isNewBatch: true,
   hasExpiry: false,
   expiryWarningDays: 30,
   manufacturingDate: '',
@@ -262,11 +263,12 @@ watch(() => directImportForm.value.productId, (newVal) => {
   }
 })
 
-function openDirectImportModal() {
+async function openDirectImportModal() {
   directImportForm.value = {
     categoryId: '',
     productId: '',
     batchCode: '',
+    isNewBatch: true,
     hasExpiry: false,
     expiryWarningDays: 30,
     manufacturingDate: '',
@@ -275,6 +277,14 @@ function openDirectImportModal() {
     price: 0
   }
   showDirectImportModal.value = true
+  if (globalInventories.value.length === 0) {
+    try {
+      const res = await api.get('/api/inventories/global')
+      if (res.ok) {
+        globalInventories.value = await res.json()
+      }
+    } catch(e) {}
+  }
 }
 
 async function submitDirectImport() {
@@ -450,6 +460,90 @@ function onTypeChange() {
 
 const sourceInventories = ref<any[]>([])
 const globalInventories = ref<any[]>([])
+
+function isValidDate(d: any): boolean {
+  return !!d && typeof d === 'string' && !d.startsWith('1970') && d !== ''
+}
+
+const directImportBatches = computed(() => {
+  if (!directImportForm.value.productId) return []
+  const uniqueBatches = new Map()
+  globalInventories.value.filter(inv => inv.productId === Number(directImportForm.value.productId)).forEach(inv => {
+    if (!uniqueBatches.has(inv.batchCode)) {
+      uniqueBatches.set(inv.batchCode, { ...inv })
+    } else {
+      const existing = uniqueBatches.get(inv.batchCode)
+      existing.quantity += inv.quantity
+      // Prefer valid dates over epoch dates
+      if (!isValidDate(existing.manufacturingDate) && isValidDate(inv.manufacturingDate)) {
+        existing.manufacturingDate = inv.manufacturingDate
+      }
+      if (!isValidDate(existing.expirationDate) && isValidDate(inv.expirationDate)) {
+        existing.expirationDate = inv.expirationDate
+      }
+      if (inv.hasExpiry) existing.hasExpiry = true
+    }
+  })
+  return Array.from(uniqueBatches.values())
+})
+
+const existingBatchInDirectImport = computed(() => {
+  return directImportBatches.value.find(b => b.batchCode === directImportForm.value.batchCode)
+})
+
+function parseToInputDate(dateStr: string | undefined): string {
+  if (!dateStr || dateStr.startsWith('1970')) return ''
+  // If DD/MM/YYYY
+  const parts = dateStr.split('/')
+  if (parts.length === 3 && parts[2].length === 4) {
+    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
+  }
+  // Try ISO parsing
+  try {
+    const d = new Date(dateStr)
+    if (!isNaN(d.getTime())) return d.toISOString().substring(0, 10)
+  } catch (e) {}
+  return dateStr.substring(0, 10)
+}
+
+const isMfgDateLocked = computed(() => {
+  const b = existingBatchInDirectImport.value
+  return !!b && !!parseToInputDate(b.manufacturingDate)
+})
+
+const isExpDateLocked = computed(() => {
+  const b = existingBatchInDirectImport.value
+  return !!b && !!parseToInputDate(b.expirationDate)
+})
+
+watch(() => directImportForm.value.productId, (newVal) => {
+  if (newVal) {
+    if (directImportBatches.value.length > 0) {
+      directImportForm.value.isNewBatch = false
+    } else {
+      directImportForm.value.isNewBatch = true
+    }
+  }
+})
+
+watch(() => directImportForm.value.batchCode, (newBatch) => {
+  if (!newBatch) return;
+  const existing = existingBatchInDirectImport.value
+  if (existing) {
+    const mDate = parseToInputDate(existing.manufacturingDate)
+    if (mDate) {
+      directImportForm.value.manufacturingDate = mDate
+    }
+    const eDate = parseToInputDate(existing.expirationDate)
+    if (eDate) {
+      directImportForm.value.expirationDate = eDate
+      directImportForm.value.hasExpiry = true
+    } else {
+      directImportForm.value.hasExpiry = false
+    }
+    directImportForm.value.price = existing.importPrice || directImportForm.value.price
+  }
+})
 
 watch(() => createForm.value.sourceBranchId, async (newVal) => {
   if (newVal) {
@@ -1920,17 +2014,32 @@ function getCustomerName(receipt: any) {
         </div>
 
         <!-- Dòng 4: Mã lô sản xuất & Số lượng nhập -->
-        <div class="grid grid-cols-2 gap-4">
-          <div>
+        <div class="grid grid-cols-12 gap-4">
+          <div class="col-span-8">
             <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Mã lô sản xuất</label>
-            <input 
-              v-model="directImportForm.batchCode" 
-              type="text" 
-              placeholder="Ví dụ: BATCH-01, MILK-2026..." 
-              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
-            />
+            <div class="flex gap-2">
+              <select v-if="!directImportForm.isNewBatch && directImportBatches.length > 0" 
+                v-model="directImportForm.batchCode" 
+                class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all">
+                <option value="">-- Chọn lô --</option>
+                <option v-for="b in directImportBatches" :key="b.batchCode" :value="b.batchCode">
+                  {{ b.batchCode }} (Tồn: {{ b.quantity }})
+                </option>
+              </select>
+              <input v-else 
+                v-model="directImportForm.batchCode" 
+                type="text" 
+                placeholder="Ví dụ: BATCH-01, MILK-2026..." 
+                class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
+              />
+              <button @click="directImportForm.isNewBatch = !directImportForm.isNewBatch; directImportForm.batchCode = ''" 
+                class="px-3 rounded-xl border border-[#e2e8f0] bg-[#f8f9fa] text-[#4361ee] hover:bg-[#eef2ff] transition-all flex items-center justify-center font-bold text-xs"
+                title="Chuyển đổi nhập lô mới/cũ">
+                <i class="fas fa-sync-alt"></i>
+              </button>
+            </div>
           </div>
-          <div>
+          <div class="col-span-4">
             <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số lượng nhập</label>
             <input 
               v-model.number="directImportForm.quantity" 
@@ -1947,7 +2056,8 @@ function getCustomerName(receipt: any) {
           <input 
             v-model="directImportForm.manufacturingDate" 
             type="date" 
-            class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
+            :disabled="isMfgDateLocked"
+            class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed" 
           />
         </div>
         <!-- Checkbox quản lý theo hạn dùng -->
@@ -1956,7 +2066,8 @@ function getCustomerName(receipt: any) {
             id="directImportHasExpiry" 
             v-model="directImportForm.hasExpiry" 
             type="checkbox" 
-            class="w-5 h-5 accent-[#4361ee] cursor-pointer rounded-md border-slate-300" 
+            :disabled="isExpDateLocked"
+            class="w-5 h-5 accent-[#4361ee] cursor-pointer rounded-md border-slate-300 disabled:opacity-60 disabled:cursor-not-allowed" 
           />
           <label for="directImportHasExpiry" class="cursor-pointer select-none font-bold text-xs text-[#8094ae] uppercase tracking-wider">
             Sản phẩm quản lý theo hạn dùng
@@ -1972,7 +2083,8 @@ function getCustomerName(receipt: any) {
                 <input 
                   v-model="directImportForm.expirationDate" 
                   type="date" 
-                  class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
+                  :disabled="isExpDateLocked"
+                  class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed" 
                 />
               </div>
               <div>
