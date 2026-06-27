@@ -687,8 +687,8 @@ async function exportPDF() {
     
     // --- Render ECharts for PDF ---
     // 1. Trend Chart (Line)
-    const tChart = echarts.init(document.getElementById('pdf-trend-chart'));
-    const tOpt = trendChartInst.getOption();
+    const tChart = echarts.init(document.getElementById('pdf-trend-chart') as HTMLElement);
+    const tOpt: any = trendChartInst?.getOption() || {};
     tOpt.animation = false;
     if(tOpt.xAxis && tOpt.xAxis[0]) {
       tOpt.xAxis[0].axisLabel = { ...tOpt.xAxis[0].axisLabel, hideOverlap: true, rotate: 15 };
@@ -696,27 +696,33 @@ async function exportPDF() {
     tChart.setOption(tOpt);
 
     // 2. Category Revenue Chart (Pie)
-    const cChart = echarts.init(document.getElementById('pdf-cat-revenue-chart'));
-    const cOpt = catRevenueChartInst.getOption();
+    const cChart = echarts.init(document.getElementById('pdf-cat-revenue-chart') as HTMLElement);
+    const cOpt: any = catRevenueChartInst?.getOption() || { legend: [{}], series: [{}] };
     cOpt.animation = false;
-    cOpt.legend[0].show = true;
-    cOpt.legend[0].bottom = 0;
-    cOpt.series[0].radius = ['35%', '50%']; 
-    cOpt.series[0].center = ['50%', '45%'];
-    cOpt.series[0].label = { show: true, formatter: '{b}\n{c}đ ({d}%)', position: 'outside', fontSize: 10 };
-    cOpt.series[0].labelLine = { length: 10, length2: 15 };
+    if (cOpt.legend && cOpt.legend[0]) {
+      cOpt.legend[0].show = true;
+      cOpt.legend[0].bottom = 0;
+    }
+    if (cOpt.series && cOpt.series[0]) {
+      cOpt.series[0].radius = ['35%', '50%']; 
+      cOpt.series[0].center = ['50%', '45%'];
+      cOpt.series[0].label = { show: true, formatter: '{b}\n{c}đ ({d}%)', position: 'outside', fontSize: 10 };
+      cOpt.series[0].labelLine = { length: 10, length2: 15 };
+    }
     cChart.setOption(cOpt);
 
     // 3. Branch Chart (Bar Horizontal)
-    const bChart = echarts.init(document.getElementById('pdf-branch-chart'));
-    const bOpt = branchChartInst.getOption();
+    const bChart = echarts.init(document.getElementById('pdf-branch-chart') as HTMLElement);
+    const bOpt: any = branchChartInst?.getOption() || { series: [{}] };
     bOpt.animation = false;
-    bOpt.series[0].barMaxWidth = 30; // Prevent super thick bars
-    bOpt.series[0].label = { show: true, position: 'right', formatter: '{c}đ', fontSize: 10 };
+    if (bOpt.series && bOpt.series[0]) {
+      bOpt.series[0].barMaxWidth = 30; // Prevent super thick bars
+      bOpt.series[0].label = { show: true, position: 'right', formatter: '{c}đ', fontSize: 10 };
+    }
     bChart.setOption(bOpt);
 
     // 4. Inventory Age Chart (Pie)
-    const iChart = echarts.init(document.getElementById('pdf-inventory-age-chart'));
+    const iChart = echarts.init(document.getElementById('pdf-inventory-age-chart') as HTMLElement);
     iChart.setOption({
       animation: false,
       color: ['#10b981', '#f59e0b', '#ef4444'],
@@ -736,7 +742,7 @@ async function exportPDF() {
     });
 
     // 5. Stocktake Chart (Bar Vertical)
-    const sChart = echarts.init(document.getElementById('pdf-stocktake-chart'));
+    const sChart = echarts.init(document.getElementById('pdf-stocktake-chart') as HTMLElement);
     const stData = stocktakeDiscrepancyData.value || [];
     sChart.setOption({
       animation: false,
@@ -758,10 +764,10 @@ async function exportPDF() {
     await new Promise(r => setTimeout(r, 1000));
 
     // Capture Pages
-    const canvas1 = await html2canvas(document.getElementById('pdf-page-1'), { scale: 2, useCORS: true, logging: false });
+    const canvas1 = await html2canvas(document.getElementById('pdf-page-1') as HTMLElement, { scale: 2, useCORS: true, logging: false });
     const img1 = canvas1.toDataURL('image/png');
 
-    const canvas2 = await html2canvas(document.getElementById('pdf-page-2'), { scale: 2, useCORS: true, logging: false });
+    const canvas2 = await html2canvas(document.getElementById('pdf-page-2') as HTMLElement, { scale: 2, useCORS: true, logging: false });
     const img2 = canvas2.toDataURL('image/png');
 
     // Create PDF

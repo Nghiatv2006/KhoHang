@@ -214,9 +214,7 @@ const statUnpaid = computed(() => receipts.value.filter(r => r.type === 'EXPORT'
 // ──────────────────────────────────────────────────────────────
 const selectedReceipt = ref<any>(null)
 const showDetail = ref(false)
-const hasReceivedQuantity = computed(() => {
-  return selectedReceipt.value?.details?.some((x: any) => x.receivedQuantity !== null) ?? false
-})
+
 
 async function openDetail(receipt: any) {
   try {

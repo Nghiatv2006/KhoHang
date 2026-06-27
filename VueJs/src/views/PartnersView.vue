@@ -78,8 +78,12 @@ async function loadCustomerReceipts(id: number) {
   }
 }
 
-// Removed openAddC as per user request
-
+// Restored openAddC
+function openAddC() {
+  editingC.value = null;
+  Object.assign(cForm, { name: '', email: '', phone: '', address: '', taxCode: '' });
+  showCModal.value = true;
+}
 function openEditC(c: any) { 
   editingC.value = c; 
   Object.assign(cForm, { name: c.name, email: c.email || '', phone: c.contactInfo || '', address: c.address || '', taxCode: c.taxCode || '' }); 
