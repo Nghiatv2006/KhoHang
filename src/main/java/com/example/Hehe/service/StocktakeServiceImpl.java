@@ -25,22 +25,22 @@ public class StocktakeServiceImpl implements StocktakeService {
     private final BranchRepository branchRepository;
     private final ProductRepository productRepository;
     private final ReceiptRepository receiptRepository;
-
-    @PersistenceContext
-    private EntityManager entityManager;
+    private final AuditLogService auditLogService;
 
     public StocktakeServiceImpl(StocktakeRepository stocktakeRepository,
                                 StocktakeDetailRepository stocktakeDetailRepository,
                                 InventoryRepository inventoryRepository,
                                 BranchRepository branchRepository,
                                 ProductRepository productRepository,
-                                ReceiptRepository receiptRepository) {
+                                ReceiptRepository receiptRepository,
+                                AuditLogService auditLogService) {
         this.stocktakeRepository = stocktakeRepository;
         this.stocktakeDetailRepository = stocktakeDetailRepository;
         this.inventoryRepository = inventoryRepository;
         this.branchRepository = branchRepository;
         this.productRepository = productRepository;
         this.receiptRepository = receiptRepository;
+        this.auditLogService = auditLogService;
     }
 
     @Override
@@ -102,7 +102,7 @@ public class StocktakeServiceImpl implements StocktakeService {
         // Save and reload
         s = stocktakeRepository.save(s);
 
-        logAudit(currentUser.getId(), "CREATE_STOCKTAKE", "stocktakes", s.getId().toString(),
+        logAudit(currentUser, "CREATE_STOCKTAKE", "stocktakes", s.getId().toString(),
                 "Tạo phiên kiểm kê nháp " + s.getCode() + " tại " + branch.getName());
 
         return new StocktakeResponse(s);
@@ -144,7 +144,7 @@ public class StocktakeServiceImpl implements StocktakeService {
 
         s = stocktakeRepository.save(s);
 
-        logAudit(currentUser.getId(), "UPDATE_STOCKTAKE", "stocktakes", s.getId().toString(),
+        logAudit(currentUser, "UPDATE_STOCKTAKE", "stocktakes", s.getId().toString(),
                 "Cập nhật số liệu kiểm kê cho phiên " + s.getCode());
 
         return new StocktakeResponse(s);
@@ -265,7 +265,7 @@ public class StocktakeServiceImpl implements StocktakeService {
         s.setStatus(StocktakeStatus.COMPLETED);
         s = stocktakeRepository.save(s);
 
-        logAudit(currentUser.getId(), "COMPLETE_STOCKTAKE", "stocktakes", s.getId().toString(),
+        logAudit(currentUser, "COMPLETE_STOCKTAKE", "stocktakes", s.getId().toString(),
                 "Manager duyệt hoàn tất phiên kiểm kê " + s.getCode() + ". Đã cân bằng tồn kho thực tế.");
 
         return new StocktakeResponse(s);
@@ -292,7 +292,7 @@ public class StocktakeServiceImpl implements StocktakeService {
         s.setStatus(StocktakeStatus.CANCELLED);
         s = stocktakeRepository.save(s);
 
-        logAudit(currentUser.getId(), "CANCEL_STOCKTAKE", "stocktakes", s.getId().toString(),
+        logAudit(currentUser, "CANCEL_STOCKTAKE", "stocktakes", s.getId().toString(),
                 "Hủy bỏ phiên kiểm kê " + s.getCode());
 
         return new StocktakeResponse(s);
@@ -329,16 +329,9 @@ public class StocktakeServiceImpl implements StocktakeService {
         inventoryRepository.save(inv);
     }
 
-    private void logAudit(Integer userId, String action, String entityName, String entityId, String details) {
+    private void logAudit(User user, String action, String entityName, String entityId, String details) {
         try {
-            entityManager.createNativeQuery(
-                            "INSERT INTO audit_logs (user_id, action, entity_name, entity_id, details) VALUES (?, ?, ?, ?, ?)")
-                    .setParameter(1, userId)
-                    .setParameter(2, action)
-                    .setParameter(3, entityName)
-                    .setParameter(4, entityId)
-                    .setParameter(5, details)
-                    .executeUpdate();
+            auditLogService.logAction(user, action, entityName, entityId, details);
         } catch (Exception e) {
             System.err.println("Audit Log insertion failed inside Stocktake: " + e.getMessage());
         }

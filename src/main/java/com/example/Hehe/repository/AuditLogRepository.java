@@ -31,6 +31,13 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
     long countSpamWarningsSince(@Param("userId") Integer userId, @Param("since") LocalDateTime since);
 
     /**
+     * Tìm thời điểm thực hiện thao tác hợp lệ gần nhất (Không phải Login/Logout/Spam)
+     * Dùng làm mốc Reset bộ đếm SPAM (Lấy công chuộc tội).
+     */
+    @Query("SELECT MAX(a.createdAt) FROM AuditLog a WHERE a.user.id = :userId AND a.action NOT IN ('LOGIN', 'LOGOUT', 'SPAM_WARNING')")
+    LocalDateTime findLastLegitimateActionTime(@Param("userId") Integer userId);
+
+    /**
      * Tìm kiếm log nâng cao với nhiều điều kiện (Cho bộ lọc giao diện).
      * Dùng native PostgreSQL query để tránh lỗi lower(bytea) của Hibernate JPQL.
      */

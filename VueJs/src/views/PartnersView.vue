@@ -175,6 +175,10 @@ function formatCurrency(val: any) {
   if (!val && val !== 0) return '—'
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(val)
 }
+
+function exportExcel() {
+  window.open('/api/reports/customers/excel', '_blank');
+}
 </script>
 
 <template>
@@ -203,9 +207,14 @@ function formatCurrency(val: any) {
             <option value="INACTIVE">Ngừng hoạt động</option>
           </select>
         </div>
-        <button v-if="isManager" @click="openAddC" class="h-[42px] px-5 bg-[#4361ee] hover:bg-[#3b51d8] text-white rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm hover:shadow transition-all cursor-pointer">
-          <i class="fas fa-plus"></i> Thêm Khách hàng
-        </button>
+        <div class="flex gap-2">
+          <button v-if="isManager" class="bg-white border border-[#e2e8f0] text-[#107c41] hover:bg-green-50 px-5 py-2.5 rounded-xl font-semibold shadow-sm transition-all text-sm flex items-center gap-2" @click="exportExcel">
+            <i class="fas fa-file-excel"></i> Xuất Excel
+          </button>
+          <button v-if="isManager" class="bg-[#4361ee] text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-sm flex items-center gap-2" @click="openAddC">
+            <i class="fas fa-plus"></i> Thêm Khách hàng
+          </button>
+        </div>
       </div>
 
       <!-- Table -->

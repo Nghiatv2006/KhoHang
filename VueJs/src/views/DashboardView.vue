@@ -2,6 +2,8 @@
 import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { api } from '../api'
 import * as echarts from 'echarts'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 
 const products = ref<any[]>([])
 const categories = ref<any[]>([])
@@ -11,6 +13,12 @@ const branches = ref<any[]>([])
 
 const loading = ref(true)
 const errorMsg = ref('')
+
+const isExporting = ref(false)
+const inventoryAgeData = ref<any>({})
+const stocktakeDiscrepancyData = ref<any[]>([])
+const user = ref<any>(JSON.parse(localStorage.getItem('wh_user') || '{}'))
+const currentUserRole = ref(user.value.role || '')
 
 const trendChartRef = ref<HTMLElement | null>(null)
 const soldProductChartRef = ref<HTMLElement | null>(null)
@@ -29,13 +37,15 @@ const inventories = ref<any[]>([])
 
 onMounted(async () => {
   try {
-    const [pRes, cRes, cuRes, bRes, rRes, iRes] = await Promise.allSettled([
+    const [pRes, cRes, cuRes, bRes, rRes, iRes, invAgeRes, stockDiscRes] = await Promise.allSettled([
       api.get('/api/products'),
       api.get('/api/categories'),
       api.get('/api/customers'),
       api.get('/api/branches'),
       api.get('/api/receipts'),
       api.get('/api/inventories'),
+      api.get('/api/reports/dashboard/inventory-age'),
+      api.get('/api/reports/dashboard/stocktake-discrepancy')
     ])
     
     if (pRes.status === 'fulfilled' && pRes.value.ok) products.value = await pRes.value.json()
@@ -55,6 +65,8 @@ onMounted(async () => {
     
     if (iRes.status === 'fulfilled' && iRes.value.ok) inventories.value = await iRes.value.json()
     else errorMsg.value += 'Lỗi API Tồn kho. '
+    if (invAgeRes.status === 'fulfilled' && invAgeRes.value.ok) inventoryAgeData.value = await invAgeRes.value.json()
+    if (stockDiscRes.status === 'fulfilled' && stockDiscRes.value.ok) stocktakeDiscrepancyData.value = await stockDiscRes.value.json()
     
   } catch (err: any) {
     errorMsg.value = 'Lỗi kết nối máy chủ: ' + err.message
@@ -663,7 +675,124 @@ watch([products, customers, categories, receipts, inventories], () => {
   }
 }, { deep: true })
 
+
+async function exportPDF() {
+  isExporting.value = true;
+  try {
+    const pdfEl = document.getElementById('pdf-report-template');
+    if (!pdfEl) return;
+    
+    // Make visible temporarily out of bounds
+    pdfEl.style.left = '0';
+    
+    // --- Render ECharts for PDF ---
+    // 1. Trend Chart (Line)
+    const tChart = echarts.init(document.getElementById('pdf-trend-chart'));
+    const tOpt = trendChartInst.getOption();
+    tOpt.animation = false;
+    if(tOpt.xAxis && tOpt.xAxis[0]) {
+      tOpt.xAxis[0].axisLabel = { ...tOpt.xAxis[0].axisLabel, hideOverlap: true, rotate: 15 };
+    }
+    tChart.setOption(tOpt);
+
+    // 2. Category Revenue Chart (Pie)
+    const cChart = echarts.init(document.getElementById('pdf-cat-revenue-chart'));
+    const cOpt = catRevenueChartInst.getOption();
+    cOpt.animation = false;
+    cOpt.legend[0].show = true;
+    cOpt.legend[0].bottom = 0;
+    cOpt.series[0].radius = ['35%', '50%']; 
+    cOpt.series[0].center = ['50%', '45%'];
+    cOpt.series[0].label = { show: true, formatter: '{b}\n{c}đ ({d}%)', position: 'outside', fontSize: 10 };
+    cOpt.series[0].labelLine = { length: 10, length2: 15 };
+    cChart.setOption(cOpt);
+
+    // 3. Branch Chart (Bar Horizontal)
+    const bChart = echarts.init(document.getElementById('pdf-branch-chart'));
+    const bOpt = branchChartInst.getOption();
+    bOpt.animation = false;
+    bOpt.series[0].barMaxWidth = 30; // Prevent super thick bars
+    bOpt.series[0].label = { show: true, position: 'right', formatter: '{c}đ', fontSize: 10 };
+    bChart.setOption(bOpt);
+
+    // 4. Inventory Age Chart (Pie)
+    const iChart = echarts.init(document.getElementById('pdf-inventory-age-chart'));
+    iChart.setOption({
+      animation: false,
+      color: ['#10b981', '#f59e0b', '#ef4444'],
+      legend: { show: false }, 
+      series: [{
+        type: 'pie', 
+        radius: ['35%', '55%'],
+        center: ['50%', '50%'],
+        label: { show: true, formatter: '{b}\n{c} mặt hàng ({d}%)', fontSize: 11, lineHeight: 16 },
+        labelLine: { show: true, length: 15, length2: 20 },
+        data: [
+          { name: 'Luân chuyển tốt (<30 ngày)', value: inventoryAgeData.value?.freshItems || 0 },
+          { name: 'Tồn kho chậm (30-90 ngày)', value: inventoryAgeData.value?.slowItems || 0 },
+          { name: 'Tồn đọng / Dead stock (>90 ngày)', value: inventoryAgeData.value?.deadItems || 0 }
+        ]
+      }]
+    });
+
+    // 5. Stocktake Chart (Bar Vertical)
+    const sChart = echarts.init(document.getElementById('pdf-stocktake-chart'));
+    const stData = stocktakeDiscrepancyData.value || [];
+    sChart.setOption({
+      animation: false,
+      color: ['#6366f1', '#f43f5e'],
+      legend: { bottom: 0 },
+      xAxis: { 
+        type: 'category', 
+        data: stData.map(d => new Date(d.date).toLocaleDateString('vi-VN')),
+        axisLabel: { hideOverlap: true }
+      },
+      yAxis: { type: 'value' },
+      series: [
+        { name: 'Lệch thừa', type: 'bar', barMaxWidth: 40, label: {show: true, position:'top', fontSize: 10}, data: stData.map(d => d.surplusValue) },
+        { name: 'Lệch thiếu', type: 'bar', barMaxWidth: 40, label: {show: true, position:'top', fontSize: 10}, data: stData.map(d => d.missingValue) }
+      ]
+    });
+
+    // Wait for rendering
+    await new Promise(r => setTimeout(r, 1000));
+
+    // Capture Pages
+    const canvas1 = await html2canvas(document.getElementById('pdf-page-1'), { scale: 2, useCORS: true, logging: false });
+    const img1 = canvas1.toDataURL('image/png');
+
+    const canvas2 = await html2canvas(document.getElementById('pdf-page-2'), { scale: 2, useCORS: true, logging: false });
+    const img2 = canvas2.toDataURL('image/png');
+
+    // Create PDF
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfWidth = 210;
+    const pdfHeight = 297;
+    
+    pdf.addImage(img1, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    pdf.addPage();
+    pdf.addImage(img2, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    
+    pdf.save('Bao_Cao_Phan_Tich.pdf');
+
+    // Clean up
+    tChart.dispose();
+    cChart.dispose();
+    bChart.dispose();
+    iChart.dispose();
+    sChart.dispose();
+    
+    pdfEl.style.left = '-9999px';
+  } catch (err) {
+    console.error('Lỗi khi xuất PDF:', err);
+    alert('Có lỗi xảy ra khi xuất file PDF');
+  } finally {
+    isExporting.value = false;
+  }
+}
+
 function formatVND(val: number) {
+
   if (!val) return '0đ'
   return new Intl.NumberFormat('vi-VN').format(val) + 'đ'
 }
@@ -676,6 +805,16 @@ function formatVND(val: number) {
   </div>
   
   <div v-else class="max-w-[1400px]">
+
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-2xl font-bold text-slate-800">Tổng quan Dashboard</h2>
+      <button v-if="['ADMIN', 'MANAGER'].includes(currentUserRole)"
+        @click="exportPDF" :disabled="isExporting"
+        class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg shadow-md disabled:opacity-50 flex items-center transition-colors">
+        <i class="fas" :class="isExporting ? 'fa-spinner fa-spin' : 'fa-file-pdf'"></i>
+        <span class="ml-2">{{ isExporting ? 'Đang xuất PDF...' : 'Xuất PDF Báo cáo' }}</span>
+      </button>
+    </div>
 
     <div v-if="errorMsg" class="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl flex items-start shadow-sm">
       <i class="fas fa-exclamation-triangle text-xl mr-3 mt-0.5"></i>
@@ -830,5 +969,75 @@ function formatVND(val: number) {
 
 
   </div>
+
+
+  <!-- Hidden PDF Report Template: Fixed Pixel Dimensions for A4 (794x1123px) -->
+  <div id="pdf-report-template" style="position: absolute; left: -9999px; top: 0; width: 794px; font-family: sans-serif; color: #334155; z-index: -1000;">
+    
+    <!-- Trang 1 -->
+    <div id="pdf-page-1" style="width: 794px; height: 1123px; padding: 40px; box-sizing: border-box; background: white; overflow: hidden; display: flex; flex-direction: column;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4361ee; padding-bottom: 10px; margin-bottom: 30px;">
+        <div style="font-size: 24px; font-weight: bold; color: #4361ee;">WAREHUB</div>
+        <div style="text-align: right;">
+          <div style="font-size: 18px; font-weight: bold;">BÁO CÁO KẾT QUẢ KINH DOANH</div>
+          <div style="font-size: 12px; color: #64748b;">Ngày xuất: {{ new Date().toLocaleDateString('vi-VN') }}</div>
+        </div>
+      </div>
+      
+      <!-- Trend (Full width, moderate height) -->
+      <div style="margin-bottom: 25px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; flex: none;">
+        <div style="font-weight: bold; font-size: 14px; margin-bottom: 10px;">Xu hướng Nhập - Xuất kho (30 ngày gần nhất)</div>
+        <div id="pdf-trend-chart" style="width: 100%; height: 280px;"></div>
+      </div>
+
+      <!-- Split Row: Category and Branch -->
+      <div style="display: flex; gap: 20px; flex: none;">
+        <div style="flex: 1; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px;">
+          <div style="font-weight: bold; font-size: 14px; margin-bottom: 10px;">Tỷ trọng Doanh thu theo Danh mục</div>
+          <div id="pdf-cat-revenue-chart" style="width: 100%; height: 280px;"></div>
+        </div>
+        <div style="flex: 1; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px;">
+          <div style="font-weight: bold; font-size: 14px; margin-bottom: 10px;">Doanh thu theo Chi nhánh</div>
+          <div id="pdf-branch-chart" style="width: 100%; height: 280px;"></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Trang 2 -->
+    <div id="pdf-page-2" style="width: 794px; height: 1123px; padding: 40px; box-sizing: border-box; background: white; overflow: hidden; display: flex; flex-direction: column; margin-top: 50px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4361ee; padding-bottom: 10px; margin-bottom: 30px;">
+        <div style="font-size: 24px; font-weight: bold; color: #4361ee;">WAREHUB</div>
+        <div style="text-align: right;">
+          <div style="font-size: 18px; font-weight: bold;">KIỂM SOÁT TỒN KHO & KIỂM KÊ</div>
+        </div>
+      </div>
+      
+      <!-- Inventory Age (Full width bounding box, pie will center and scale to height) -->
+      <div style="margin-bottom: 25px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; flex: none;">
+        <div style="font-weight: bold; font-size: 14px; margin-bottom: 10px;">Cơ cấu Tuổi thọ Tồn kho (Toàn hệ thống)</div>
+        <div id="pdf-inventory-age-chart" style="width: 100%; height: 280px;"></div>
+      </div>
+
+      <!-- Stocktake (Full width) -->
+      <div style="margin-bottom: 40px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; flex: none;">
+        <div style="font-weight: bold; font-size: 14px; margin-bottom: 10px;">Lịch sử Chênh lệch Kiểm kê</div>
+        <div id="pdf-stocktake-chart" style="width: 100%; height: 280px;"></div>
+      </div>
+      
+      <!-- Signatures -->
+      <div style="margin-top: auto; display: flex; justify-content: space-between; padding: 0 80px; margin-bottom: 80px;">
+        <div style="text-align: center;">
+          <div style="font-weight: bold; font-size: 16px; margin-bottom: 120px;">Người lập biểu</div>
+          <div style="color: #64748b; font-size: 14px;">(Ký, ghi rõ họ tên)</div>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-weight: bold; font-size: 16px; margin-bottom: 120px;">Giám đốc phê duyệt</div>
+          <div style="color: #64748b; font-size: 14px;">(Ký, ghi rõ họ tên)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </template>
+
 

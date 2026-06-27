@@ -573,6 +573,21 @@ function formatDateTime(dateTimeStr: string) {
     return dateTimeStr
   }
 }
+
+// Export Excel Report
+function exportExcel() {
+  let targetBranchId: number | string = '';
+  if (activeTab.value === 'head') {
+    targetBranchId = headBranch.value ? headBranch.value.id : 1;
+  } else {
+    targetBranchId = selectedSubBranchId.value || user.value?.branchId;
+  }
+  if (!targetBranchId) {
+    toast.error('Vui lòng chọn chi nhánh để xuất báo cáo');
+    return;
+  }
+  window.open(`/api/reports/inventory/excel?branchId=${targetBranchId}`, '_blank');
+}
 </script>
 
 <template>
@@ -656,6 +671,15 @@ function formatDateTime(dateTimeStr: string) {
           class="h-[42px] bg-white border border-[#e2e8f0] text-[#364a63] hover:bg-[#f8f9fa] px-4 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-2"
         >
           <i class="fas fa-cog text-slate-500"></i> Ngưỡng cảnh báo ({{ activeThreshold }})
+        </button>
+
+        <!-- Xuất Excel -->
+        <button 
+          v-if="user?.role !== 'STAFF'"
+          @click="exportExcel"
+          class="h-[42px] bg-white border border-[#e2e8f0] text-[#107c41] hover:bg-green-50 px-4 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-2"
+        >
+          <i class="fas fa-file-excel"></i> Xuất Excel
         </button>
 
         <!-- Add Product to Head Branch -->

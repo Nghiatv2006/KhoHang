@@ -30,6 +30,10 @@ const ACTION_LABELS: Record<string, string> = {
   'CANCEL':        'Hủy phiếu',
   'SPAM_WARNING':  '⚠️ Cảnh báo SPAM',
   'LOCK_ACCOUNT':  '🔒 Khóa tài khoản',
+  'CREATE_STOCKTAKE': 'Tạo kiểm kê',
+  'UPDATE_STOCKTAKE': 'Sửa kiểm kê',
+  'COMPLETE_STOCKTAKE': 'Chốt kiểm kê',
+  'CANCEL_STOCKTAKE': 'Hủy kiểm kê',
 }
 
 const ACTION_OPTIONS = Object.entries(ACTION_LABELS).map(([value, label]) => ({ value, label }))
@@ -128,6 +132,10 @@ function actionColor(action: string, isWarning: boolean) {
     'CANCEL': 'bg-orange-50 text-orange-700 border-orange-200',
     'SPAM_WARNING': 'bg-red-100 text-red-700 border-red-200',
     'LOCK_ACCOUNT': 'bg-red-200 text-red-900 border-red-300',
+    'CREATE_STOCKTAKE': 'bg-teal-50 text-teal-700 border-teal-200',
+    'UPDATE_STOCKTAKE': 'bg-amber-50 text-amber-700 border-amber-200',
+    'COMPLETE_STOCKTAKE': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    'CANCEL_STOCKTAKE': 'bg-orange-50 text-orange-700 border-orange-200',
   }
   return map[action] || 'bg-slate-50 text-slate-600 border-slate-200'
 }

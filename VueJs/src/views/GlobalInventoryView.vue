@@ -57,7 +57,7 @@ const groupedInventories = computed(() => {
   if (kw) {
     filtered = filtered.filter(inv => 
       (inv.productName && inv.productName.toLowerCase().includes(kw)) ||
-      (inv.productCode && inv.productCode.toLowerCase().includes(kw))
+      (inv.productSku && inv.productSku.toLowerCase().includes(kw))
     )
   }
 
@@ -69,7 +69,7 @@ const groupedInventories = computed(() => {
       groups[inv.productId] = {
         productId: inv.productId,
         productName: inv.productName,
-        productCode: inv.productCode,
+        productSku: inv.productSku,
         unit: inv.unit || 'Chiếc',
         price: inv.price || 0,
         totalQuantity: 0,
@@ -81,15 +81,20 @@ const groupedInventories = computed(() => {
     
     // Optional: Include expiry logic
     let branchDetail = inv.branchName
-    if (inv.expirationDate) {
+    if (inv.hasExpiry && inv.expirationDate && !inv.expirationDate.startsWith('1970')) {
        branchDetail += ` (HSD: ${new Date(inv.expirationDate).toLocaleDateString('vi-VN')})`
     }
     
-    groups[inv.productId].branches.push({
-      branchName: inv.branchName,
-      quantity: inv.quantity,
-      detail: branchDetail
-    })
+    const existing = groups[inv.productId].branches.find((b: any) => b.detail === branchDetail)
+    if (existing) {
+      existing.quantity += inv.quantity
+    } else {
+      groups[inv.productId].branches.push({
+        branchName: inv.branchName,
+        quantity: inv.quantity,
+        detail: branchDetail
+      })
+    }
   })
 
   return Object.values(groups)
@@ -151,15 +156,14 @@ const groupedInventories = computed(() => {
           <table class="w-full text-left border-collapse">
             <thead>
               <tr class="bg-[#f8f9fa] border-b border-[#e2e8f0]">
-                <th class="py-4 px-5 text-xs font-extrabold text-[#64748b] uppercase tracking-wider sticky top-0 bg-[#f8f9fa] z-10">Mã SKU</th>
-                <th class="py-4 px-5 text-xs font-extrabold text-[#64748b] uppercase tracking-wider sticky top-0 bg-[#f8f9fa] z-10">Sản phẩm</th>
-                <th class="py-4 px-5 text-center text-xs font-extrabold text-[#64748b] uppercase tracking-wider sticky top-0 bg-[#f8f9fa] z-10">Tổng tồn kho</th>
-                <th class="py-4 px-5 text-xs font-extrabold text-[#64748b] uppercase tracking-wider sticky top-0 bg-[#f8f9fa] z-10">Phân bổ tại Chi nhánh</th>
+                <th class="py-4 px-5 text-xs font-extrabold text-[#64748b] uppercase tracking-wider sticky top-0 bg-[#f8f9fa] z-10 w-1/3">Sản phẩm</th>
+                <th class="py-4 px-5 text-xs font-extrabold text-[#64748b] uppercase tracking-wider sticky top-0 bg-[#f8f9fa] z-10 w-1/2">Phân bổ tại Chi nhánh</th>
+                <th class="py-4 px-5 text-center text-xs font-extrabold text-[#64748b] uppercase tracking-wider sticky top-0 bg-[#f8f9fa] z-10 w-1/6">Tổng tồn kho</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-[#e2e8f0]">
               <tr v-if="!loading && groupedInventories.length === 0">
-                <td colspan="4" class="py-12 text-center">
+                <td colspan="3" class="py-12 text-center">
                   <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#f1f5f9] text-[#94a3b8] mb-4">
                     <i class="fas fa-box-open text-2xl"></i>
                   </div>
@@ -170,28 +174,26 @@ const groupedInventories = computed(() => {
               
               <tr v-for="item in groupedInventories" :key="item.productId" class="hover:bg-[#f8f9fa]/50 transition-colors group">
                 <td class="py-4 px-5 align-top">
-                  <span class="inline-block px-2.5 py-1 bg-[#f1f5f9] text-[#475569] font-mono text-xs font-bold rounded-lg border border-[#e2e8f0]">{{ item.productCode }}</span>
-                </td>
-                <td class="py-4 px-5 align-top">
                   <div class="font-bold text-[#1e293b] text-sm mb-0.5">{{ item.productName }}</div>
+                  <div v-if="item.productSku" class="text-[11px] text-[#94a3b8] font-bold tracking-widest uppercase mb-1">{{ item.productSku }}</div>
                   <div class="text-xs text-[#94a3b8] font-medium">Đơn vị: {{ item.unit }}</div>
                 </td>
-                <td class="py-4 px-5 align-top text-center">
-                  <div class="text-lg font-extrabold" :class="item.totalQuantity > 0 ? 'text-[#10b981]' : 'text-[#ea4f52]'">
-                    {{ item.totalQuantity }}
-                  </div>
-                </td>
                 <td class="py-4 px-5 align-top">
-                  <div class="flex flex-wrap gap-2">
+                  <div class="flex flex-col gap-1.5 max-h-[140px] overflow-y-auto custom-scrollbar pr-2">
                     <div 
                       v-for="(b, idx) in item.branches" 
                       :key="idx" 
-                      class="px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-2"
+                      class="px-2.5 py-1.5 rounded-md border text-xs font-bold flex items-center justify-between gap-3"
                       :class="b.quantity > 0 ? 'bg-blue-50 border-blue-100 text-blue-700' : 'bg-red-50 border-red-100 text-red-600'"
                     >
-                      <span>{{ b.detail }}</span>
-                      <span class="px-1.5 py-0.5 rounded bg-white/60 tabular-nums">{{ b.quantity }}</span>
+                      <span class="truncate" :title="b.detail">{{ b.detail }}</span>
+                      <span class="px-1.5 py-0.5 rounded bg-white/60 tabular-nums shrink-0">{{ b.quantity }}</span>
                     </div>
+                  </div>
+                </td>
+                <td class="py-4 px-5 align-top text-center">
+                  <div class="text-lg font-extrabold mt-1" :class="item.totalQuantity > 0 ? 'text-[#10b981]' : 'text-[#ea4f52]'">
+                    {{ item.totalQuantity }}
                   </div>
                 </td>
               </tr>

@@ -8,4 +8,5 @@ import java.util.List;
 @Repository
 public interface StocktakeRepository extends JpaRepository<Stocktake, Integer> {
     List<Stocktake> findByBranchIdOrderByCreatedAtDesc(Integer branchId);
+    List<Stocktake> findAllByOrderByCreatedAtDesc();
 }

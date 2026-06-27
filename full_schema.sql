@@ -58,6 +58,7 @@ CREATE TABLE users (
     role user_role NOT NULL,
     branch_id INT,
     status user_status NOT NULL DEFAULT 'ACTIVE',
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     ban_until TIMESTAMP, -- Thời gian bị phạt SPAM (null = không bị phạt)

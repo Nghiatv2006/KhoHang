@@ -38,7 +38,7 @@ public class Product {
     @Column(name = "unit", nullable = false)
     private String unit;
 
-    @Column(name = "has_expiry", nullable = false)
+    @Column(name = "has_expiry", nullable = false, columnDefinition = "boolean default false")
     private Boolean hasExpiry;
 
     @Column(name = "image_url", length = 500)

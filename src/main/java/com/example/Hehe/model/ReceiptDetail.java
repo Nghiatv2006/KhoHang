@@ -35,7 +35,7 @@ public class ReceiptDetail {
     @Column(name = "received_quantity")
     private Integer receivedQuantity;
 
-    @Column(name = "batch_code", nullable = false)
+    @Column(name = "batch_code", nullable = false, length = 100, columnDefinition = "varchar(100) default 'DEFAULT_BATCH'")
     private String batchCode = "DEFAULT_BATCH";
 
     @Column(name = "shortfall_reason", columnDefinition = "TEXT")
