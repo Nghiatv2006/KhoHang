@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mxfile host="Electron" type="device">
+  <diagram id="03_tong_quan-admin" name="ADMIN – Tổng quan">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1"
+        connect="1" arrows="1" fold="1" page="1" pageScale="1"
+        pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        
+        <!-- System Boundary -->
+        <mxCell id="sys" value="Tổng quan (Dashboard)" vertex="1" parent="1"
+            style="swimlane;startSize=35;whiteSpace=wrap;html=1;fontStyle=1;fontSize=13;
+                   fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;fontColor=#333333;align=center;">
+          <mxGeometry x="230" y="30" width="530" height="480" as="geometry"/>
+        </mxCell>
+        
+        <!-- Actor -->
+        <mxCell id="act" value="Quản lí&#xa;(Manager)" vertex="1" parent="1"
+            style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;
+                   outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;
+                   fontColor=#1a1a1a;fontStyle=1;fontSize=11;">
+          <mxGeometry x="60" y="215" width="50" height="90" as="geometry"/>
+        </mxCell>
+        
+        <!-- Main Use Case -->
+        <mxCell id="uc_main" value="Truy cập Dashboard" vertex="1" parent="sys" 
+            style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;">
+          <mxGeometry x="30" y="200" width="160" height="60" as="geometry"/>
+        </mxCell>
+        
+        <!-- Included Use Cases -->
+        <mxCell id="uc_kpi" value="Xem các chỉ số KPI&#xa;(Giá trị kho, KH, AR...)" vertex="1" parent="sys" 
+            style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;fontSize=11;align=center;">
+          <mxGeometry x="300" y="40" width="180" height="60" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="uc_trend" value="Xem Xu hướng&#xa;Nhập - Xuất kho" vertex="1" parent="sys" 
+            style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;fontSize=11;align=center;">
+          <mxGeometry x="300" y="120" width="180" height="60" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="uc_revenue" value="Xem Thống kê Doanh thu&#xa;(Theo CN / Danh mục)" vertex="1" parent="sys" 
+            style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;fontSize=11;align=center;">
+          <mxGeometry x="300" y="200" width="180" height="60" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="uc_top" value="Xem Top 10 sản phẩm&#xa;bán chạy" vertex="1" parent="sys" 
+            style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;fontSize=11;align=center;">
+          <mxGeometry x="300" y="280" width="180" height="60" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="uc_forecast" value="Xem Dự báo tồn kho&#xa;(Inventory Runway)" vertex="1" parent="sys" 
+            style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;fontSize=11;align=center;">
+          <mxGeometry x="300" y="360" width="180" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Connections -->
+        <mxCell id="edge_main" value="" edge="1" parent="1" source="act" target="uc_main"
+            style="endArrow=classic;html=1;strokeColor=#3b82f6;strokeWidth=2;rounded=0;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="inc1" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" edge="1" parent="1" source="uc_main" target="uc_kpi"
+            style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;strokeColor=#666666;strokeWidth=1.5;labelBackgroundColor=#ffffff;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="inc2" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" edge="1" parent="1" source="uc_main" target="uc_trend"
+            style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;strokeColor=#666666;strokeWidth=1.5;labelBackgroundColor=#ffffff;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="inc3" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" edge="1" parent="1" source="uc_main" target="uc_revenue"
+            style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;strokeColor=#666666;strokeWidth=1.5;labelBackgroundColor=#ffffff;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="inc4" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" edge="1" parent="1" source="uc_main" target="uc_top"
+            style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;strokeColor=#666666;strokeWidth=1.5;labelBackgroundColor=#ffffff;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="inc5" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" edge="1" parent="1" source="uc_main" target="uc_forecast"
+            style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;strokeColor=#666666;strokeWidth=1.5;labelBackgroundColor=#ffffff;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
