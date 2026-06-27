@@ -22,4 +22,7 @@ public interface ProductRepository extends JpaRepository<Product, Integer>, JpaS
 
     // Tìm kiếm sản phẩm đã bị xóa mềm theo tên
     java.util.Optional<Product> findFirstByNameAndIsDeletedTrue(String name);
+    
+    // Tìm sản phẩm theo tên (đang hoạt động)
+    java.util.Optional<Product> findFirstByNameAndIsDeletedFalse(String name);
 }

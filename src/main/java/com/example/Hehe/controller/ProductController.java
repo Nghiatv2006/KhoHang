@@ -151,10 +151,11 @@ public class ProductController {
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> importProducts(
             @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "preview", defaultValue = "false") boolean preview,
             @AuthenticationPrincipal User currentUser) {
         try {
             if (file.isEmpty()) throw new RuntimeException("File tải lên trống.");
-            Map<String, Object> result = productService.importProductsFromExcel(file, currentUser);
+            Map<String, Object> result = productService.importProductsFromExcel(file, preview, currentUser);
             return ResponseEntity.ok(result);
         } catch (RuntimeException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));

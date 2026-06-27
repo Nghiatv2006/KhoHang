@@ -186,7 +186,9 @@ async function doDeleteProduct() {
 
 // Import Excel
 const importingExcel = ref(false)
-const importResult = ref<{ successCount: number; errors: string[] } | null>(null)
+const pendingImportFile = ref<File | null>(null)
+const importPreviewResult = ref<any>(null)
+const importResult = ref<{ newCount?: number; updateCount?: number; skippedCount?: number; successCount: number; errors: string[]; updateDetails?: string[] } | null>(null)
 
 function downloadTemplate() {
   window.open('/api/products/template', '_blank')
@@ -197,30 +199,59 @@ async function handleExcelImport(event: Event) {
   if (!target.files || target.files.length === 0) return
   
   const file = target.files[0]
+  pendingImportFile.value = file
+  
   const formData = new FormData()
   formData.append('file', file)
   
   importingExcel.value = true
   try {
-    const res = await api.upload('/api/products/import', formData)
+    const res = await api.upload('/api/products/import?preview=true', formData)
+    const data = await res.json()
+    if (res.ok) {
+      importPreviewResult.value = data
+    } else {
+      toast.error(data.message || 'Lỗi phân tích file Excel')
+      pendingImportFile.value = null
+    }
+  } catch (error) {
+    toast.error('Không thể kết nối máy chủ.')
+    pendingImportFile.value = null
+  } finally {
+    importingExcel.value = false
+    target.value = ''
+  }
+}
+
+async function confirmExcelImport() {
+  if (!pendingImportFile.value) return
+  
+  const formData = new FormData()
+  formData.append('file', pendingImportFile.value)
+  
+  importingExcel.value = true
+  try {
+    const res = await api.upload('/api/products/import?preview=false', formData)
     const data = await res.json()
     if (res.ok) {
       importResult.value = data
-      if (data.errors && data.errors.length > 0) {
-        toast.warning(`Nhập thành công ${data.successCount} sản phẩm. Có ${data.errors.length} lỗi.`)
-      } else {
-        toast.success(`Nhập thành công ${data.successCount} sản phẩm!`)
-      }
+      toast.success('Nhập và cập nhật sản phẩm thành công!')
       await loadProducts()
     } else {
-      toast.error(data.message || 'Lỗi nhập file Excel')
+      toast.error(data.message || 'Lỗi khi lưu dữ liệu Excel')
     }
   } catch (error) {
     toast.error('Không thể kết nối máy chủ.')
   } finally {
     importingExcel.value = false
-    target.value = ''
+    importPreviewResult.value = null
+    pendingImportFile.value = null
   }
+}
+
+function cancelExcelImport() {
+  importPreviewResult.value = null
+  pendingImportFile.value = null
 }
 
 // ─── Categories ─────────────────────────────────────────────────────────────
@@ -604,19 +635,75 @@ function formatCurrency(val: any) {
     <ConfirmDialog :show="showDeleteProduct" title="Xóa sản phẩm" :message="`Bạn có chắc muốn xóa sản phẩm '${deletingProduct?.name}'? Thao tác này không thể hoàn tác.`" confirm-text="Xóa" :danger="true" @confirm="doDeleteProduct" @cancel="showDeleteProduct = false" />
     <ConfirmDialog :show="showDeleteCat" title="Xóa danh mục" :message="`Bạn có chắc muốn xóa danh mục '${deletingCat?.name}'?`" confirm-text="Xóa" :danger="true" @confirm="doDeleteCat" @cancel="showDeleteCat = false" />
 
+    <!-- Import Preview Modal -->
+    <AppModal :show="!!importPreviewResult" title="Phân tích File Excel" size="md" @close="cancelExcelImport">
+      <div class="p-6">
+        <div class="text-[#364a63] font-medium mb-4">Hệ thống đã đọc xong file Excel, dưới đây là thống kê trước khi thực hiện:</div>
+        
+        <div class="space-y-3 mb-6">
+          <div v-if="importPreviewResult?.newCount > 0" class="flex items-center gap-3 p-3 bg-blue-50 text-blue-700 rounded-xl border border-blue-100">
+            <i class="fas fa-plus-circle text-lg"></i>
+            <div>Sẽ <strong>thêm mới</strong>: {{ importPreviewResult.newCount }} sản phẩm.</div>
+          </div>
+          
+          <div v-if="importPreviewResult?.updateCount > 0" class="p-3 bg-amber-50 text-amber-700 rounded-xl border border-amber-100">
+            <div class="flex items-center gap-3 mb-2">
+              <i class="fas fa-edit text-lg"></i>
+              <div>Sẽ <strong>cập nhật</strong>: {{ importPreviewResult.updateCount }} sản phẩm.</div>
+            </div>
+            <div class="pl-7">
+              <ul class="space-y-2 text-sm max-h-[150px] overflow-y-auto custom-scrollbar pr-2">
+                <li v-for="(detail, idx) in importPreviewResult.updateDetails" :key="idx" class="border-b border-amber-200/50 last:border-0 pb-1.5 last:pb-0">
+                  <div class="font-bold text-amber-900 mb-0.5">{{ detail.name }}</div>
+                  <div class="text-amber-700/90 pl-3 border-l-2 border-amber-300 ml-1 text-[13px] leading-relaxed">
+                    <div v-for="(change, cIdx) in detail.changes" :key="cIdx">• Cập nhật: {{ change }}</div>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div v-if="importPreviewResult?.skippedCount > 0" class="flex items-center gap-3 p-3 bg-gray-50 text-gray-600 rounded-xl border border-gray-200">
+            <i class="fas fa-forward text-lg"></i>
+            <div><strong>Bỏ qua</strong>: {{ importPreviewResult.skippedCount }} sản phẩm (Dữ liệu không đổi).</div>
+          </div>
+
+          <div v-if="importPreviewResult?.errors?.length > 0" class="flex items-start gap-3 p-3 bg-red-50 text-red-700 rounded-xl border border-red-100">
+            <i class="fas fa-exclamation-triangle text-lg mt-0.5"></i>
+            <div class="flex-1">
+              <div class="font-bold mb-1">Cảnh báo: {{ importPreviewResult.errors.length }} dòng bị lỗi sẽ không được nhập:</div>
+              <ul class="list-disc pl-5 space-y-1 text-sm max-h-[150px] overflow-y-auto custom-scrollbar">
+                <li v-for="(err, idx) in importPreviewResult.errors" :key="idx">{{ err }}</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-3">
+          <button class="px-5 py-2.5 rounded-xl font-bold text-[#364a63] bg-gray-100 hover:bg-gray-200 transition-colors" @click="cancelExcelImport">
+            Hủy bỏ
+          </button>
+          <button class="bg-[#4361ee] text-white px-6 py-2.5 rounded-xl font-bold shadow-sm hover:bg-[#3a0ca3] transition-colors flex items-center gap-2" @click="confirmExcelImport" :disabled="importingExcel">
+            <i v-if="importingExcel" class="fas fa-spinner fa-spin"></i>
+            {{ importingExcel ? 'Đang xử lý...' : 'Xác nhận Nhập & Cập nhật' }}
+          </button>
+        </div>
+      </div>
+    </AppModal>
+
     <!-- Import Result Modal -->
     <AppModal :show="!!importResult" title="Kết quả Nhập Excel" size="md" @close="importResult = null">
       <div class="p-6">
         <div v-if="importResult?.errors && importResult.errors.length === 0" class="flex flex-col items-center justify-center py-6 text-[#10b981]">
           <i class="fas fa-check-circle text-5xl mb-4"></i>
           <h4 class="text-lg font-bold text-[#364a63]">Thành công!</h4>
-          <p class="text-[#8094ae]">Đã nhập thành công {{ importResult?.successCount }} sản phẩm.</p>
+          <p class="text-[#8094ae]">Đã nhập/cập nhật thành công {{ importResult?.successCount }} sản phẩm.</p>
         </div>
         <div v-else class="space-y-4">
           <div class="flex items-center gap-3 p-4 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100">
             <i class="fas fa-check-circle text-xl"></i>
             <div>
-              <div class="font-bold">Nhập thành công: {{ importResult?.successCount }} sản phẩm</div>
+              <div class="font-bold">Đã nhập/cập nhật: {{ importResult?.successCount }} sản phẩm</div>
             </div>
           </div>
           

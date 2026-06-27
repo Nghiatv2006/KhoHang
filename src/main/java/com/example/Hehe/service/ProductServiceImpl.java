@@ -27,6 +27,7 @@ import java.time.format.DateTimeFormatter;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.util.CellRangeAddressList;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -308,18 +309,70 @@ public class ProductServiceImpl implements ProductService {
 
             // Tạo header row
             Row headerRow = sheet.createRow(0);
-            String[] columns = {"Tên sản phẩm", "Mã SKU", "Tên Danh mục", "Giá nhập", "Giá bán", "Đơn vị tính", "Đường dẫn ảnh (URL)"};
+            String[] columns = {"Tên sản phẩm", "Tên Danh mục (Bấm mũi tên để chọn 👇)", "Giá nhập", "Giá bán", "Đơn vị tính"};
             
             CellStyle headerStyle = workbook.createCellStyle();
             Font headerFont = workbook.createFont();
             headerFont.setBold(true);
             headerStyle.setFont(headerFont);
+            headerStyle.setFillForegroundColor(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            headerStyle.setBorderTop(BorderStyle.THIN);
+            headerStyle.setBorderBottom(BorderStyle.THIN);
+            headerStyle.setBorderLeft(BorderStyle.THIN);
+            headerStyle.setBorderRight(BorderStyle.THIN);
 
             for (int i = 0; i < columns.length; i++) {
                 Cell cell = headerRow.createCell(i);
                 cell.setCellValue(columns[i]);
                 cell.setCellStyle(headerStyle);
-                sheet.setColumnWidth(i, 4000); // Set width
+                
+                // Căn chỉnh độ rộng từng cột cho chuẩn xác nhất
+                if (i == 1) {
+                    sheet.setColumnWidth(i, 13000); // Cột Danh mục cực rộng để chứa đủ dòng text hướng dẫn và icon
+                } else if (i == 0) {
+                    sheet.setColumnWidth(i, 10000); // Cột Tên sản phẩm rộng rãi
+                } else {
+                    sheet.setColumnWidth(i, 6000);  // Các cột số liệu (Giá, Đơn vị) gọn gàng
+                }
+            }
+
+            CellStyle dataStyle = workbook.createCellStyle();
+            dataStyle.setBorderTop(BorderStyle.THIN);
+            dataStyle.setBorderBottom(BorderStyle.THIN);
+            dataStyle.setBorderLeft(BorderStyle.THIN);
+            dataStyle.setBorderRight(BorderStyle.THIN);
+
+            for (int r = 1; r <= 100; r++) {
+                Row row = sheet.createRow(r);
+                for (int c = 0; c < columns.length; c++) {
+                    Cell cell = row.createCell(c);
+                    cell.setCellStyle(dataStyle);
+                }
+            }
+
+            List<Category> categories = categoryRepository.findAll();
+            if (!categories.isEmpty()) {
+                Sheet hiddenSheet = workbook.createSheet("Hidden_Data");
+                for (int i = 0; i < categories.size(); i++) {
+                    Row row = hiddenSheet.createRow(i);
+                    Cell cell = row.createCell(0);
+                    cell.setCellValue(categories.get(i).getName());
+                }
+                
+                int hiddenSheetIndex = workbook.getSheetIndex(hiddenSheet);
+                workbook.setSheetHidden(hiddenSheetIndex, true);
+
+                Name namedRange = workbook.createName();
+                namedRange.setNameName("CategoryList");
+                namedRange.setRefersToFormula("Hidden_Data!$A$1:$A$" + categories.size());
+
+                DataValidationHelper validationHelper = sheet.getDataValidationHelper();
+                DataValidationConstraint constraint = validationHelper.createFormulaListConstraint("CategoryList");
+                CellRangeAddressList addressList = new CellRangeAddressList(1, 1000, 1, 1);
+                DataValidation validation = validationHelper.createValidation(constraint, addressList);
+                validation.setShowErrorBox(true);
+                sheet.addValidationData(validation);
             }
 
             workbook.write(out);
@@ -330,11 +383,14 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public Map<String, Object> importProductsFromExcel(MultipartFile file, User currentUser) {
+    public Map<String, Object> importProductsFromExcel(MultipartFile file, boolean preview, User currentUser) {
         checkPermission(currentUser);
 
-        int successCount = 0;
+        int newCount = 0;
+        int updateCount = 0;
+        int skippedCount = 0;
         List<String> errors = new ArrayList<>();
+        List<Map<String, Object>> updateDetails = new ArrayList<>();
 
         try (InputStream is = file.getInputStream(); Workbook workbook = new XSSFWorkbook(is)) {
             Sheet sheet = workbook.getSheetAt(0);
@@ -350,20 +406,34 @@ public class ProductServiceImpl implements ProductService {
                 headerMap.put(cell.getStringCellValue().trim(), cell.getColumnIndex());
             }
 
+            // Hỗ trợ cả tên cột cũ và mới cho Danh mục để đảm bảo tương thích ngược
+            String catColName = headerMap.containsKey("Tên Danh mục (Bấm mũi tên để chọn 👇)") ? "Tên Danh mục (Bấm mũi tên để chọn 👇)" : "Tên Danh mục";
+
             // Kiểm tra các cột bắt buộc
-            if (!headerMap.containsKey("Tên sản phẩm") || !headerMap.containsKey("Tên Danh mục") || !headerMap.containsKey("Giá bán")) {
-                throw new RuntimeException("File Excel thiếu các cột bắt buộc (Tên sản phẩm, Tên Danh mục, Giá bán).");
+            if (!headerMap.containsKey("Tên sản phẩm") || !headerMap.containsKey(catColName) || !headerMap.containsKey("Giá nhập") || !headerMap.containsKey("Giá bán")) {
+                throw new RuntimeException("File Excel thiếu các cột bắt buộc (Tên sản phẩm, Tên Danh mục, Giá nhập, Giá bán).");
             }
 
             for (int i = 1; i <= sheet.getLastRowNum(); i++) {
                 Row row = sheet.getRow(i);
                 if (row == null) continue;
 
+                // Kiểm tra xem dòng có trống hoàn toàn không (dựa trên các cột đã map)
+                boolean isRowEmpty = true;
+                for (Integer colIndex : headerMap.values()) {
+                    if (!getCellValueAsString(row.getCell(colIndex)).trim().isEmpty()) {
+                        isRowEmpty = false;
+                        break;
+                    }
+                }
+                // Nếu dòng trống hoàn toàn (chỉ có viền hoặc không gõ gì), bỏ qua trong im lặng
+                if (isRowEmpty) continue;
+
                 try {
                     String name = getCellValueAsString(row.getCell(headerMap.get("Tên sản phẩm")));
                     if (name.isEmpty()) throw new RuntimeException("Tên sản phẩm không được để trống.");
 
-                    String categoryName = getCellValueAsString(row.getCell(headerMap.get("Tên Danh mục")));
+                    String categoryName = getCellValueAsString(row.getCell(headerMap.get(catColName)));
                     if (categoryName.isEmpty()) throw new RuntimeException("Tên Danh mục không được để trống.");
 
                     Category category = categoryRepository.findFirstByNameIgnoreCase(categoryName)
@@ -373,18 +443,14 @@ public class ProductServiceImpl implements ProductService {
                     if (headerMap.containsKey("Mã SKU")) {
                         sku = getCellValueAsString(row.getCell(headerMap.get("Mã SKU")));
                     }
-                    if (!sku.isEmpty() && productRepository.findBySku(sku) != null) {
-                         throw new RuntimeException("Mã SKU '" + sku + "' đã tồn tại trong hệ thống.");
-                    }
 
                     BigDecimal importPrice = BigDecimal.ZERO;
-                    if (headerMap.containsKey("Giá nhập")) {
-                        String impPriceStr = getCellValueAsString(row.getCell(headerMap.get("Giá nhập")));
-                        if (!impPriceStr.isEmpty()) {
-                            try { importPrice = new BigDecimal(impPriceStr); } 
-                            catch (Exception e) { throw new RuntimeException("Giá nhập không hợp lệ."); }
-                        }
+                    String impPriceStr = getCellValueAsString(row.getCell(headerMap.get("Giá nhập")));
+                    if (impPriceStr.isEmpty()) {
+                        throw new RuntimeException("Giá nhập không được để trống.");
                     }
+                    try { importPrice = new BigDecimal(impPriceStr); } 
+                    catch (Exception e) { throw new RuntimeException("Giá nhập không hợp lệ."); }
 
                     BigDecimal price = BigDecimal.ZERO;
                     String priceStr = getCellValueAsString(row.getCell(headerMap.get("Giá bán")));
@@ -404,29 +470,87 @@ public class ProductServiceImpl implements ProductService {
                         imageUrl = getCellValueAsString(row.getCell(headerMap.get("Đường dẫn ảnh (URL)")));
                     }
 
-                    // Lưu vào DB
-                    Product product = new Product();
-                    if (sku.isEmpty()) {
-                        product.setSku("PRD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+                    // Xử lý Upsert dựa trên Tên sản phẩm
+                    java.util.Optional<Product> existingOpt = productRepository.findFirstByNameAndIsDeletedFalse(name);
+                    
+                    if (existingOpt.isPresent()) {
+                        Product existing = existingOpt.get();
+                        
+                        // Nếu có SKU truyền vào nhưng khác với SKU hiện tại -> chặn
+                        if (!sku.isEmpty() && !existing.getSku().equals(sku)) {
+                            // Kiểm tra xem SKU mới này đã có ai dùng chưa
+                            Product skuOwner = productRepository.findBySku(sku);
+                            if (skuOwner != null && !skuOwner.getId().equals(existing.getId())) {
+                                throw new RuntimeException("Mã SKU '" + sku + "' đã tồn tại trong hệ thống cho một sản phẩm khác.");
+                            }
+                        }
+
+                        // So sánh dữ liệu
+                        boolean isChanged = false;
+                        List<String> changes = new ArrayList<>();
+                        java.text.NumberFormat format = java.text.NumberFormat.getInstance(new java.util.Locale("vi", "VN"));
+                        
+                        if (existing.getImportPrice().compareTo(importPrice) != 0) {
+                            changes.add("Giá nhập (" + format.format(existing.getImportPrice()) + " đ ➔ " + format.format(importPrice) + " đ)");
+                            isChanged = true;
+                        }
+                        if (existing.getPrice().compareTo(price) != 0) {
+                            changes.add("Giá bán (" + format.format(existing.getPrice()) + " đ ➔ " + format.format(price) + " đ)");
+                            isChanged = true;
+                        }
+                        if (!existing.getCategory().getId().equals(category.getId())) {
+                            changes.add("Danh mục (" + existing.getCategory().getName() + " ➔ " + category.getName() + ")");
+                            isChanged = true;
+                        }
+                        
+                        if (isChanged) {
+                            updateCount++;
+                            Map<String, Object> detailMap = new HashMap<>();
+                            detailMap.put("name", name);
+                            detailMap.put("changes", changes);
+                            updateDetails.add(detailMap);
+                            
+                            if (!preview) {
+                                if (!sku.isEmpty()) existing.setSku(sku);
+                                existing.setCategory(category);
+                                existing.setImportPrice(importPrice);
+                                existing.setPrice(price);
+                                existing.setUnit(unit);
+                                if (!imageUrl.isEmpty()) existing.setImageUrl(imageUrl);
+                                productRepository.save(existing);
+                            }
+                        } else {
+                            skippedCount++;
+                        }
+                        
                     } else {
-                        product.setSku(sku);
+                        // Thêm mới
+                        if (!sku.isEmpty() && productRepository.findBySku(sku) != null) {
+                             throw new RuntimeException("Mã SKU '" + sku + "' đã tồn tại trong hệ thống.");
+                        }
+                        
+                        newCount++;
+                        if (!preview) {
+                            Product product = new Product();
+                            if (sku.isEmpty()) {
+                                product.setSku("PRD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+                            } else {
+                                product.setSku(sku);
+                            }
+                            product.setName(name);
+                            product.setCategory(category);
+                            product.setImportPrice(importPrice);
+                            product.setPrice(price);
+                            product.setUnit(unit);
+                            product.setImageUrl(imageUrl.isEmpty() ? null : imageUrl);
+                            product.setHasExpiry(false);
+                            product.setManufacturingDate(null);
+                            product.setExpirationDate(null);
+
+                            productRepository.save(product);
+                        }
                     }
-                    product.setName(name);
-                    product.setCategory(category);
-                    product.setImportPrice(importPrice);
-                    product.setPrice(price);
-                    product.setUnit(unit);
-                    product.setImageUrl(imageUrl.isEmpty() ? null : imageUrl);
-                    product.setHasExpiry(false);
-                    product.setManufacturingDate(null);
-                    product.setExpirationDate(null);
 
-                    Product savedProduct = productRepository.save(product);
-
-                    // Khởi tạo tồn kho đã bị vô hiệu hóa theo yêu cầu.
-                    // Tồn kho sẽ chỉ được tạo ra khi có phiếu nhập kho hoặc phiếu kiểm kê.
-
-                    successCount++;
                 } catch (Exception e) {
                     errors.add("Dòng " + (i + 1) + ": " + e.getMessage());
                 }
@@ -437,8 +561,21 @@ public class ProductServiceImpl implements ProductService {
         }
 
         Map<String, Object> result = new HashMap<>();
-        result.put("successCount", successCount);
+        result.put("newCount", newCount);
+        result.put("updateCount", updateCount);
+        result.put("skippedCount", skippedCount);
         result.put("errors", errors);
+        result.put("updateDetails", updateDetails);
+        // Giữ lại successCount cho tương thích ngược (hoặc tổng của new + update)
+        result.put("successCount", newCount + updateCount);
+
+        // Ghi nhật ký hệ thống nếu import THẬT và có thành công ít nhất 1 sản phẩm
+        if (!preview && (newCount > 0 || updateCount > 0)) {
+            String logDetails = String.format("Đã import Excel thành công. Thêm mới: %d, Cập nhật: %d. (Bỏ qua %d lỗi, %d không đổi)", 
+                                              newCount, updateCount, errors.size(), skippedCount);
+            auditLogService.logAction(currentUser, "IMPORT_EXCEL", "products", "Bulk", logDetails);
+        }
+
         return result;
     }
 

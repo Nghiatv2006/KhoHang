@@ -59,10 +59,11 @@ public interface ProductService {
     /**
      * Nhập hàng loạt sản phẩm từ file Excel.
      * @param file File Excel chứa dữ liệu
+     * @param preview Chế độ xem trước không lưu vào DB
      * @param currentUser Người dùng thực hiện
      * @return Map chứa successCount và danh sách errors
      */
-    Map<String, Object> importProductsFromExcel(MultipartFile file, User currentUser);
+    Map<String, Object> importProductsFromExcel(MultipartFile file, boolean preview, User currentUser);
 
     /**
      * Tạo file Excel mẫu (template) để người dùng tải về.
