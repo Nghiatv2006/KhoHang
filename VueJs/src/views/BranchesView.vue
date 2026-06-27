@@ -120,11 +120,6 @@ onMounted(loadBranches)
         <!-- Decorative top bar -->
         <div :class="['absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#4361ee] to-[#3a0ca3] transition-opacity', b.isHead ? 'opacity-100' : 'opacity-0 group-hover:opacity-100']"></div>
         
-        <!-- Head branch badge -->
-        <div v-if="b.isHead" class="absolute top-4 right-4 bg-[#eef2ff] text-[#4361ee] text-[10px] font-bold px-2 py-1 rounded-md border border-[#dbeafe] flex items-center gap-1 shadow-sm">
-          <i class="fas fa-crown text-[9px] text-[#f59e0b]"></i> CHI NHÁNH TỔNG
-        </div>
-
         <!-- Header -->
         <div class="flex items-start justify-between mb-5 relative z-10">
           <div class="flex items-center gap-3">
@@ -134,6 +129,9 @@ onMounted(loadBranches)
             <div>
               <div class="font-bold text-[#364a63] text-lg leading-tight">{{ b.name }}</div>
               <div class="text-xs font-mono text-[#8094ae] mt-1">ID: #{{ b.id }}</div>
+              <div v-if="b.isHead" class="mt-1.5 inline-flex items-center gap-1 bg-[#eef2ff] text-[#4361ee] text-[10px] font-bold px-2 py-0.5 rounded-md border border-[#dbeafe] shadow-sm">
+                <i class="fas fa-crown text-[9px] text-[#f59e0b]"></i> CHI NHÁNH TỔNG
+              </div>
             </div>
           </div>
           <div v-if="isAdmin" class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur rounded-lg p-1">
@@ -145,6 +143,7 @@ onMounted(loadBranches)
             </button>
           </div>
         </div>
+
 
         <!-- Info -->
         <div class="space-y-3 flex-1 flex flex-col justify-between">
