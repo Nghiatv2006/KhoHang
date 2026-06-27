@@ -56,9 +56,11 @@ const isManagerOrAdmin = computed(() => {
 })
 
 const adminNavItems = computed(() => {
-  const items: { label: string; to: string; icon: string }[] = [
-    { label: 'Đối tác', to: '/partners', icon: 'fas fa-handshake' }
-  ]
+  const items: { label: string; to: string; icon: string }[] = []
+  // @ts-ignore
+  if (!user.value || user.value.role !== 'ADMIN') {
+    items.push({ label: 'Đối tác', to: '/partners', icon: 'fas fa-handshake' })
+  }
   if (isManagerOrAdmin.value) {
     items.push({ label: 'Nhân viên', to: '/users', icon: 'fas fa-users' })
   }
@@ -71,6 +73,7 @@ const adminNavItems = computed(() => {
   }
   return items
 })
+
 
 
 async function logout() {

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { api } from '../api'
 import { useToast } from '../utils/toast'
+import AppModal from '../components/AppModal.vue'
 
 const toast = useToast()
 const user = ref<any>(JSON.parse(localStorage.getItem('wh_user') || '{}'))
@@ -50,13 +51,10 @@ function approveReceiptText(r: any) {
 }
 
 function canCancelReceipt(r: any) {
-  if (r.status !== 'DRAFT' && r.status !== 'PENDING_ADMIN' && r.status !== 'PENDING_STOCKTAKE') return false;
-  if (r.status === 'PENDING_STOCKTAKE' && r.type !== 'IMPORT' && r.type !== 'TRANSFER') return false;
+  if (r.status !== 'DRAFT' && r.status !== 'PENDING_ADMIN') return false;
   if (r.type === 'EXPORT' && isAdmin.value && r.sourceBranchId !== 1) return false;
   if (isAdmin.value) return true;
   if (!isManager.value) return false;
-  
-  if (r.status === 'PENDING_STOCKTAKE') return false;
   
   const isCrossBranchImport = r.type === 'IMPORT' && r.sourceBranchId !== r.destBranchId;
   if (isCrossBranchImport) {
@@ -78,6 +76,7 @@ const products = ref<any[]>([])
 const branches = ref<any[]>([])
 const customers = ref<any[]>([])
 // const inventories = ref<any[]>([])
+const categories = ref<any[]>([])
 const loading = ref(true)
 
 // ──────────────────────────────────────────────────────────────
@@ -131,13 +130,11 @@ const filteredReceipts = computed(() => {
     }
   }
   if (searchKeyword.value.trim()) {
-    const kw = searchKeyword.value.toLowerCase()
-    result = result.filter(r =>
-      r.code?.toLowerCase().includes(kw) ||
-      r.createdByName?.toLowerCase().includes(kw) ||
-      r.sourceBranchName?.toLowerCase().includes(kw) ||
-      r.destBranchName?.toLowerCase().includes(kw)
-    )
+    const kw = searchKeyword.value.trim().toLowerCase()
+    result = result.filter(r => {
+      const code = (r.code || '').toLowerCase()
+      return code.includes(kw)
+    })
   }
   if (filterStartDate.value) {
     const start = new Date(filterStartDate.value).setHours(0, 0, 0, 0)
@@ -155,21 +152,40 @@ const filteredReceipts = computed(() => {
 })
 
 // ──────────────────────────────────────────────────────────────
+// PAGINATION
+// ──────────────────────────────────────────────────────────────
+const currentPage = ref(1)
+const itemsPerPage = 50
+
+watch([filterType, filterStatus, searchKeyword, filterTimeRange, filterStartDate, filterEndDate], () => {
+  currentPage.value = 1
+})
+
+const paginatedReceipts = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  return filteredReceipts.value.slice(start, start + itemsPerPage)
+})
+
+const totalPages = computed(() => Math.ceil(filteredReceipts.value.length / itemsPerPage) || 1)
+
+// ──────────────────────────────────────────────────────────────
 // LOAD DATA
 // ──────────────────────────────────────────────────────────────
 async function loadData() {
   loading.value = true
   try {
-    const [rRes, pRes, bRes, cRes] = await Promise.all([
+    const [rRes, pRes, bRes, cRes, catRes] = await Promise.all([
       api.get('/api/receipts'),
       api.get('/api/products'),
       api.get('/api/branches'),
-      api.get('/api/customers')
+      api.get('/api/customers'),
+      api.get('/api/categories')
     ])
     if (rRes.ok) receipts.value = await rRes.json()
     if (pRes.ok) products.value = await pRes.json()
     if (bRes.ok) branches.value = await bRes.json()
     if (cRes.ok) customers.value = await cRes.json()
+    if (catRes.ok) categories.value = await catRes.json()
   } catch (e: any) {
     toast.error('Lỗi tải dữ liệu: ' + e.message)
   } finally {
@@ -211,6 +227,116 @@ async function openDetail(receipt: any) {
     }
   } catch (e: any) {
     toast.error('Lỗi tải chi tiết: ' + e.message)
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+// DIRECT IMPORT MODAL (THÊM SẢN PHẨM)
+// ──────────────────────────────────────────────────────────────
+const showDirectImportModal = ref(false)
+const submittingDirectImport = ref(false)
+const directImportForm = ref({
+  categoryId: '' as number | '',
+  productId: '' as number | '',
+  batchCode: '',
+  hasExpiry: false,
+  expiryWarningDays: 30,
+  manufacturingDate: '',
+  expirationDate: '',
+  quantity: 1,
+  price: 0
+})
+
+const filteredProductsForDirectImport = computed(() => {
+  if (!directImportForm.value.categoryId) return []
+  return products.value.filter(p => p.categoryId === Number(directImportForm.value.categoryId))
+})
+
+const selectedProductInDirectImport = computed(() => {
+  if (!directImportForm.value.productId) return null
+  return products.value.find(p => p.id === Number(directImportForm.value.productId)) || null
+})
+
+watch(() => directImportForm.value.productId, (newVal) => {
+  if (!newVal) {
+    directImportForm.value.price = 0
+  } else {
+    directImportForm.value.price = selectedProductInDirectImport.value?.importPrice || 0
+  }
+})
+
+function openDirectImportModal() {
+  directImportForm.value = {
+    categoryId: '',
+    productId: '',
+    batchCode: '',
+    hasExpiry: false,
+    expiryWarningDays: 30,
+    manufacturingDate: '',
+    expirationDate: '',
+    quantity: 1,
+    price: 0
+  }
+  showDirectImportModal.value = true
+}
+
+async function submitDirectImport() {
+  const form = directImportForm.value
+  if (!form.categoryId) { toast.error('Vui lòng chọn danh mục.'); return }
+  if (!form.productId) { toast.error('Vui lòng chọn sản phẩm.'); return }
+  if (!form.batchCode.trim()) { toast.error('Vui lòng nhập mã lô sản xuất.'); return }
+  if (form.quantity <= 0) { toast.error('Số lượng nhập phải lớn hơn 0.'); return }
+  if (!form.manufacturingDate) { toast.error('Vui lòng nhập Ngày sản xuất (NSX).'); return }
+
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const mfgDate = new Date(form.manufacturingDate); mfgDate.setHours(0, 0, 0, 0);
+  if (mfgDate > today) { toast.error('Ngày sản xuất (NSX) không được lớn hơn ngày hiện tại.'); return }
+
+  if (form.hasExpiry) {
+    if (!form.expirationDate) { toast.error('Vui lòng nhập Hạn sử dụng (HSD).'); return }
+    if (new Date(form.expirationDate) < new Date(form.manufacturingDate)) { toast.error('Hạn sử dụng không được nhỏ hơn Ngày sản xuất.'); return }
+    if (!form.expiryWarningDays || Number(form.expiryWarningDays) <= 0) { toast.error('Số ngày cảnh báo hạn dùng phải lớn hơn 0.'); return }
+  }
+
+  const payload: any = {
+    type: 'IMPORT',
+    sourceBranchId: null,
+    destBranchId: headBranch.value?.id || 1,
+    description: 'Thêm sản phẩm trực tiếp vào Kho Tổng',
+    details: [{
+      productId: Number(form.productId),
+      batchCode: form.batchCode.trim(),
+      quantity: form.quantity,
+      price: form.price,
+      manufacturingDate: form.manufacturingDate,
+      expirationDate: form.hasExpiry ? form.expirationDate : '2099-12-31',
+    }]
+  }
+
+  submittingDirectImport.value = true
+  try {
+    const res = await api.post('/api/receipts', payload)
+    if (res.ok) {
+      const data = await res.json()
+      if (isAdmin.value && data.id) {
+         await api.post(`/api/receipts/${data.id}/approve`, {})
+         if (payload.type === 'IMPORT' || payload.type === 'TRANSFER') {
+            await api.post(`/api/receipts/${data.id}/approve`, {})
+         }
+         toast.success('Đã tạo và tự động chuyển sang Chờ kiểm kê thành công!')
+      } else {
+         toast.success('Đã tạo Phiếu nhập hàng mới! Hãy duyệt phiếu để cộng tồn kho.')
+      }
+      showDirectImportModal.value = false
+      await loadData()
+    } else {
+      const errData = await res.json()
+      toast.error(errData.message || 'Lỗi khi tạo phiếu.')
+    }
+  } catch (err: any) {
+    toast.error('Lỗi kết nối: ' + err.message)
+  } finally {
+    submittingDirectImport.value = false
   }
 }
 
@@ -281,7 +407,7 @@ interface DetailRow {
 }
 
 function openCreateModal() {
-  const defaultType = (user.value?.branchId !== headBranch.value?.id) ? 'IMPORT' : 'EXPORT';
+  const defaultType = (user.value?.branchId !== headBranch.value?.id && !isManager.value) ? 'IMPORT' : 'EXPORT';
   createForm.value = {
     type: defaultType,
     sourceBranchId: user.value?.branchId || headBranch.value?.id || '',
@@ -309,7 +435,7 @@ function removeDetailRow(index: number) {
 function onTypeChange() {
   const t = createForm.value.type
   if (t === 'IMPORT') {
-    createForm.value.sourceBranchId = headBranch.value?.id || ''
+    createForm.value.sourceBranchId = ''
     createForm.value.destBranchId = user.value?.branchId || headBranch.value?.id || ''
   } else if (t === 'EXPORT') {
     createForm.value.sourceBranchId = user.value?.branchId || headBranch.value?.id || ''
@@ -322,13 +448,11 @@ function onTypeChange() {
     createForm.value.destBranchId = ''
   }
   // Reset products when changing type to avoid stale/out-of-stock products
-  createForm.value.details = [{ productId: '', batchCode: '', isNewBatch: false, manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 }]
+  createForm.value.details = [{ productId: '', batchCode: '', manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 }]
 }
 
 const sourceInventories = ref<any[]>([])
 const globalInventories = ref<any[]>([])
-
-import { watch } from 'vue'
 
 watch(() => createForm.value.sourceBranchId, async (newVal) => {
   if (newVal) {
@@ -564,7 +688,7 @@ async function submitCreateDraft() {
       quantity: d.quantity,
       price: d.price,
       manufacturingDate: d.manufacturingDate || '1970-01-01',
-      expirationDate: d.expirationDate || '1970-01-01',
+      expirationDate: d.expirationDate || '2099-12-31',
     }))
   }
 
@@ -572,7 +696,16 @@ async function submitCreateDraft() {
   try {
     const res = await api.post('/api/receipts', payload)
     if (res.ok) {
-      toast.success('Tạo phiếu kho nháp thành công!')
+      const data = await res.json()
+      if (isAdmin.value && data.id) {
+         await api.post(`/api/receipts/${data.id}/approve`, {})
+         if (payload.type === 'IMPORT' || payload.type === 'TRANSFER') {
+            await api.post(`/api/receipts/${data.id}/approve`, {})
+         }
+         toast.success('Đã tạo và tự động chuyển trạng thái phiếu thành công!')
+      } else {
+         toast.success('Tạo phiếu kho nháp thành công!')
+      }
       showCreateModal.value = false
       await loadData()
     } else {
@@ -921,13 +1054,22 @@ function getCustomerName(receipt: any) {
         </h2>
         <p class="text-[#8094ae] text-sm mt-1">Theo dõi, lập và phê duyệt các phiếu nhập/xuất/điều chuyển kho</p>
       </div>
-      <button
-        v-if="!isAdmin"
-        @click="openCreateModal"
-        class="h-[42px] bg-[#4361ee] hover:bg-[#3a0ca3] text-white px-5 rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-2"
-      >
-        <i class="fas fa-plus"></i> Lập phiếu nháp
-      </button>
+      <div class="flex items-center gap-3">
+        <button
+          v-if="isAdmin"
+          @click="openDirectImportModal"
+          class="h-[42px] bg-[#05b171] hover:bg-[#04965e] text-white px-5 rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-2"
+        >
+          <i class="fas fa-box-open"></i> Thêm sản phẩm
+        </button>
+        <button
+          v-if="!isAdmin"
+          @click="openCreateModal"
+          class="h-[42px] bg-[#4361ee] hover:bg-[#3a0ca3] text-white px-5 rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-2"
+        >
+          <i class="fas fa-plus"></i> Lập phiếu nháp
+        </button>
+      </div>
     </div>
 
     <!-- STAT CARDS -->
@@ -983,7 +1125,7 @@ function getCustomerName(receipt: any) {
           <!-- Tìm kiếm đa năng -->
           <div class="lg:col-span-2 relative">
             <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae] text-sm"></i>
-            <input v-model="searchKeyword" type="text" placeholder="Tìm kiếm mã phiếu, người lập, chi nhánh..."
+            <input v-model="searchKeyword" type="text" placeholder="Tìm kiếm theo mã phiếu..."
               class="w-full h-11 pl-10 pr-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all" />
           </div>
           <!-- Lọc loại phiếu -->
@@ -1072,7 +1214,7 @@ function getCustomerName(receipt: any) {
             </tr>
           </thead>
           <tbody class="divide-y divide-[#f1f5f9]">
-            <tr v-for="r in filteredReceipts" :key="r.id"
+            <tr v-for="r in paginatedReceipts" :key="r.id"
               @dblclick="openDetail(r)"
               class="hover:bg-[#f8f9fa]/80 cursor-pointer transition-colors group">
               <td class="px-5 py-4">
@@ -1101,7 +1243,9 @@ function getCustomerName(receipt: any) {
                 <span class="text-[#364a63] font-medium" v-else>{{ r.destBranchName || '—' }}</span>
               </td>
               <td class="px-5 py-4">
-                <span class="text-[#8094ae]">{{ r.createdByName }}</span>
+                <div class="text-[#8094ae]">{{ r.createdByName }}</div>
+                <div v-if="r.stocktakeByName" class="text-xs text-purple-600 mt-1 font-semibold" title="Người kiểm kê"><i class="fas fa-clipboard-check"></i> {{ r.stocktakeByName }}</div>
+                <div v-else-if="r.status === 'COMPLETED' && (r.type === 'IMPORT' || r.type === 'TRANSFER') && r.createdByRole === 'STAFF'" class="text-xs text-purple-600 mt-1 font-semibold opacity-60" title="Người kiểm kê (Dữ liệu cũ)"><i class="fas fa-clipboard-check"></i> {{ r.createdByName }}</div>
               </td>
               <td class="px-5 py-4">
                 <span class="text-[#8094ae] text-xs">{{ formatDateTime(r.createdAt) }}</span>
@@ -1120,6 +1264,12 @@ function getCustomerName(receipt: any) {
                     title="Phê duyệt">
                     <i class="fas fa-check text-xs"></i>
                   </button>
+                  <button v-if="canConfirmStocktake(r)"
+                    @click.stop="openStocktakeModal(r)"
+                    class="w-8 h-8 flex items-center justify-center rounded-lg bg-purple-50 hover:bg-purple-500 hover:text-white text-purple-600 transition-all"
+                    title="Thực hiện kiểm kê">
+                    <i class="fas fa-boxes text-xs"></i>
+                  </button>
                   <button v-if="canCancelReceipt(r)"
                     @click.stop="cancelReceipt(r)"
                     class="w-8 h-8 flex items-center justify-center rounded-lg bg-red-50 hover:bg-red-500 hover:text-white text-red-500 transition-all"
@@ -1137,6 +1287,26 @@ function getCustomerName(receipt: any) {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Pagination -->
+      <div v-if="totalPages > 1" class="px-6 py-4 border-t border-[#e2e8f0] flex flex-col sm:flex-row items-center justify-between bg-white rounded-b-2xl gap-4">
+        <div class="text-sm text-[#8094ae]">
+          Hiển thị <span class="font-bold text-[#364a63]">{{ (currentPage - 1) * itemsPerPage + 1 }}</span> - <span class="font-bold text-[#364a63]">{{ Math.min(currentPage * itemsPerPage, filteredReceipts.length) }}</span> trong số <span class="font-bold text-[#364a63]">{{ filteredReceipts.length }}</span> phiếu
+        </div>
+        <div class="flex items-center gap-2">
+          <button @click="currentPage--" :disabled="currentPage === 1"
+            class="px-3 py-1.5 flex items-center justify-center rounded-lg border border-[#e2e8f0] bg-white text-[#364a63] font-medium text-sm hover:bg-[#f8f9fa] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            <i class="fas fa-chevron-left mr-1.5 text-[10px]"></i> Trước
+          </button>
+          <div class="px-4 py-1.5 flex items-center justify-center rounded-lg bg-[#f8f9fa] text-[#364a63] font-bold text-sm border border-[#e2e8f0]">
+            {{ currentPage }} / {{ totalPages }}
+          </div>
+          <button @click="currentPage++" :disabled="currentPage === totalPages"
+            class="px-3 py-1.5 flex items-center justify-center rounded-lg border border-[#e2e8f0] bg-white text-[#364a63] font-medium text-sm hover:bg-[#f8f9fa] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            Sau <i class="fas fa-chevron-right ml-1.5 text-[10px]"></i>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -1198,6 +1368,8 @@ function getCustomerName(receipt: any) {
               <div>
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Người lập</div>
                 <div class="font-semibold text-[#364a63]">{{ selectedReceipt.createdByName }}</div>
+                <div v-if="selectedReceipt.stocktakeByName" class="text-xs text-purple-600 font-bold mt-1 flex items-center gap-1.5" title="Người kiểm kê"><i class="fas fa-clipboard-check"></i> Kiểm kê: {{ selectedReceipt.stocktakeByName }}</div>
+                <div v-else-if="selectedReceipt.status === 'COMPLETED' && (selectedReceipt.type === 'IMPORT' || selectedReceipt.type === 'TRANSFER') && selectedReceipt.createdByRole === 'STAFF'" class="text-xs text-purple-600 font-bold mt-1 flex items-center gap-1.5 opacity-60" title="Người kiểm kê (Dữ liệu cũ)"><i class="fas fa-clipboard-check"></i> Kiểm kê: {{ selectedReceipt.createdByName }}</div>
               </div>
               <div>
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Ngày tạo</div>
@@ -1225,8 +1397,8 @@ function getCustomerName(receipt: any) {
                       <th class="px-4 py-2.5 text-left font-bold">Sản phẩm</th>
                       <th class="px-4 py-2.5 text-center font-bold">NSX</th>
                       <th class="px-4 py-2.5 text-center font-bold">HSD</th>
-                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.status === 'COMPLETED' && hasReceivedQuantity">SL Gửi</th>
-                      <th class="px-4 py-2.5 text-right font-bold text-teal-600" v-if="selectedReceipt.status === 'COMPLETED' && hasReceivedQuantity">SL Nhận</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.status === 'COMPLETED' && selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)">SL Gửi</th>
+                      <th class="px-4 py-2.5 text-right font-bold text-teal-600" v-if="selectedReceipt.status === 'COMPLETED' && selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)">SL Nhận</th>
                       <th class="px-4 py-2.5 text-right font-bold" v-else>SL</th>
                       <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Đơn giá</th>
                       <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Thành tiền</th>
@@ -1236,10 +1408,6 @@ function getCustomerName(receipt: any) {
                     <tr v-for="d in selectedReceipt.details" :key="d.id" class="hover:bg-[#f8f9fa]/50">
                       <td class="px-4 py-3">
                         <div class="font-semibold text-[#364a63]">{{ d.productName }}</div>
-                        <div v-if="d.receivedQuantity !== null && d.receivedQuantity < d.quantity" class="text-[11px] text-red-500 font-normal mt-1 flex items-start gap-1">
-                          <i class="fas fa-exclamation-circle mt-0.5"></i>
-                          <span>Lý do hao hụt: {{ d.shortfallReason }}</span>
-                        </div>
                       </td>
                       <td class="px-4 py-3 text-center text-[#8094ae]">{{ formatDate(d.manufacturingDate) }}</td>
                       <td class="px-4 py-3 text-center text-[#8094ae]">{{ formatDate(d.expirationDate) }}</td>
@@ -1252,18 +1420,29 @@ function getCustomerName(receipt: any) {
                       </td>
                       <td class="px-4 py-3 text-right font-bold" v-else>{{ d.quantity }}</td>
                       <td class="px-4 py-3 text-right" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">{{ formatVND(d.price) }}</td>
-                      <td class="px-4 py-3 text-right font-bold text-[#4361ee]" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">{{ formatVND(d.quantity * d.price) }}</td>
+<td class="px-4 py-3 text-right font-bold text-[#4361ee]" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">{{ formatVND(d.quantity * d.price) }}</td>
                     </tr>
                   </tbody>
                   <tfoot v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">
                     <tr class="bg-[#f8f9fa]">
-                      <td :colspan="(selectedReceipt.status === 'COMPLETED' && hasReceivedQuantity) ? 6 : 5" class="px-4 py-2.5 text-right font-bold text-[#8094ae] text-xs uppercase">Tổng cộng</td>
+                      <td :colspan="(selectedReceipt.status === 'COMPLETED' && selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)) ? 6 : 5" class="px-4 py-2.5 text-right font-bold text-[#8094ae] text-xs uppercase">Tổng cộng</td>
                       <td class="px-4 py-2.5 text-right font-extrabold text-[#4361ee]">
                         {{ formatVND((selectedReceipt.details || []).reduce((s: number, d: any) => s + d.quantity * d.price, 0)) }}
                       </td>
                     </tr>
                   </tfoot>
                 </table>
+              </div>
+              
+              <!-- Shortfall reasons section -->
+              <div v-if="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null && x.receivedQuantity < x.quantity)" class="mt-4 p-4 bg-red-50 rounded-xl border border-red-100">
+                <div class="text-xs font-bold text-red-600 uppercase mb-2 flex items-center gap-1.5"><i class="fas fa-exclamation-circle"></i> Lý do hao hụt</div>
+                <div class="space-y-1.5">
+                  <div v-for="d in selectedReceipt.details.filter((x: any) => x.receivedQuantity !== null && x.receivedQuantity < x.quantity)" :key="'reason-'+d.id" class="text-sm">
+                    <span class="font-bold text-red-700">- {{ d.productName }}:</span>
+                    <span class="text-red-600 ml-1 whitespace-pre-wrap break-words">{{ d.shortfallReason }}</span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1351,7 +1530,7 @@ function getCustomerName(receipt: any) {
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Loại phiếu <span class="text-red-500">*</span></label>
                   <select v-model="createForm.type" @change="onTypeChange"
                     class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
-                    <option value="IMPORT" v-if="user?.branchId !== headBranch?.id">📥 Nhập kho</option>
+                    <option value="IMPORT" v-if="user?.branchId !== headBranch?.id && !isManager">📥 Nhập kho</option>
                     <option value="EXPORT">📤 Xuất bán</option>
                     <option value="TRANSFER">🔄 Điều chuyển</option>
                   </select>
@@ -1360,7 +1539,7 @@ function getCustomerName(receipt: any) {
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh nguồn</label>
                   <select v-model="createForm.sourceBranchId" disabled
                     class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-[#f1f5f9] disabled:text-[#8094ae] cursor-not-allowed">
-                    <option v-if="headBranch" :value="headBranch.id">{{ headBranch.name }}</option>
+                    <option value="">-- Bên ngoài hệ thống --</option>
                   </select>
                 </div>
                 <div v-if="createForm.type === 'IMPORT' || createForm.type === 'TRANSFER' || createForm.type === 'ADJUST_IN'">
@@ -1567,7 +1746,8 @@ function getCustomerName(receipt: any) {
                 </div>
                 <div class="flex items-center gap-3">
                   <label class="text-xs text-[#8094ae] whitespace-nowrap">Thực đếm:</label>
-                  <input v-model.number="item.actualQuantity" type="number" :min="0" :max="item.sentQty"
+                  <input v-model.number="item.actualQuantity" type="number" :min="0" :max="item.sentQty" @keydown="(e) => { if(['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault() }"
+                    @input="item.actualQuantity = item.actualQuantity > item.sentQty ? item.sentQty : (item.actualQuantity < 0 ? 0 : item.actualQuantity)"
                     class="flex-1 h-9 px-3 border rounded-lg text-sm focus:ring-2 focus:ring-purple-400/20 focus:border-purple-400 outline-none"
                     :class="item.actualQuantity < item.sentQty ? 'border-amber-400 bg-amber-50' : 'border-[#e2e8f0]'" />
                   <span v-if="item.actualQuantity < item.sentQty"
@@ -1578,8 +1758,8 @@ function getCustomerName(receipt: any) {
                 </div>
                 <div v-if="item.actualQuantity < item.sentQty" class="mt-3 bg-red-50 p-3 rounded-lg border border-red-100 flex items-start gap-3">
                   <label class="text-xs font-bold text-red-600 whitespace-nowrap mt-2">Lý do <span class="text-red-500">*</span></label>
-                  <input v-model="item.shortfallReason" type="text" placeholder="VD: Hư hỏng, thiếu hàng..."
-                    class="flex-1 h-9 px-3 border border-red-200 rounded-lg text-sm focus:ring-2 focus:ring-red-400/20 focus:border-red-400 outline-none bg-white" />
+                  <textarea v-model="item.shortfallReason" rows="2" placeholder="VD: Hư hỏng, thiếu hàng..."
+                    class="flex-1 px-3 py-2 border border-red-200 rounded-lg text-sm focus:ring-2 focus:ring-red-400/20 focus:border-red-400 outline-none bg-white resize-none"></textarea>
                 </div>
               </div>
             </div>
@@ -1634,7 +1814,8 @@ function getCustomerName(receipt: any) {
                 </div>
                 <div class="flex items-center gap-3">
                   <label class="text-xs text-[#8094ae] whitespace-nowrap">Số lượng nhận:</label>
-                  <input v-model.number="item.actualQuantity" type="number" :min="0" :max="item.sentQty"
+                  <input v-model.number="item.actualQuantity" type="number" :min="0" :max="item.sentQty" @keydown="(e) => { if(['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault() }"
+                    @input="item.actualQuantity = item.actualQuantity > item.sentQty ? item.sentQty : (item.actualQuantity < 0 ? 0 : item.actualQuantity)"
                     class="flex-1 h-9 px-3 border rounded-lg text-sm focus:ring-2 focus:ring-sky-400/20 focus:border-sky-400 outline-none"
                     :class="item.actualQuantity < item.sentQty ? 'border-amber-400 bg-amber-50' : 'border-[#e2e8f0]'" />
                   <span v-if="item.actualQuantity < item.sentQty"
@@ -1646,8 +1827,8 @@ function getCustomerName(receipt: any) {
                 <!-- Input for shortfall reason -->
                 <div v-if="item.actualQuantity < item.sentQty" class="mt-3 bg-red-50 p-3 rounded-lg border border-red-100 flex items-start gap-3">
                   <label class="text-xs font-bold text-red-600 whitespace-nowrap mt-2">Lý do hao hụt <span class="text-red-500">*</span></label>
-                  <input v-model="item.shortfallReason" type="text" placeholder="VD: Rơi vỡ, ẩm mốc, thiếu hàng..."
-                    class="flex-1 h-9 px-3 border border-red-200 rounded-lg text-sm focus:ring-2 focus:ring-red-400/20 focus:border-red-400 outline-none bg-white" />
+                  <textarea v-model="item.shortfallReason" rows="2" placeholder="VD: Rơi vỡ, ẩm mốc, thiếu hàng..."
+                    class="flex-1 px-3 py-2 border border-red-200 rounded-lg text-sm focus:ring-2 focus:ring-red-400/20 focus:border-red-400 outline-none bg-white resize-none"></textarea>
                 </div>
               </div>
             </div>
@@ -1668,6 +1849,167 @@ function getCustomerName(receipt: any) {
         </div>
       </div>
     </Teleport>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- DIRECT IMPORT MODAL (THÊM SẢN PHẨM) -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <AppModal 
+      :show="showDirectImportModal" 
+      title="Thêm sản phẩm (Tạo Phiếu Nhập)" 
+      size="md" 
+      @close="showDirectImportModal = false"
+    >
+      <div class="p-6 space-y-4 text-sm">
+        <!-- Dòng 1: Danh mục -->
+        <div>
+          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Danh mục</label>
+          <select 
+            v-model="directImportForm.categoryId" 
+            @change="directImportForm.productId = ''; directImportForm.manufacturingDate = ''; directImportForm.expirationDate = ''"
+            class="w-full h-11 px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all shadow-sm"
+          >
+            <option value="">-- Chọn danh mục --</option>
+            <option v-for="c in categories" :key="c.id" :value="c.id">
+              {{ c.name }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Dòng 2: Sản phẩm -->
+        <div>
+          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Sản phẩm</label>
+          <select 
+            v-model="directImportForm.productId" 
+            :disabled="!directImportForm.categoryId"
+            class="w-full h-11 px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all shadow-sm disabled:bg-[#f1f5f9] disabled:text-slate-400"
+          >
+            <option value="">-- Chọn sản phẩm --</option>
+            <option v-for="p in filteredProductsForDirectImport" :key="p.id" :value="p.id">
+              [{{ p.sku }}] {{ p.name }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Dòng 3: Đơn vị tính, Giá nhập & Giá bán -->
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Đơn vị tính</label>
+            <input 
+              :value="selectedProductInDirectImport ? selectedProductInDirectImport.unit : '-'" 
+              type="text" 
+              disabled 
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#eef2ff] text-[#4361ee] rounded-xl text-sm outline-none font-extrabold transition-all" 
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Giá nhập</label>
+            <input 
+              v-model.number="directImportForm.price" 
+              type="number" 
+              min="0"
+              disabled
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none text-slate-500 font-semibold transition-all" 
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Giá bán</label>
+            <input 
+              :value="selectedProductInDirectImport ? formatVND(selectedProductInDirectImport.price) : '-'" 
+              type="text" 
+              disabled 
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none text-slate-500 font-semibold transition-all" 
+            />
+          </div>
+        </div>
+
+        <!-- Dòng 4: Mã lô sản xuất & Số lượng nhập -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Mã lô sản xuất</label>
+            <input 
+              v-model="directImportForm.batchCode" 
+              type="text" 
+              placeholder="Ví dụ: BATCH-01, MILK-2026..." 
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số lượng nhập</label>
+            <input 
+              v-model.number="directImportForm.quantity" 
+              type="number" 
+              min="1" 
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
+            />
+          </div>
+        </div>
+
+        <!-- Ngày sản xuất (NSX) - Bắt buộc -->
+        <div>
+          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Ngày sản xuất (NSX)</label>
+          <input 
+            v-model="directImportForm.manufacturingDate" 
+            type="date" 
+            class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
+          />
+        </div>
+        <!-- Checkbox quản lý theo hạn dùng -->
+        <div class="flex items-center gap-2 py-1">
+          <input 
+            id="directImportHasExpiry" 
+            v-model="directImportForm.hasExpiry" 
+            type="checkbox" 
+            class="w-5 h-5 accent-[#4361ee] cursor-pointer rounded-md border-slate-300" 
+          />
+          <label for="directImportHasExpiry" class="cursor-pointer select-none font-bold text-xs text-[#8094ae] uppercase tracking-wider">
+            Sản phẩm quản lý theo hạn dùng
+          </label>
+        </div>
+
+        <!-- Các trường hạn dùng (chỉ hiện khi hasExpiry được tích chọn) -->
+        <Transition name="fade">
+          <div v-if="directImportForm.hasExpiry" class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Hạn sử dụng (HSD)</label>
+                <input 
+                  v-model="directImportForm.expirationDate" 
+                  type="date" 
+                  class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
+                />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số ngày cảnh báo hạn dùng</label>
+                <input 
+                  v-model.number="directImportForm.expiryWarningDays" 
+                  type="number" 
+                  min="1"
+                  placeholder="Mặc định: 30" 
+                  class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
+                />
+              </div>
+            </div>
+          </div>
+        </Transition>
+
+        <div class="flex gap-3 pt-4 border-t border-[#f1f5f9]">
+          <button 
+            class="flex-1 h-11 bg-[#f8f9fa] hover:bg-[#e2e8f0] text-[#364a63] rounded-xl text-sm font-bold transition-colors" 
+            @click="showDirectImportModal = false"
+          >
+            Hủy bỏ
+          </button>
+          <button 
+            class="flex-1 h-11 bg-[#4361ee] hover:bg-[#3a0ca3] text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2" 
+            :disabled="submittingDirectImport"
+            @click="submitDirectImport"
+          >
+            <i v-if="submittingDirectImport" class="fas fa-spinner fa-spin"></i>
+            Xác nhận tạo Phiếu
+          </button>
+        </div>
+      </div>
+    </AppModal>
 
   </div>
 </template>

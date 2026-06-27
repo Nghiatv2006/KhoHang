@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { api } from '../api'
 import { useToast } from '../utils/toast'
 import AppModal from '../components/AppModal.vue'
@@ -34,6 +34,20 @@ const filteredCustomers = computed(() => {
   )
 })
 
+const currentPage = ref(1)
+const pageSize = 15
+
+const totalPages = computed(() => Math.ceil(filteredCustomers.value.length / pageSize) || 1)
+
+const paginatedCustomers = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return filteredCustomers.value.slice(start, start + pageSize)
+})
+
+watch([cSearch, cStatusFilter], () => {
+  currentPage.value = 1
+})
+
 const showCModal = ref(false)
 const editingC = ref<any>(null)
 const cForm = reactive({ name: '', email: '', phone: '', address: '', taxCode: '' })
@@ -64,12 +78,7 @@ async function loadCustomerReceipts(id: number) {
   }
 }
 
-function openAddC() { 
-  editingC.value = null; 
-  Object.assign(cForm, { name: '', email: '', phone: '', address: '', taxCode: '' }); 
-  cTab.value = 'info'; 
-  showCModal.value = true 
-}
+// Removed openAddC as per user request
 
 function openEditC(c: any) { 
   editingC.value = c; 
@@ -110,6 +119,10 @@ async function doDeleteC() {
 }
 
 async function toggleCustomer(c: any) {
+  if (c.status === 'ACTIVE' && c.debt > 0) {
+    toast.error('Không thể ngừng hoạt động khi khách hàng vẫn còn nợ.');
+    return;
+  }
   try {
     const res = await api.patch(`/api/customers/${c.id}/toggle-status`, {})
     const data = await res.json()
@@ -213,7 +226,7 @@ function formatCurrency(val: any) {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="c in filteredCustomers" :key="c.id" class="border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer group hover:-translate-y-[1px]" @dblclick="isManager ? openEditC(c) : null">
+            <tr v-for="c in paginatedCustomers" :key="c.id" class="border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer group hover:-translate-y-[1px]" @dblclick="isManager ? openEditC(c) : null">
               <td class="p-4 first:rounded-l-xl last:rounded-r-xl">
                 <div class="font-bold text-[#364a63]">{{ c.name }}</div>
                 <div class="text-xs text-[#8094ae] font-mono mt-0.5">MST: {{ c.taxCode || '—' }}</div>
@@ -239,7 +252,7 @@ function formatCurrency(val: any) {
                   <button class="w-8 h-8 rounded-lg text-[#0ea5e9] bg-white hover:bg-[#e0f2fe] flex items-center justify-center transition-colors cursor-pointer shadow-sm border border-[#e2e8f0]/50" title="Sửa" @click.stop="openEditC(c)">
                     <i class="fas fa-pen text-sm"></i>
                   </button>
-                  <button v-if="isAdmin" class="w-8 h-8 rounded-lg text-[#ea4f52] bg-white hover:bg-[#ffe4e6] flex items-center justify-center transition-colors cursor-pointer shadow-sm border border-[#e2e8f0]/50" title="Xóa" @click.stop="confirmDeleteC(c)">
+                  <button v-if="isAdmin && c.status === 'INACTIVE'" class="w-8 h-8 rounded-lg text-[#ea4f52] bg-white hover:bg-[#ffe4e6] flex items-center justify-center transition-colors cursor-pointer shadow-sm border border-[#e2e8f0]/50" title="Xóa" @click.stop="confirmDeleteC(c)">
                     <i class="fas fa-trash text-sm"></i>
                   </button>
                 </div>
@@ -247,6 +260,29 @@ function formatCurrency(val: any) {
             </tr>
           </tbody>
         </table>
+      </div>
+      
+      <!-- Pagination -->
+      <div v-if="!cLoading && filteredCustomers.length > 0" class="p-4 border-t border-[#f1f5f9] bg-[#f8f9fa]/50 flex items-center justify-between">
+        <div class="text-sm text-[#8094ae]">
+          Hiển thị <span class="font-bold text-[#364a63]">{{ (currentPage - 1) * pageSize + 1 }}</span> - 
+          <span class="font-bold text-[#364a63]">{{ Math.min(currentPage * pageSize, filteredCustomers.length) }}</span> 
+          trong số <span class="font-bold text-[#364a63]">{{ filteredCustomers.length }}</span> khách hàng
+        </div>
+        <div class="flex items-center gap-2">
+          <button @click="currentPage--" :disabled="currentPage === 1"
+            class="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-[#e2e8f0] text-[#364a63] hover:bg-[#f1f5f9] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm">
+            <i class="fas fa-chevron-left text-xs"></i>
+          </button>
+          <div class="flex items-center gap-1">
+            <span class="font-semibold text-sm text-[#4361ee] bg-[#4361ee]/10 w-9 h-9 flex items-center justify-center rounded-xl">{{ currentPage }}</span>
+            <span class="text-[#8094ae] text-sm">/ {{ totalPages }}</span>
+          </div>
+          <button @click="currentPage++" :disabled="currentPage === totalPages"
+            class="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-[#e2e8f0] text-[#364a63] hover:bg-[#f1f5f9] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm">
+            <i class="fas fa-chevron-right text-xs"></i>
+          </button>
+        </div>
       </div>
     </div>
 
