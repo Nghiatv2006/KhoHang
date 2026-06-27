@@ -328,7 +328,7 @@ public class ReportServiceImpl implements ReportService {
         }
 
         // Fetch all customers, already filtered by branch if user is Manager
-        List<CustomerResponse> allCustomers = customerService.searchCustomers(null, null);
+        List<CustomerResponse> allCustomers = customerService.searchCustomers(null, null, currentUser);
 
         // Filter only those with debt > 0
         List<CustomerResponse> debtCustomers = allCustomers.stream()
