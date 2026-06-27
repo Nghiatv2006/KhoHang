@@ -660,7 +660,7 @@ function formatDateTime(dateTimeStr: string) {
 
         <!-- Add Product to Head Branch -->
         <button 
-          v-if="activeTab === 'head' && (isAdmin || userIsAtHeadBranch)"
+          v-if="activeTab === 'head' && !isAdmin && userIsAtHeadBranch"
           @click="openCreateInventoryModal" 
           class="h-[42px] bg-[#4361ee] hover:bg-[#3a0ca3] text-white px-5 rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-2"
         >

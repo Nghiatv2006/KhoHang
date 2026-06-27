@@ -373,8 +373,17 @@ public class ReceiptServiceImpl implements ReceiptService {
             }
             updateCustomerDebt(r, true, true, false);
         } else if (wasDeducted) {
-            for (ReceiptDetail d : r.getDetails()) {
-                addInventory(r.getSourceBranch(), d, d.getQuantity());
+            boolean shouldRevertSource = true;
+            if (r.getType() == ReceiptType.IMPORT) {
+                boolean isCrossBranch = (r.getSourceBranch() != null && r.getDestBranch() != null && !r.getSourceBranch().getId().equals(r.getDestBranch().getId()));
+                if (!isCrossBranch) {
+                    shouldRevertSource = false;
+                }
+            }
+            if (shouldRevertSource) {
+                for (ReceiptDetail d : r.getDetails()) {
+                    addInventory(r.getSourceBranch(), d, d.getQuantity());
+                }
             }
         }
         

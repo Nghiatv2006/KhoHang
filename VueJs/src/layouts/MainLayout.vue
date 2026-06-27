@@ -56,11 +56,15 @@ const isManagerOrAdmin = computed(() => {
 })
 
 const adminNavItems = computed(() => {
-  const items: { label: string; to: string; icon: string }[] = [
-    { label: 'Đối tác', to: '/partners', icon: 'fas fa-handshake' },
+  const items: { label: string; to: string; icon: string }[] = []
+  // @ts-ignore
+  if (!user.value || user.value.role !== 'ADMIN') {
+    items.push({ label: 'Đối tác', to: '/partners', icon: 'fas fa-handshake' })
+  }
+  items.push(
     { label: 'Nhân viên', to: '/users', icon: 'fas fa-users' },
-    { label: 'Chi nhánh', to: '/branches', icon: 'fas fa-building' },
-  ]
+    { label: 'Chi nhánh', to: '/branches', icon: 'fas fa-building' }
+  )
   if (isManagerOrAdmin.value) {
     items.push({ label: 'Nhật ký hoạt động', to: '/audit-logs', icon: 'fas fa-history' })
   }
