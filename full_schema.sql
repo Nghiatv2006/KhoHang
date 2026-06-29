@@ -11,7 +11,7 @@ DROP TYPE IF EXISTS user_role, user_status, receipt_type, receipt_status, stockt
 CREATE TYPE user_role AS ENUM ('ADMIN', 'MANAGER', 'STAFF');
 CREATE TYPE user_status AS ENUM ('ACTIVE', 'LOCKED');
 CREATE TYPE receipt_type AS ENUM ('IMPORT', 'EXPORT', 'TRANSFER', 'ADJUST_IN', 'ADJUST_OUT');
-CREATE TYPE receipt_status AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED');
+CREATE TYPE receipt_status AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED', 'PENDING_ADMIN', 'PENDING_STOCKTAKE');
 CREATE TYPE stocktake_status AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED');
 
 -- Bảng Chi nhánh (Branches)
@@ -129,11 +129,13 @@ CREATE TABLE receipts (
     customer_name VARCHAR(255),    -- Tên khách hàng (lưu thẳng vào phiếu, không cần JOIN)
     customer_phone VARCHAR(50),    -- SĐT khách hàng
     description VARCHAR(500),
+    stocktake_by_id INT,           -- Người xác nhận kiểm kê (phiếu PENDING_STOCKTAKE)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_receipt_source_branch FOREIGN KEY (source_branch_id) REFERENCES branches(id) ON DELETE RESTRICT,
     CONSTRAINT fk_receipt_dest_branch FOREIGN KEY (dest_branch_id) REFERENCES branches(id) ON DELETE RESTRICT,
     CONSTRAINT fk_receipt_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
-    CONSTRAINT fk_receipt_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT
+    CONSTRAINT fk_receipt_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_receipt_stocktake_by FOREIGN KEY (stocktake_by_id) REFERENCES users(id)
 );
 
 -- Bảng Chi tiết phiếu kho (Receipt Details)

@@ -114,3 +114,110 @@ INSERT INTO audit_logs (user_id, action, entity_name, entity_id, details) VALUES
 (1, 'CREATE', 'users', '2', 'Admin tạo tài khoản manager_hn'),
 (2, 'CREATE', 'receipts', '1', 'Manager HN lập phiếu nhập kho IM12345678'),
 (2, 'COMPLETE', 'stocktakes', '1', 'Hoàn tất phiên kiểm kê STK_HN_001, phát hiện dư 1 Airpods');
+
+
+-- ==============================================================================
+-- 7. DỮ LIỆU MẪU PHIẾU XUẤT BÁN & NHẬP KHO (30 NGÀY QUA)
+-- ==============================================================================
+
+-- Phiếu xuất bán (EXPORT)
+INSERT INTO receipts (code, type, status, payment_status, source_branch_id, dest_branch_id, created_by, customer_id, description, created_at) VALUES
+('EX20260601', 'EXPORT', 'COMPLETED', 'PAID', 1, NULL, 2, 1, 'Bán sỉ iPhone cho đại lý HN', '2026-06-01 10:00:00'),
+('EX20260603', 'EXPORT', 'COMPLETED', 'PAID', 2, NULL, 5, 2, 'Bán lẻ MacBook tại HCM', '2026-06-03 14:30:00'),
+('EX20260605', 'EXPORT', 'COMPLETED', 'UNPAID', 3, NULL, 3, 1, 'Bán hàng cho khách nợ Đà Nẵng', '2026-06-05 09:15:00'),
+('EX20260608', 'EXPORT', 'COMPLETED', 'PAID', 1, NULL, 2, 2, 'Khách mua AirPods và Phụ kiện HN', '2026-06-08 16:45:00'),
+('EX20260610', 'EXPORT', 'COMPLETED', 'UNPAID', 2, NULL, 5, 2, 'Bán sữa số lượng lớn HCM', '2026-06-10 11:20:00'),
+('EX20260612', 'EXPORT', 'COMPLETED', 'PAID', 3, NULL, 3, 1, 'Khách mua lẻ iPhone ĐN', '2026-06-12 15:10:00'),
+('EX20260615', 'EXPORT', 'COMPLETED', 'PAID', 1, NULL, 2, 1, 'Xuất bán MacBook HN', '2026-06-15 13:00:00'),
+('EX20260618', 'EXPORT', 'COMPLETED', 'UNPAID', 2, NULL, 5, 1, 'Hợp đồng bán sỉ iPhone HCM', '2026-06-18 10:30:00'),
+('EX20260620', 'EXPORT', 'COMPLETED', 'PAID', 3, NULL, 3, 2, 'Bán MacBook và AirPods ĐN', '2026-06-20 17:00:00'),
+('EX20260621', 'EXPORT', 'COMPLETED', 'PAID', 1, NULL, 2, 2, 'Bán sữa hộp HN', '2026-06-21 08:30:00');
+
+INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code) VALUES
+((SELECT id FROM receipts WHERE code='EX20260601'), 1, 5, 29900000, 'IP15-HN-001'),
+((SELECT id FROM receipts WHERE code='EX20260603'), 2, 3, 25500000, 'MACM2-HN-001'),
+((SELECT id FROM receipts WHERE code='EX20260605'), 1, 1, 29900000, 'IP15-HN-001'),
+((SELECT id FROM receipts WHERE code='EX20260605'), 3, 4, 5500000, 'AIR-HN-001'),
+((SELECT id FROM receipts WHERE code='EX20260608'), 3, 6, 5500000, 'AIR-HN-001'),
+((SELECT id FROM receipts WHERE code='EX20260610'), 4, 50, 35000, 'MILK-2024A'),
+((SELECT id FROM receipts WHERE code='EX20260610'), 5, 150, 35000, 'MILK-2024B'),
+((SELECT id FROM receipts WHERE code='EX20260612'), 1, 2, 29900000, 'IP15-HN-001'),
+((SELECT id FROM receipts WHERE code='EX20260615'), 2, 4, 25500000, 'MACM2-HN-001'),
+((SELECT id FROM receipts WHERE code='EX20260618'), 1, 8, 29900000, 'IP15-HN-001'),
+((SELECT id FROM receipts WHERE code='EX20260620'), 2, 2, 25500000, 'MACM2-HN-001'),
+((SELECT id FROM receipts WHERE code='EX20260620'), 3, 2, 5500000, 'AIR-HN-001'),
+((SELECT id FROM receipts WHERE code='EX20260621'), 5, 80, 35000, 'MILK-2024B');
+
+-- Phiếu nhập kho (IMPORT)
+INSERT INTO receipts (code, type, status, payment_status, source_branch_id, dest_branch_id, created_by, customer_id, description, created_at) VALUES
+('IM20260602', 'IMPORT', 'COMPLETED', 'PAID', NULL, 1, 2, NULL, 'Nhập thêm iPhone và MacBook HN', '2026-06-02 09:00:00'),
+('IM20260607', 'IMPORT', 'COMPLETED', 'PAID', NULL, 2, 5, NULL, 'Nhập thêm sữa HCM', '2026-06-07 11:00:00'),
+('IM20260614', 'IMPORT', 'COMPLETED', 'PAID', NULL, 3, 3, NULL, 'Nhập AirPods Đà Nẵng', '2026-06-14 14:00:00');
+
+INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code) VALUES
+((SELECT id FROM receipts WHERE code='IM20260602'), 1, 10, 29000000, 'IP15-HN-001'),
+((SELECT id FROM receipts WHERE code='IM20260602'), 2, 5, 24000000, 'MACM2-HN-001'),
+((SELECT id FROM receipts WHERE code='IM20260607'), 5, 300, 30000, 'MILK-2024B'),
+((SELECT id FROM receipts WHERE code='IM20260614'), 3, 15, 5000000, 'AIR-HN-001');
+
+
+-- ==============================================================================
+-- 8. DỮ LIỆU MẪU QUY MÔ LỚN (TỰ ĐỘNG SINH CHO 30 NGÀY)
+-- ==============================================================================
+
+DO $$
+DECLARE
+    day_offset INT;
+    curr_date TIMESTAMP;
+    r_id INT;
+    imp_qty INT;
+    exp_qty INT;
+    p_id INT;
+    p_price NUMERIC(15,2);
+    p_import_price NUMERIC(15,2);
+    p_batch VARCHAR(100);
+    target_branch INT;
+    creator_id INT;
+BEGIN
+    -- Dọn dẹp dữ liệu tự động cũ nếu có
+    DELETE FROM receipt_details WHERE batch_code LIKE '%-BATCH-%';
+    DELETE FROM receipts WHERE code LIKE 'IM_AUTO_%' OR code LIKE 'EX_AUTO_%';
+
+    -- Sinh dữ liệu quy mô lớn xoay vòng cho 3 chi nhánh
+    FOR day_offset IN 0..29 LOOP
+        curr_date := NOW() - (day_offset || ' days')::INTERVAL;
+        target_branch := (day_offset % 3) + 1;
+
+        IF target_branch = 1 THEN creator_id := 3;     -- staff_hn_1
+        ELSIF target_branch = 2 THEN creator_id := 4;  -- manager_hcm
+        ELSE creator_id := 2;                          -- manager_dn
+        END IF;
+
+        -- Phiếu NHẬP (IMPORT) mỗi 2 ngày
+        IF day_offset % 2 = 0 THEN
+            p_id := (day_offset % 3) + 1;
+            SELECT import_price, code INTO p_import_price, p_batch FROM products WHERE id = p_id;
+
+            INSERT INTO receipts (code, type, status, payment_status, source_branch_id, dest_branch_id, created_by, description, created_at)
+            VALUES ('IM_AUTO_' || day_offset || '_' || EXTRACT(EPOCH FROM curr_date)::BIGINT, 'IMPORT', 'COMPLETED', 'PAID', NULL, target_branch, creator_id, 'Nhập hàng mẫu quy mô lớn', curr_date)
+            RETURNING id INTO r_id;
+
+            imp_qty := 35 + (day_offset * 2) % 45;
+            INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code)
+            VALUES (r_id, p_id, imp_qty, p_import_price, p_batch || '-BATCH-' || day_offset);
+        END IF;
+
+        -- Phiếu XUẤT BÁN (EXPORT) hằng ngày
+        p_id := ((day_offset + 1) % 3) + 1;
+        SELECT price, code INTO p_price, p_batch FROM products WHERE id = p_id;
+
+        INSERT INTO receipts (code, type, status, payment_status, source_branch_id, dest_branch_id, created_by, customer_id, description, created_at)
+        VALUES ('EX_AUTO_' || day_offset || '_' || EXTRACT(EPOCH FROM curr_date)::BIGINT, 'EXPORT', 'COMPLETED', 'PAID', target_branch, NULL, creator_id, 1, 'Xuất bán sỉ quy mô lớn', curr_date)
+        RETURNING id INTO r_id;
+
+        exp_qty := 15 + (day_offset * 2) % 30;
+        INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code)
+        VALUES (r_id, p_id, exp_qty, p_price, p_batch || '-BATCH-' || day_offset);
+    END LOOP;
+END $$;
+
