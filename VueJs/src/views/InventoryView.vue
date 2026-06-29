@@ -1323,13 +1323,6 @@ function exportExcel() {
             >
               Đóng
             </button>
-            <button 
-              v-if="user?.role !== 'STAFF'"
-              class="flex-1 h-11 bg-[#05b171] hover:bg-[#04965f] text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2"
-              @click="openAddStockModal"
-            >
-              <i class="fas fa-plus"></i> Nhập thêm
-            </button>
           </div>
         </div>
       </Transition>
