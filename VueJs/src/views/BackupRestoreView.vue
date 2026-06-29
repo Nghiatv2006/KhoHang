@@ -387,7 +387,7 @@ onMounted(() => {
     </div>
 
     <!-- ═══ WARNING BANNER ════════════════════════════════════════════════════ -->
-    <div v-if="!isAdmin" class="warning-banner">
+    <div class="warning-banner">
       <div class="warning-banner__icon"><i class="fas fa-shield-alt"></i></div>
       <div class="warning-banner__text">
         <strong>Lưu ý quan trọng:</strong> Hành động khôi phục sẽ <strong>xoá sạch và ghi đè</strong>
@@ -397,7 +397,7 @@ onMounted(() => {
     </div>
 
     <!-- ═══ SECURITY BADGES ═══════════════════════════════════════════════════ -->
-    <div v-if="!isAdmin" class="sec-badges">
+    <div class="sec-badges">
       <div class="sec-badge"><i class="fas fa-lock"></i><span>AES-256-GCM</span></div>
       <div class="sec-badge"><i class="fas fa-fingerprint"></i><span>HMAC-SHA256</span></div>
       <div class="sec-badge"><i class="fas fa-file-archive"></i><span>Định dạng .wbk</span></div>
@@ -405,7 +405,7 @@ onMounted(() => {
     </div>
 
     <!-- ═══ MAIN GRID (Manager only) ═══════════════════════════════════════════ -->
-    <div v-if="!isAdmin" class="main-grid">
+    <div class="main-grid">
 
       <!-- LEFT: Operations -->
       <div class="ops-col">
@@ -621,7 +621,7 @@ onMounted(() => {
         <div class="warning-banner__icon"><i class="fas fa-info-circle"></i></div>
         <div class="warning-banner__text">
           Phục hồi System Config sẽ <strong>UPSERT</strong> lại danh mục, sản phẩm, chi nhánh và nhân viên.
-          Dữ liệu giao dịch kho của từng chi nhánh <em>không bị ảnh hưởng</em>.
+          Dữ liệu giao dịch kho của mọi chi nhánh (bao gồm cả chi nhánh tổng) <em>không bị ảnh hưởng</em>.
         </div>
       </div>
 
