@@ -329,8 +329,8 @@ async function executeSysDelete() {
 }
 
 onMounted(() => {
-  if (!isAdmin.value) loadHistory()
-  else loadSysHistory()
+  loadHistory()
+  if (isAdmin.value) loadSysHistory()
 })
 </script>
 

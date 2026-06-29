@@ -160,12 +160,12 @@ CREATE TABLE stocktakes (
     id SERIAL PRIMARY KEY,
     code VARCHAR(50) NOT NULL UNIQUE,
     branch_id INT NOT NULL,
-    created_by INT NOT NULL,
+    created_by INT,
     status stocktake_status NOT NULL DEFAULT 'DRAFT',
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_stocktake_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE RESTRICT,
-    CONSTRAINT fk_stocktake_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT
+    CONSTRAINT fk_stocktake_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- Bảng Chi tiết kiểm kê (Stocktake Details)
