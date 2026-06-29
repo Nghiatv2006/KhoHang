@@ -67,9 +67,7 @@ const showDetailPanel = ref(false)
 const selectedInv = ref<any>(null)
 
 // Add Stock Modal state
-const showAddStockModal = ref(false)
-const submittingAddStock = ref(false)
-const addStockForm = ref({ quantity: 1 })
+
 
 // Create Inventory Modal state (Thêm sản phẩm vào Kho Tổng)
 const showCreateModal = ref(false)
@@ -331,41 +329,6 @@ async function saveThreshold() {
 function openDetails(inv: any) {
   selectedInv.value = inv
   showDetailPanel.value = true
-}
-
-function openAddStockModal() {
-  addStockForm.value.quantity = 1
-  showAddStockModal.value = true
-}
-
-async function submitAddStock() {
-  if (!selectedInv.value) return
-  const qty = addStockForm.value.quantity
-  if (!qty || qty <= 0) {
-    toast.error('Số lượng nhập thêm phải lớn hơn 0.')
-    return
-  }
-
-  submittingAddStock.value = true
-  try {
-    const res = await api.patch(`/api/inventories/${selectedInv.value.id}/add-stock`, {
-      quantityToAdd: qty
-    })
-
-    if (res.ok) {
-      toast.success(`Nhập thêm hàng cùng lô thành công!`)
-      showAddStockModal.value = false
-      showDetailPanel.value = false
-      await loadData()
-    } else {
-      const errData = await res.json()
-      toast.error(errData.message || 'Lỗi khi nhập thêm hàng.')
-    }
-  } catch (err: any) {
-    toast.error('Lỗi kết nối: ' + err.message)
-  } finally {
-    submittingAddStock.value = false
-  }
 }
 
 async function deleteInventory() {
@@ -1327,61 +1290,7 @@ function exportExcel() {
         </div>
       </Transition>
 
-      <!-- Add Stock Modal -->
-      <AppModal 
-        :show="showAddStockModal" 
-        title="Nhập thêm hàng cùng lô" 
-        size="sm" 
-        @close="showAddStockModal = false"
-      >
-        <div class="p-6 space-y-4 text-sm">
-          <div class="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-2">
-            <div class="flex justify-between">
-              <span class="text-[#8094ae] font-medium">Sản phẩm:</span>
-              <span class="font-bold text-[#364a63] text-right">{{ selectedInv?.productName }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-[#8094ae] font-medium">Lô sản xuất:</span>
-              <span class="font-bold text-[#364a63] font-mono text-xs">{{ selectedInv?.batchCode }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-[#8094ae] font-medium">Chi nhánh:</span>
-              <span class="font-bold text-[#364a63]">{{ selectedInv?.branchName }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-[#8094ae] font-medium">Tồn hiện tại:</span>
-              <span class="font-bold text-[#364a63]">{{ selectedInv?.quantity }} {{ selectedInv?.unit }}</span>
-            </div>
-          </div>
 
-          <div>
-            <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số lượng nhập thêm</label>
-            <input 
-              v-model="addStockForm.quantity" 
-              type="number" 
-              min="1" 
-              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#05b171]/20 focus:border-[#05b171] text-[#364a63] font-semibold transition-all" 
-            />
-          </div>
-
-          <div class="flex gap-3 pt-4 border-t border-[#f1f5f9]">
-            <button 
-              class="flex-1 h-11 bg-[#f8f9fa] hover:bg-[#e2e8f0] text-[#364a63] rounded-xl text-sm font-bold transition-colors" 
-              @click="showAddStockModal = false"
-            >
-              Hủy bỏ
-            </button>
-            <button 
-              class="flex-1 h-11 bg-[#05b171] hover:bg-[#04965f] text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2" 
-              :disabled="submittingAddStock"
-              @click="submitAddStock"
-            >
-              <i v-if="submittingAddStock" class="fas fa-spinner fa-spin"></i>
-              Xác nhận nhập
-            </button>
-          </div>
-        </div>
-      </AppModal>
     </Teleport>
   </div>
 </template>
