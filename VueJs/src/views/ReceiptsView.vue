@@ -443,7 +443,11 @@ function removeDetailRow(index: number) {
 function onTypeChange() {
   const t = createForm.value.type
   if (t === 'IMPORT') {
-    createForm.value.sourceBranchId = ''
+    if (user.value?.branchId !== headBranch.value?.id) {
+      createForm.value.sourceBranchId = headBranch.value?.id || ''
+    } else {
+      createForm.value.sourceBranchId = ''
+    }
     createForm.value.destBranchId = user.value?.branchId || headBranch.value?.id || ''
   } else if (t === 'EXPORT') {
     createForm.value.sourceBranchId = user.value?.branchId || headBranch.value?.id || ''
@@ -1622,8 +1626,8 @@ function getCustomerName(receipt: any) {
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Loại phiếu <span class="text-red-500">*</span></label>
                   <select v-model="createForm.type" @change="onTypeChange"
                     class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
-                    <option value="IMPORT" v-if="user?.branchId !== headBranch?.id && !isManager">📥 Nhập kho</option>
-                    <option value="EXPORT">📤 Xuất bán</option>
+                    <option value="IMPORT" v-if="user?.branchId !== headBranch?.id && !isManager || user?.branchId === headBranch?.id">📥 Nhập kho</option>
+                    <option value="EXPORT" v-if="user?.branchId !== headBranch?.id">📤 Xuất bán</option>
                     <option value="TRANSFER">🔄 Điều chuyển</option>
                   </select>
                 </div>
@@ -1632,6 +1636,7 @@ function getCustomerName(receipt: any) {
                   <select v-model="createForm.sourceBranchId" disabled
                     class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-[#f1f5f9] disabled:text-[#8094ae] cursor-not-allowed">
                     <option value="">-- Bên ngoài hệ thống --</option>
+                    <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
                   </select>
                 </div>
                 <div v-if="createForm.type === 'IMPORT' || createForm.type === 'TRANSFER' || createForm.type === 'ADJUST_IN'">
