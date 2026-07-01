@@ -12,5 +12,4 @@ public interface InventoryService {
     InventoryResponse createProductWithInventory(com.example.Hehe.dto.ProductWithInventoryRequest request, User currentUser);
     InventoryResponse updateExpiryWarning(Integer id, Integer expiryWarningDays, User currentUser);
     void deleteInventory(Integer id, User currentUser);
-    List<InventoryResponse> getGlobalInventories();
 }

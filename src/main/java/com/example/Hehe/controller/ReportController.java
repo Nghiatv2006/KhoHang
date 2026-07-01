@@ -54,21 +54,26 @@ public class ReportController {
         return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
     }
 
-    @GetMapping("/dashboard/inventory-age")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    public ResponseEntity<java.util.Map<String, Object>> getInventoryAgeAnalysis(@AuthenticationPrincipal User currentUser) {
-        return ResponseEntity.ok(reportService.getInventoryAgeAnalysis(currentUser));
-    }
-
-    @GetMapping("/dashboard/stocktake-discrepancy")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    public ResponseEntity<java.util.List<java.util.Map<String, Object>>> getStocktakeDiscrepancyHistory(@AuthenticationPrincipal User currentUser) {
-        return ResponseEntity.ok(reportService.getStocktakeDiscrepancyHistory(currentUser));
-    }
 
     @GetMapping("/dashboard/debt-aging")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<java.util.Map<String, Object>> getDebtAgingAnalysis(@AuthenticationPrincipal User currentUser) {
         return ResponseEntity.ok(reportService.getDebtAgingAnalysis(currentUser));
     }
+
+    @GetMapping("/revenue/excel")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<byte[]> exportRevenueExcel(
+            @AuthenticationPrincipal User currentUser) {
+
+        byte[] excelBytes = reportService.exportRevenueReport(currentUser);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentDispositionFormData("attachment", "Bao_Cao_Doanh_Thu.xlsx");
+        headers.setCacheControl("must-revalidate, post-check=0, pre-check=0");
+
+        return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
+    }
 }
+

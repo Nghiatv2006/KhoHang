@@ -588,84 +588,764 @@ public class ReportServiceImpl implements ReportService {
     }
 
     @Override
-    public java.util.Map<String, Object> getInventoryAgeAnalysis(User currentUser) {
-        List<Inventory> inventories;
-        if (currentUser.getRole() == UserRole.MANAGER) {
-            inventories = inventoryRepository.findByBranchId(currentUser.getBranch().getId());
+    public byte[] exportRevenueReport(User currentUser) {
+        if (currentUser.getRole() == UserRole.STAFF) {
+            throw new AccessDeniedException("Staff không có quyền xuất báo cáo doanh thu.");
+        }
+
+        boolean isAdmin = currentUser.getRole() == UserRole.ADMIN;
+        boolean isHeadBranch = currentUser.getBranch() != null && Boolean.TRUE.equals(currentUser.getBranch().getIsHead());
+
+        // Determine report type: Head branch uses TRANSFER, others use EXPORT
+        boolean isTransferReport = !isAdmin && isHeadBranch;
+
+        List<Receipt> receipts;
+        if (isAdmin) {
+            // Admin: get all EXPORT receipts across all branches
+            receipts = receiptRepository.findByTypeAndStatus(ReceiptType.EXPORT, ReceiptStatus.COMPLETED);
+        } else if (isTransferReport) {
+            // Head Branch Manager: get TRANSFER receipts where this branch is the source
+            receipts = receiptRepository.findByTypeAndStatusAndSourceBranchId(
+                    ReceiptType.TRANSFER, ReceiptStatus.COMPLETED, currentUser.getBranch().getId());
         } else {
-            inventories = inventoryRepository.findAll();
+            // Child Branch Manager: get EXPORT receipts for their branch
+            receipts = receiptRepository.findByTypeAndStatusAndSourceBranchId(
+                    ReceiptType.EXPORT, ReceiptStatus.COMPLETED, currentUser.getBranch().getId());
         }
 
-        BigDecimal fastMovingValue = BigDecimal.ZERO; // <= 30 days
-        BigDecimal slowMovingValue = BigDecimal.ZERO; // 31 - 90 days
-        BigDecimal deadStockValue = BigDecimal.ZERO;  // > 90 days
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
-        LocalDateTime now = LocalDateTime.now();
+            // ====== STYLES ======
+            Font titleFont = workbook.createFont();
+            titleFont.setBold(true);
+            titleFont.setFontHeightInPoints((short) 16);
 
-        for (Inventory inv : inventories) {
-            if (inv.getQuantity() <= 0) continue;
-            
-            BigDecimal value = inv.getProduct().getPrice().multiply(BigDecimal.valueOf(inv.getQuantity()));
-            long days = java.time.temporal.ChronoUnit.DAYS.between(inv.getLastUpdated(), now);
-            
-            if (days <= 30) {
-                fastMovingValue = fastMovingValue.add(value);
-            } else if (days <= 90) {
-                slowMovingValue = slowMovingValue.add(value);
+            Font boldFont = workbook.createFont();
+            boldFont.setBold(true);
+
+            Font italicFont = workbook.createFont();
+            italicFont.setItalic(true);
+
+            CellStyle titleStyle = workbook.createCellStyle();
+            titleStyle.setFont(titleFont);
+            titleStyle.setAlignment(HorizontalAlignment.CENTER);
+            titleStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+            CellStyle boldStyle = workbook.createCellStyle();
+            boldStyle.setFont(boldFont);
+
+            CellStyle boldCenterStyle = workbook.createCellStyle();
+            boldCenterStyle.setFont(boldFont);
+            boldCenterStyle.setAlignment(HorizontalAlignment.CENTER);
+
+            CellStyle italicCenterStyle = workbook.createCellStyle();
+            italicCenterStyle.setFont(italicFont);
+            italicCenterStyle.setAlignment(HorizontalAlignment.CENTER);
+
+            CellStyle headerStyle = workbook.createCellStyle();
+            headerStyle.setFont(boldFont);
+            headerStyle.setAlignment(HorizontalAlignment.CENTER);
+            headerStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+            headerStyle.setBorderTop(BorderStyle.THIN);
+            headerStyle.setBorderBottom(BorderStyle.THIN);
+            headerStyle.setBorderLeft(BorderStyle.THIN);
+            headerStyle.setBorderRight(BorderStyle.THIN);
+            headerStyle.setFillForegroundColor(IndexedColors.PALE_BLUE.getIndex());
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+            CellStyle borderStyle = workbook.createCellStyle();
+            borderStyle.setBorderTop(BorderStyle.THIN);
+            borderStyle.setBorderBottom(BorderStyle.THIN);
+            borderStyle.setBorderLeft(BorderStyle.THIN);
+            borderStyle.setBorderRight(BorderStyle.THIN);
+
+            CellStyle borderCenterStyle = workbook.createCellStyle();
+            borderCenterStyle.cloneStyleFrom(borderStyle);
+            borderCenterStyle.setAlignment(HorizontalAlignment.CENTER);
+
+            DataFormat format = workbook.createDataFormat();
+
+            CellStyle moneyStyle = workbook.createCellStyle();
+            moneyStyle.cloneStyleFrom(borderStyle);
+            moneyStyle.setDataFormat(format.getFormat("#,##0"));
+
+            CellStyle percentStyle = workbook.createCellStyle();
+            percentStyle.cloneStyleFrom(borderStyle);
+            percentStyle.setDataFormat(format.getFormat("0.00%"));
+
+            CellStyle totalRowStyle = workbook.createCellStyle();
+            totalRowStyle.cloneStyleFrom(borderStyle);
+            totalRowStyle.setFont(boldFont);
+            totalRowStyle.setFillForegroundColor(IndexedColors.LIGHT_YELLOW.getIndex());
+            totalRowStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+            CellStyle totalRowMoneyStyle = workbook.createCellStyle();
+            totalRowMoneyStyle.cloneStyleFrom(totalRowStyle);
+            totalRowMoneyStyle.setDataFormat(format.getFormat("#,##0"));
+
+            CellStyle totalRowCenterStyle = workbook.createCellStyle();
+            totalRowCenterStyle.cloneStyleFrom(totalRowStyle);
+            totalRowCenterStyle.setAlignment(HorizontalAlignment.CENTER);
+
+            CellStyle totalRowPercentStyle = workbook.createCellStyle();
+            totalRowPercentStyle.cloneStyleFrom(totalRowStyle);
+            totalRowPercentStyle.setDataFormat(format.getFormat("0.00%"));
+
+            CellStyle totalRowRightStyle = workbook.createCellStyle();
+            totalRowRightStyle.cloneStyleFrom(totalRowStyle);
+            totalRowRightStyle.setAlignment(HorizontalAlignment.RIGHT);
+
+            DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+            String reportDate = LocalDateTime.now().format(dtf);
+            String reporterName = currentUser.getFullName();
+            String branchName = isAdmin ? "TOÀN HỆ THỐNG" :
+                    (currentUser.getBranch() != null ? currentUser.getBranch().getName() : "N/A");
+
+            if (isTransferReport) {
+                // ====== HEAD BRANCH: TRANSFER REPORT ======
+                buildTransferTimeSheets(workbook, receipts, reportDate, reporterName, branchName,
+                        titleStyle, boldStyle, boldCenterStyle, italicCenterStyle,
+                        headerStyle, borderStyle, borderCenterStyle, moneyStyle,
+                        totalRowStyle, totalRowMoneyStyle, totalRowCenterStyle, totalRowRightStyle);
+
+                buildTransferProductSheet(workbook, receipts, reportDate, reporterName, branchName,
+                        titleStyle, boldStyle, boldCenterStyle, italicCenterStyle,
+                        headerStyle, borderStyle, borderCenterStyle, moneyStyle,
+                        totalRowStyle, totalRowMoneyStyle, totalRowCenterStyle, totalRowRightStyle);
             } else {
-                deadStockValue = deadStockValue.add(value);
-            }
-        }
+                // ====== REVENUE REPORT (Admin or Child Branch Manager) ======
+                buildRevenueTimeSheets(workbook, receipts, isAdmin, reportDate, reporterName, branchName,
+                        titleStyle, boldStyle, boldCenterStyle, italicCenterStyle,
+                        headerStyle, borderStyle, borderCenterStyle, moneyStyle, percentStyle,
+                        totalRowStyle, totalRowMoneyStyle, totalRowCenterStyle, totalRowPercentStyle, totalRowRightStyle);
 
-        java.util.Map<String, Object> result = new java.util.HashMap<>();
-        result.put("fastMoving", fastMovingValue);
-        result.put("slowMoving", slowMovingValue);
-        result.put("deadStock", deadStockValue);
-        return result;
+                buildRevenueProductSheet(workbook, receipts, isAdmin, reportDate, reporterName, branchName,
+                        titleStyle, boldStyle, boldCenterStyle, italicCenterStyle,
+                        headerStyle, borderStyle, borderCenterStyle, moneyStyle,
+                        totalRowStyle, totalRowMoneyStyle, totalRowCenterStyle, totalRowRightStyle);
+            }
+
+            workbook.write(out);
+            return out.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi khi tạo file Excel báo cáo doanh thu", e);
+        }
     }
 
-    @Override
-    public java.util.List<java.util.Map<String, Object>> getStocktakeDiscrepancyHistory(User currentUser) {
-        List<Stocktake> stocktakes;
-        if (currentUser.getRole() == UserRole.MANAGER) {
-            stocktakes = stocktakeRepository.findByBranchIdOrderByCreatedAtDesc(currentUser.getBranch().getId());
-        } else {
-            stocktakes = stocktakeRepository.findAllByOrderByCreatedAtDesc();
-        }
+    // ================================================================
+    //  REVENUE TIME SHEETS (Tuần / Tháng / Quý / Năm)
+    // ================================================================
+    private void buildRevenueTimeSheets(Workbook workbook, List<Receipt> receipts, boolean isAdmin,
+            String reportDate, String reporterName, String branchName,
+            CellStyle titleStyle, CellStyle boldStyle, CellStyle boldCenterStyle, CellStyle italicCenterStyle,
+            CellStyle headerStyle, CellStyle borderStyle, CellStyle borderCenterStyle,
+            CellStyle moneyStyle, CellStyle percentStyle,
+            CellStyle totalRowStyle, CellStyle totalRowMoneyStyle, CellStyle totalRowCenterStyle,
+            CellStyle totalRowPercentStyle, CellStyle totalRowRightStyle) {
 
-        // Limit to last 5 completed stocktakes
-        List<Stocktake> completedStocktakes = stocktakes.stream()
-                .filter(s -> s.getStatus() == StocktakeStatus.COMPLETED)
-                .limit(5)
-                .collect(Collectors.toList());
+        String[][] sheetConfigs = {
+                {"Theo Tuần", "WEEK"},
+                {"Theo Tháng", "MONTH"},
+                {"Theo Quý", "QUARTER"},
+                {"Theo Năm", "YEAR"}
+        };
 
-        java.util.List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
+        for (String[] config : sheetConfigs) {
+            Sheet sheet = workbook.createSheet(config[0]);
+            String groupType = config[1];
 
-        // Reverse to show chronologically
-        for (int i = completedStocktakes.size() - 1; i >= 0; i--) {
-            Stocktake stocktake = completedStocktakes.get(i);
-            int totalShortfall = 0;
-            int totalSurplus = 0;
+            // Group receipts by time period and optionally by branch
+            Map<String, Map<String, List<Receipt>>> groupedData = groupReceiptsByTimeAndBranch(receipts, groupType, isAdmin);
 
-            for (StocktakeDetail detail : stocktake.getDetails()) {
-                int expected = detail.getExpectedQuantity();
-                int actual = detail.getActualQuantity();
-                if (actual < expected) {
-                    totalShortfall += (expected - actual);
-                } else if (actual > expected) {
-                    totalSurplus += (actual - expected);
+            // Headers
+            String[] headers;
+            if (isAdmin) {
+                headers = new String[]{"STT", "Thời gian", "Tên Chi nhánh", "Số lượng Đơn", "Tổng Sản phẩm",
+                        "Tổng Doanh thu (VNĐ)", "Giá vốn hàng ĐÃ BÁN (VNĐ)", "Lợi nhuận gộp (VNĐ)", "Tỷ suất LN"};
+            } else {
+                headers = new String[]{"STT", "Thời gian", "Số lượng Đơn", "Tổng Sản phẩm",
+                        "Tổng Doanh thu (VNĐ)", "Giá vốn hàng ĐÃ BÁN (VNĐ)", "Lợi nhuận gộp (VNĐ)", "Tỷ suất LN"};
+            }
+
+            int rowIdx = writeReportHeader(sheet, "BÁO CÁO DOANH THU & LỢI NHUẬN (" + config[0].toUpperCase() + ")",
+                    reportDate, reporterName, branchName, headers,
+                    titleStyle, boldStyle, italicCenterStyle, headerStyle);
+
+            // Add cell comments for clarity
+            addCellComment(workbook, sheet, rowIdx - 1, isAdmin ? 5 : 4, "Công thức: Giá bán khách hàng × Số lượng bán ra");
+            addCellComment(workbook, sheet, rowIdx - 1, isAdmin ? 6 : 5, "Công thức: Giá nhập gốc × Số lượng đã bán ra\n(Chỉ tính cho hàng đã bán, không tính hàng tồn kho)");
+            addCellComment(workbook, sheet, rowIdx - 1, isAdmin ? 7 : 6, "Công thức: Tổng Doanh thu - Giá vốn hàng ĐÃ BÁN");
+            addCellComment(workbook, sheet, rowIdx - 1, isAdmin ? 8 : 7, "Công thức: (Lợi nhuận gộp / Tổng Doanh thu) × 100%");
+
+            // Freeze header row
+            sheet.createFreezePane(0, rowIdx);
+
+            int stt = 1;
+            long grandTotalOrders = 0;
+            long grandTotalItems = 0;
+            BigDecimal grandTotalRevenue = BigDecimal.ZERO;
+            BigDecimal grandTotalCost = BigDecimal.ZERO;
+
+            // Sort time periods
+            List<String> sortedPeriods = new java.util.ArrayList<>(groupedData.keySet());
+            java.util.Collections.sort(sortedPeriods);
+
+            for (String period : sortedPeriods) {
+                Map<String, List<Receipt>> branchMap = groupedData.get(period);
+                List<String> sortedBranches = new java.util.ArrayList<>(branchMap.keySet());
+                java.util.Collections.sort(sortedBranches);
+
+                for (String branch : sortedBranches) {
+                    List<Receipt> periodReceipts = branchMap.get(branch);
+
+                    long orderCount = periodReceipts.size();
+                    long totalItems = periodReceipts.stream()
+                            .flatMap(r -> r.getDetails().stream())
+                            .mapToLong(ReceiptDetail::getQuantity)
+                            .sum();
+
+                    BigDecimal totalRevenue = periodReceipts.stream()
+                            .flatMap(r -> r.getDetails().stream())
+                            .map(d -> d.getPrice().multiply(BigDecimal.valueOf(d.getQuantity())))
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                    BigDecimal totalCost = periodReceipts.stream()
+                            .flatMap(r -> r.getDetails().stream())
+                            .map(d -> {
+                                BigDecimal importPrice = d.getProduct().getImportPrice();
+                                if (importPrice == null) importPrice = BigDecimal.ZERO;
+                                return importPrice.multiply(BigDecimal.valueOf(d.getQuantity()));
+                            })
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                    BigDecimal profit = totalRevenue.subtract(totalCost);
+                    double profitMargin = totalRevenue.compareTo(BigDecimal.ZERO) > 0
+                            ? profit.doubleValue() / totalRevenue.doubleValue() : 0;
+
+                    grandTotalOrders += orderCount;
+                    grandTotalItems += totalItems;
+                    grandTotalRevenue = grandTotalRevenue.add(totalRevenue);
+                    grandTotalCost = grandTotalCost.add(totalCost);
+
+                    Row row = sheet.createRow(rowIdx++);
+                    int col = 0;
+                    setCellValue(row, col++, stt++, borderCenterStyle);
+                    setCellValue(row, col++, period, borderStyle);
+                    if (isAdmin) {
+                        setCellValue(row, col++, branch, borderStyle);
+                    }
+                    setCellValue(row, col++, orderCount, borderCenterStyle);
+                    setCellValue(row, col++, totalItems, borderCenterStyle);
+                    setCellValue(row, col++, totalRevenue.doubleValue(), moneyStyle);
+                    setCellValue(row, col++, totalCost.doubleValue(), moneyStyle);
+                    setCellValue(row, col++, profit.doubleValue(), moneyStyle);
+                    setCellValue(row, col++, profitMargin, percentStyle);
                 }
             }
 
-            java.util.Map<String, Object> dataPoint = new java.util.HashMap<>();
-            dataPoint.put("code", stocktake.getCode());
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM");
-            dataPoint.put("date", stocktake.getCreatedAt().format(formatter));
-            dataPoint.put("shortfall", totalShortfall);
-            dataPoint.put("surplus", totalSurplus);
-            result.add(dataPoint);
+            // Total row
+            BigDecimal grandProfit = grandTotalRevenue.subtract(grandTotalCost);
+            double grandProfitMargin = grandTotalRevenue.compareTo(BigDecimal.ZERO) > 0
+                    ? grandProfit.doubleValue() / grandTotalRevenue.doubleValue() : 0;
+
+            Row totalRow = sheet.createRow(rowIdx++);
+            int col = 0;
+            int mergeEnd = isAdmin ? 2 : 1;
+            for (int i = 0; i <= mergeEnd; i++) {
+                totalRow.createCell(i).setCellStyle(totalRowRightStyle);
+            }
+            sheet.addMergedRegion(new CellRangeAddress(rowIdx - 1, rowIdx - 1, 0, mergeEnd));
+            totalRow.getCell(0).setCellValue("TỔNG CỘNG:");
+            col = mergeEnd + 1;
+            setCellValue(totalRow, col++, grandTotalOrders, totalRowCenterStyle);
+            setCellValue(totalRow, col++, grandTotalItems, totalRowCenterStyle);
+            setCellValue(totalRow, col++, grandTotalRevenue.doubleValue(), totalRowMoneyStyle);
+            setCellValue(totalRow, col++, grandTotalCost.doubleValue(), totalRowMoneyStyle);
+            setCellValue(totalRow, col++, grandProfit.doubleValue(), totalRowMoneyStyle);
+            setCellValue(totalRow, col++, grandProfitMargin, totalRowPercentStyle);
+
+            // Signature section
+            writeSignatureSection(sheet, rowIdx + 2, boldCenterStyle, italicCenterStyle, isAdmin ? 8 : 7);
+
+            // Auto-size columns
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+        }
+    }
+
+    // ================================================================
+    //  REVENUE PRODUCT DETAIL SHEET
+    // ================================================================
+    private void buildRevenueProductSheet(Workbook workbook, List<Receipt> receipts, boolean isAdmin,
+            String reportDate, String reporterName, String branchName,
+            CellStyle titleStyle, CellStyle boldStyle, CellStyle boldCenterStyle, CellStyle italicCenterStyle,
+            CellStyle headerStyle, CellStyle borderStyle, CellStyle borderCenterStyle, CellStyle moneyStyle,
+            CellStyle totalRowStyle, CellStyle totalRowMoneyStyle, CellStyle totalRowCenterStyle, CellStyle totalRowRightStyle) {
+
+        Sheet sheet = workbook.createSheet("Chi tiết Hàng hóa");
+
+        String[] headers;
+        if (isAdmin) {
+            headers = new String[]{"STT", "Tên Chi nhánh", "Tên Sản phẩm", "Danh mục", "Giá nhập gốc (VNĐ)",
+                    "Giá bán (VNĐ)", "SL Đã bán", "Tổng Doanh thu (VNĐ)", "Tổng Lợi nhuận (VNĐ)"};
+        } else {
+            headers = new String[]{"STT", "Tên Sản phẩm", "Danh mục", "Giá nhập gốc (VNĐ)",
+                    "Giá bán (VNĐ)", "SL Đã bán", "Tổng Doanh thu (VNĐ)", "Tổng Lợi nhuận (VNĐ)"};
+        }
+
+        int rowIdx = writeReportHeader(sheet, "BÁO CÁO CHI TIẾT BÁN HÀNG THEO SẢN PHẨM",
+                reportDate, reporterName, branchName, headers,
+                titleStyle, boldStyle, italicCenterStyle, headerStyle);
+
+        sheet.createFreezePane(0, rowIdx);
+
+        // Group by branch (if admin) and product
+        // Key: branchName -> productId -> aggregated data
+        Map<String, Map<Integer, double[]>> productStats = new java.util.LinkedHashMap<>();
+        Map<Integer, String[]> productInfo = new java.util.HashMap<>(); // productId -> [name, category]
+        Map<Integer, BigDecimal> productImportPrices = new java.util.HashMap<>();
+
+        for (Receipt receipt : receipts) {
+            String bName = receipt.getSourceBranch() != null ? receipt.getSourceBranch().getName() : "N/A";
+            if (!isAdmin) bName = "_SINGLE_";
+
+            productStats.computeIfAbsent(bName, k -> new java.util.LinkedHashMap<>());
+
+            for (ReceiptDetail detail : receipt.getDetails()) {
+                Product product = detail.getProduct();
+                int pid = product.getId();
+
+                productInfo.putIfAbsent(pid, new String[]{
+                        product.getName(),
+                        product.getCategory() != null ? product.getCategory().getName() : "N/A"
+                });
+                productImportPrices.putIfAbsent(pid, product.getImportPrice() != null ? product.getImportPrice() : BigDecimal.ZERO);
+
+                double[] stats = productStats.get(bName).computeIfAbsent(pid, k -> new double[4]);
+                // [0] = avg sell price accumulator, [1] = total qty, [2] = total revenue, [3] = total cost
+                BigDecimal importPrice = product.getImportPrice() != null ? product.getImportPrice() : BigDecimal.ZERO;
+                double revenue = detail.getPrice().multiply(BigDecimal.valueOf(detail.getQuantity())).doubleValue();
+                double cost = importPrice.multiply(BigDecimal.valueOf(detail.getQuantity())).doubleValue();
+
+                stats[0] += detail.getPrice().doubleValue() * detail.getQuantity(); // weighted price accumulator
+                stats[1] += detail.getQuantity();
+                stats[2] += revenue;
+                stats[3] += cost;
+            }
+        }
+
+        int stt = 1;
+        long grandTotalQty = 0;
+        BigDecimal grandTotalRevenue = BigDecimal.ZERO;
+        BigDecimal grandTotalProfit = BigDecimal.ZERO;
+
+        List<String> sortedBranches = new java.util.ArrayList<>(productStats.keySet());
+        java.util.Collections.sort(sortedBranches);
+
+        for (String branch : sortedBranches) {
+            Map<Integer, double[]> products = productStats.get(branch);
+
+            // Sort by total revenue descending (best sellers first)
+            List<Map.Entry<Integer, double[]>> sortedProducts = new java.util.ArrayList<>(products.entrySet());
+            sortedProducts.sort((a, b) -> Double.compare(b.getValue()[2], a.getValue()[2]));
+
+            for (Map.Entry<Integer, double[]> entry : sortedProducts) {
+                int pid = entry.getKey();
+                double[] stats = entry.getValue();
+                String[] info = productInfo.get(pid);
+                BigDecimal importPrice = productImportPrices.get(pid);
+
+                double avgPrice = stats[1] > 0 ? stats[0] / stats[1] : 0;
+                double profit = stats[2] - stats[3];
+
+                grandTotalQty += (long) stats[1];
+                grandTotalRevenue = grandTotalRevenue.add(BigDecimal.valueOf(stats[2]));
+                grandTotalProfit = grandTotalProfit.add(BigDecimal.valueOf(profit));
+
+                Row row = sheet.createRow(rowIdx++);
+                int c = 0;
+                setCellValue(row, c++, stt++, borderCenterStyle);
+                if (isAdmin) {
+                    setCellValue(row, c++, branch, borderStyle);
+                }
+                setCellValue(row, c++, info[0], borderStyle);       // Tên SP
+                setCellValue(row, c++, info[1], borderStyle);       // Danh mục
+                setCellValue(row, c++, importPrice.doubleValue(), moneyStyle); // Giá nhập
+                setCellValue(row, c++, avgPrice, moneyStyle);       // Giá bán bình quân
+                setCellValue(row, c++, (long) stats[1], borderCenterStyle); // SL đã bán
+                setCellValue(row, c++, stats[2], moneyStyle);       // Doanh thu
+                setCellValue(row, c++, profit, moneyStyle);         // Lợi nhuận
+            }
+        }
+
+        // Total row
+        Row totalRow = sheet.createRow(rowIdx++);
+        int mergeEnd = isAdmin ? 5 : 4;
+        for (int i = 0; i <= mergeEnd; i++) {
+            totalRow.createCell(i).setCellStyle(totalRowRightStyle);
+        }
+        sheet.addMergedRegion(new CellRangeAddress(rowIdx - 1, rowIdx - 1, 0, mergeEnd));
+        totalRow.getCell(0).setCellValue("TỔNG CỘNG:");
+
+        int c = mergeEnd + 1;
+        setCellValue(totalRow, c++, grandTotalQty, totalRowCenterStyle);
+        setCellValue(totalRow, c++, grandTotalRevenue.doubleValue(), totalRowMoneyStyle);
+        setCellValue(totalRow, c++, grandTotalProfit.doubleValue(), totalRowMoneyStyle);
+
+        writeSignatureSection(sheet, rowIdx + 2, boldCenterStyle, italicCenterStyle, isAdmin ? 8 : 7);
+
+        for (int i = 0; i < headers.length; i++) {
+            sheet.autoSizeColumn(i);
+        }
+    }
+
+    // ================================================================
+    //  TRANSFER TIME SHEETS (Head Branch)
+    // ================================================================
+    private void buildTransferTimeSheets(Workbook workbook, List<Receipt> receipts,
+            String reportDate, String reporterName, String branchName,
+            CellStyle titleStyle, CellStyle boldStyle, CellStyle boldCenterStyle, CellStyle italicCenterStyle,
+            CellStyle headerStyle, CellStyle borderStyle, CellStyle borderCenterStyle, CellStyle moneyStyle,
+            CellStyle totalRowStyle, CellStyle totalRowMoneyStyle, CellStyle totalRowCenterStyle, CellStyle totalRowRightStyle) {
+
+        String[][] sheetConfigs = {
+                {"Theo Tuần", "WEEK"},
+                {"Theo Tháng", "MONTH"},
+                {"Theo Quý", "QUARTER"},
+                {"Theo Năm", "YEAR"}
+        };
+
+        for (String[] config : sheetConfigs) {
+            Sheet sheet = workbook.createSheet(config[0]);
+
+            Map<String, Map<String, List<Receipt>>> groupedData = groupReceiptsByTimeAndBranch(receipts, config[1], true);
+
+            String[] headers = {"STT", "Thời gian", "Chi nhánh nhận", "Số lệnh Điều chuyển",
+                    "Tổng SL Phân bổ", "Tổng Giá trị xuất kho (VNĐ)"};
+
+            int rowIdx = writeReportHeader(sheet, "BÁO CÁO LUÂN CHUYỂN NỘI BỘ (" + config[0].toUpperCase() + ")",
+                    reportDate, reporterName, branchName, headers,
+                    titleStyle, boldStyle, italicCenterStyle, headerStyle);
+
+            addCellComment(workbook, sheet, rowIdx - 1, 5, "Tính bằng: Giá nhập gốc × Số lượng phân bổ\n(Phản ánh giá trị tài sản luân chuyển, không phải doanh thu)");
+
+            sheet.createFreezePane(0, rowIdx);
+
+            int stt = 1;
+            long grandTotalOrders = 0;
+            long grandTotalItems = 0;
+            BigDecimal grandTotalValue = BigDecimal.ZERO;
+
+            List<String> sortedPeriods = new java.util.ArrayList<>(groupedData.keySet());
+            java.util.Collections.sort(sortedPeriods);
+
+            for (String period : sortedPeriods) {
+                Map<String, List<Receipt>> branchMap = groupedData.get(period);
+                List<String> sortedBranches = new java.util.ArrayList<>(branchMap.keySet());
+                java.util.Collections.sort(sortedBranches);
+
+                for (String destBranch : sortedBranches) {
+                    List<Receipt> periodReceipts = branchMap.get(destBranch);
+
+                    long orderCount = periodReceipts.size();
+                    long totalItems = periodReceipts.stream()
+                            .flatMap(r -> r.getDetails().stream())
+                            .mapToLong(ReceiptDetail::getQuantity)
+                            .sum();
+
+                    BigDecimal totalValue = periodReceipts.stream()
+                            .flatMap(r -> r.getDetails().stream())
+                            .map(d -> {
+                                BigDecimal ip = d.getProduct().getImportPrice();
+                                if (ip == null) ip = BigDecimal.ZERO;
+                                return ip.multiply(BigDecimal.valueOf(d.getQuantity()));
+                            })
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                    grandTotalOrders += orderCount;
+                    grandTotalItems += totalItems;
+                    grandTotalValue = grandTotalValue.add(totalValue);
+
+                    Row row = sheet.createRow(rowIdx++);
+                    setCellValue(row, 0, stt++, borderCenterStyle);
+                    setCellValue(row, 1, period, borderStyle);
+                    setCellValue(row, 2, destBranch, borderStyle);
+                    setCellValue(row, 3, orderCount, borderCenterStyle);
+                    setCellValue(row, 4, totalItems, borderCenterStyle);
+                    setCellValue(row, 5, totalValue.doubleValue(), moneyStyle);
+                }
+            }
+
+            // Total row
+            Row totalRow = sheet.createRow(rowIdx++);
+            for (int i = 0; i <= 2; i++) {
+                totalRow.createCell(i).setCellStyle(totalRowRightStyle);
+            }
+            sheet.addMergedRegion(new CellRangeAddress(rowIdx - 1, rowIdx - 1, 0, 2));
+            totalRow.getCell(0).setCellValue("TỔNG CỘNG:");
+            setCellValue(totalRow, 3, grandTotalOrders, totalRowCenterStyle);
+            setCellValue(totalRow, 4, grandTotalItems, totalRowCenterStyle);
+            setCellValue(totalRow, 5, grandTotalValue.doubleValue(), totalRowMoneyStyle);
+
+            writeSignatureSection(sheet, rowIdx + 2, boldCenterStyle, italicCenterStyle, 5);
+
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+        }
+    }
+
+    // ================================================================
+    //  TRANSFER PRODUCT DETAIL SHEET
+    // ================================================================
+    private void buildTransferProductSheet(Workbook workbook, List<Receipt> receipts,
+            String reportDate, String reporterName, String branchName,
+            CellStyle titleStyle, CellStyle boldStyle, CellStyle boldCenterStyle, CellStyle italicCenterStyle,
+            CellStyle headerStyle, CellStyle borderStyle, CellStyle borderCenterStyle, CellStyle moneyStyle,
+            CellStyle totalRowStyle, CellStyle totalRowMoneyStyle, CellStyle totalRowCenterStyle, CellStyle totalRowRightStyle) {
+
+        Sheet sheet = workbook.createSheet("Chi tiết Hàng Luân chuyển");
+
+        String[] headers = {"STT", "Chi nhánh nhận", "Tên Sản phẩm", "SL Phân bổ", "Tổng Giá trị (VNĐ)"};
+
+        int rowIdx = writeReportHeader(sheet, "BÁO CÁO CHI TIẾT HÀNG LUÂN CHUYỂN THEO SẢN PHẨM",
+                reportDate, reporterName, branchName, headers,
+                titleStyle, boldStyle, italicCenterStyle, headerStyle);
+
+        sheet.createFreezePane(0, rowIdx);
+
+        // Group by destBranch -> product
+        Map<String, Map<Integer, double[]>> branchProductMap = new java.util.LinkedHashMap<>();
+        Map<Integer, String> productNames = new java.util.HashMap<>();
+
+        for (Receipt receipt : receipts) {
+            String destName = receipt.getDestBranch() != null ? receipt.getDestBranch().getName() : "N/A";
+            branchProductMap.computeIfAbsent(destName, k -> new java.util.LinkedHashMap<>());
+
+            for (ReceiptDetail detail : receipt.getDetails()) {
+                int pid = detail.getProduct().getId();
+                productNames.putIfAbsent(pid, detail.getProduct().getName());
+                BigDecimal importPrice = detail.getProduct().getImportPrice() != null
+                        ? detail.getProduct().getImportPrice() : BigDecimal.ZERO;
+
+                double[] stats = branchProductMap.get(destName).computeIfAbsent(pid, k -> new double[2]);
+                stats[0] += detail.getQuantity(); // qty
+                stats[1] += importPrice.multiply(BigDecimal.valueOf(detail.getQuantity())).doubleValue(); // value
+            }
+        }
+
+        int stt = 1;
+        long grandTotalQty = 0;
+        BigDecimal grandTotalValue = BigDecimal.ZERO;
+
+        List<String> sortedBranches = new java.util.ArrayList<>(branchProductMap.keySet());
+        java.util.Collections.sort(sortedBranches);
+
+        for (String destBranch : sortedBranches) {
+            Map<Integer, double[]> products = branchProductMap.get(destBranch);
+            List<Map.Entry<Integer, double[]>> sortedProducts = new java.util.ArrayList<>(products.entrySet());
+            sortedProducts.sort((a, b) -> Double.compare(b.getValue()[1], a.getValue()[1]));
+
+            for (Map.Entry<Integer, double[]> entry : sortedProducts) {
+                double[] stats = entry.getValue();
+                Row row = sheet.createRow(rowIdx++);
+                setCellValue(row, 0, stt++, borderCenterStyle);
+                setCellValue(row, 1, destBranch, borderStyle);
+                setCellValue(row, 2, productNames.get(entry.getKey()), borderStyle);
+                setCellValue(row, 3, (long) stats[0], borderCenterStyle);
+                setCellValue(row, 4, stats[1], moneyStyle);
+
+                grandTotalQty += (long) stats[0];
+                grandTotalValue = grandTotalValue.add(BigDecimal.valueOf(stats[1]));
+            }
+        }
+
+        // Total row
+        Row totalRow = sheet.createRow(rowIdx++);
+        for (int i = 0; i <= 2; i++) {
+            totalRow.createCell(i).setCellStyle(totalRowRightStyle);
+        }
+        sheet.addMergedRegion(new CellRangeAddress(rowIdx - 1, rowIdx - 1, 0, 2));
+        totalRow.getCell(0).setCellValue("TỔNG CỘNG:");
+        setCellValue(totalRow, 3, grandTotalQty, totalRowCenterStyle);
+        setCellValue(totalRow, 4, grandTotalValue.doubleValue(), totalRowMoneyStyle);
+
+        writeSignatureSection(sheet, rowIdx + 2, boldCenterStyle, italicCenterStyle, 4);
+
+        for (int i = 0; i < headers.length; i++) {
+            sheet.autoSizeColumn(i);
+        }
+    }
+
+    // ================================================================
+    //  HELPER: Group receipts by time period and branch
+    // ================================================================
+    private Map<String, Map<String, List<Receipt>>> groupReceiptsByTimeAndBranch(
+            List<Receipt> receipts, String groupType, boolean groupByBranch) {
+
+        Map<String, Map<String, List<Receipt>>> result = new java.util.TreeMap<>();
+
+        for (Receipt receipt : receipts) {
+            if (receipt.getCreatedAt() == null) continue;
+            LocalDateTime dt = receipt.getCreatedAt();
+
+            String period;
+            switch (groupType) {
+                case "WEEK":
+                    java.time.temporal.WeekFields weekFields = java.time.temporal.WeekFields.ISO;
+                    int weekNum = dt.get(weekFields.weekOfWeekBasedYear());
+                    int weekYear = dt.get(weekFields.weekBasedYear());
+                    period = String.format("Tuần %02d - %d", weekNum, weekYear);
+                    break;
+                case "MONTH":
+                    period = String.format("Tháng %02d/%d", dt.getMonthValue(), dt.getYear());
+                    break;
+                case "QUARTER":
+                    int quarter = (dt.getMonthValue() - 1) / 3 + 1;
+                    period = String.format("Quý %d - %d", quarter, dt.getYear());
+                    break;
+                case "YEAR":
+                    period = String.format("Năm %d", dt.getYear());
+                    break;
+                default:
+                    period = dt.toString();
+            }
+
+            // For TRANSFER reports, use destBranch; for EXPORT, use sourceBranch
+            String branchLabel;
+            if (groupByBranch) {
+                if (receipt.getType() == ReceiptType.TRANSFER) {
+                    branchLabel = receipt.getDestBranch() != null ? receipt.getDestBranch().getName() : "N/A";
+                } else {
+                    branchLabel = receipt.getSourceBranch() != null ? receipt.getSourceBranch().getName() : "N/A";
+                }
+            } else {
+                branchLabel = "_ALL_";
+            }
+
+            result.computeIfAbsent(period, k -> new java.util.TreeMap<>())
+                    .computeIfAbsent(branchLabel, k -> new java.util.ArrayList<>())
+                    .add(receipt);
         }
 
         return result;
     }
+
+    // ================================================================
+    //  HELPER: Write report header (Company info, Title, Metadata, Column Headers)
+    // ================================================================
+    private int writeReportHeader(Sheet sheet, String title,
+            String reportDate, String reporterName, String branchName,
+            String[] headers,
+            CellStyle titleStyle, CellStyle boldStyle, CellStyle italicCenterStyle, CellStyle headerStyle) {
+
+        Row r0 = sheet.createRow(0);
+        Cell c00 = r0.createCell(0);
+        c00.setCellValue("CÔNG TY TNHH WAREHUB");
+        c00.setCellStyle(boldStyle);
+
+        Row r1 = sheet.createRow(1);
+        r1.createCell(0).setCellValue("Chi nhánh: " + branchName);
+
+        Row r3 = sheet.createRow(3);
+        Cell titleCell = r3.createCell(0);
+        titleCell.setCellValue(title);
+        titleCell.setCellStyle(titleStyle);
+        sheet.addMergedRegion(new CellRangeAddress(3, 3, 0, headers.length - 1));
+
+        Row r4 = sheet.createRow(4);
+        Cell infoCell = r4.createCell(0);
+        infoCell.setCellValue("Ngày xuất: " + reportDate + " - Người lập biểu: " + reporterName);
+        infoCell.setCellStyle(italicCenterStyle);
+        sheet.addMergedRegion(new CellRangeAddress(4, 4, 0, headers.length - 1));
+
+        Row headerRow = sheet.createRow(6);
+        for (int i = 0; i < headers.length; i++) {
+            Cell cell = headerRow.createCell(i);
+            cell.setCellValue(headers[i]);
+            cell.setCellStyle(headerStyle);
+        }
+
+        return 7; // next row index after headers
+    }
+
+    // ================================================================
+    //  HELPER: Add Cell Comment
+    // ================================================================
+    private void addCellComment(Workbook workbook, Sheet sheet, int rowIdx, int colIdx, String commentText) {
+        try {
+            org.apache.poi.ss.usermodel.Drawing<?> drawing = sheet.createDrawingPatriarch();
+            org.apache.poi.ss.usermodel.CreationHelper factory = workbook.getCreationHelper();
+            org.apache.poi.ss.usermodel.ClientAnchor anchor = factory.createClientAnchor();
+            anchor.setCol1(colIdx);
+            anchor.setRow1(rowIdx);
+            anchor.setCol2(colIdx + 4);
+            anchor.setRow2(rowIdx + 4);
+
+            Comment comment = drawing.createCellComment(anchor);
+            comment.setString(factory.createRichTextString(commentText));
+
+            Row row = sheet.getRow(rowIdx);
+            if (row != null) {
+                Cell cell = row.getCell(colIdx);
+                if (cell != null) {
+                    cell.setCellComment(comment);
+                }
+            }
+        } catch (Exception e) {
+            // Silently ignore comment creation errors
+        }
+    }
+
+    // ================================================================
+    //  HELPER: Write signature section
+    // ================================================================
+    private void writeSignatureSection(Sheet sheet, int startRow, CellStyle boldCenterStyle, CellStyle italicCenterStyle, int lastCol) {
+        int midCol = lastCol / 2;
+        int endCol = lastCol;
+
+        Row signLabelRow = sheet.createRow(startRow);
+        Cell sig1 = signLabelRow.createCell(0);
+        sig1.setCellValue("Người lập biểu");
+        sig1.setCellStyle(boldCenterStyle);
+        sheet.addMergedRegion(new CellRangeAddress(startRow, startRow, 0, midCol - 1));
+
+        Cell sig2 = signLabelRow.createCell(midCol + 1);
+        sig2.setCellValue("Giám đốc phê duyệt");
+        sig2.setCellStyle(boldCenterStyle);
+        sheet.addMergedRegion(new CellRangeAddress(startRow, startRow, midCol + 1, endCol));
+
+        Row signSubRow = sheet.createRow(startRow + 1);
+        Cell sub1 = signSubRow.createCell(0);
+        sub1.setCellValue("(Ký, ghi rõ họ tên)");
+        sub1.setCellStyle(italicCenterStyle);
+        sheet.addMergedRegion(new CellRangeAddress(startRow + 1, startRow + 1, 0, midCol - 1));
+
+        Cell sub2 = signSubRow.createCell(midCol + 1);
+        sub2.setCellValue("(Ký, đóng dấu, họ tên)");
+        sub2.setCellStyle(italicCenterStyle);
+        sheet.addMergedRegion(new CellRangeAddress(startRow + 1, startRow + 1, midCol + 1, endCol));
+    }
+
+    // ================================================================
+    //  HELPER: Set cell value with style
+    // ================================================================
+    private void setCellValue(Row row, int colIdx, Object value, CellStyle style) {
+        Cell cell = row.createCell(colIdx);
+        if (value instanceof String) {
+            cell.setCellValue((String) value);
+        } else if (value instanceof Double) {
+            cell.setCellValue((Double) value);
+        } else if (value instanceof Long) {
+            cell.setCellValue((Long) value);
+        } else if (value instanceof Integer) {
+            cell.setCellValue((Integer) value);
+        } else if (value != null) {
+            cell.setCellValue(value.toString());
+        }
+        cell.setCellStyle(style);
+    }
+
 }
+

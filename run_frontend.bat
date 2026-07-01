@@ -1,6 +1,6 @@
 @echo off
 title WareHub Frontend
-cd /d d:\IT\Hehe\VueJs
+cd /d "%~dp0VueJs"
 echo Khoi dong VueJS (Vite dev)...
-npm run dev
+call npm run dev
 pause
