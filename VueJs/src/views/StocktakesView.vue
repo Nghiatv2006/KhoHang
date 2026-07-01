@@ -2,6 +2,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { api } from '../api'
 import { useToast } from '../utils/toast'
+import { refreshStocktakeBadge } from '../utils/stocktakeStore'
 import AppModal from '../components/AppModal.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 
@@ -88,6 +89,7 @@ async function createStocktake() {
       toast.success('Khởi tạo phiên kiểm kê thành công!')
       const newSt = await res.json()
       await loadStocktakes()
+      await refreshStocktakeBadge()   // ↠ cập nhật badge ngay
       openDetail(newSt)
     } else {
       const err = await res.text()
@@ -172,6 +174,7 @@ async function completeStocktake() {
       toast.success('Hoàn tất kiểm kê và cập nhật tồn kho thành công!')
       await loadingDetail(selectedStocktake.value.id)
       await loadStocktakes()
+      await refreshStocktakeBadge()   // ↠ cập nhật badge ngay
     } else {
       const err = await res.text()
       toast.error(err || 'Không thể duyệt hoàn tất phiên kiểm kê.')
@@ -194,6 +197,7 @@ async function cancelStocktake() {
       toast.success('Đã hủy bỏ phiên kiểm kê.')
       await loadingDetail(selectedStocktake.value.id)
       await loadStocktakes()
+      await refreshStocktakeBadge()   // ↠ cập nhật badge ngay
     } else {
       const err = await res.text()
       toast.error(err || 'Không thể hủy phiên kiểm kê.')

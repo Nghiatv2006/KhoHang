@@ -14,4 +14,5 @@ public interface ReceiptRepository extends JpaRepository<Receipt, Integer> {
     // For debt analysis
     List<Receipt> findByTypeAndStatusAndPaymentStatus(com.example.Hehe.model.ReceiptType type, com.example.Hehe.model.ReceiptStatus status, String paymentStatus);
     List<Receipt> findByTypeAndStatusAndPaymentStatusAndSourceBranchId(com.example.Hehe.model.ReceiptType type, com.example.Hehe.model.ReceiptStatus status, String paymentStatus, Integer branchId);
+    List<Receipt> findByTypeAndStatus(com.example.Hehe.model.ReceiptType type, com.example.Hehe.model.ReceiptStatus status);
 }
