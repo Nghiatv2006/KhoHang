@@ -348,8 +348,6 @@ onUnmounted(() => {
   background-size: 200% auto;
   animation: gradient-x 3s linear infinite;
 }
-<<<<<<< HEAD
-
 /* ── Nav item hover & active ─────────────────────────────── */
 .nav-idle {
   color: #364a63;
