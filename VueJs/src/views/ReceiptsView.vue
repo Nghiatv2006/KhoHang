@@ -280,7 +280,7 @@ async function openDirectImportModal() {
   showDirectImportModal.value = true
   if (globalInventories.value.length === 0) {
     try {
-      const res = await api.get('/api/inventories/global')
+      const res = await api.get('/api/inventories')
       if (res.ok) {
         globalInventories.value = await res.json()
       }
@@ -553,7 +553,7 @@ watch(() => directImportForm.value.batchCode, (newBatch) => {
 watch(() => createForm.value.sourceBranchId, async (newVal) => {
   if (newVal) {
     try {
-      const res = await api.get('/api/inventories/global')
+      const res = await api.get('/api/inventories')
       if (res.ok) {
         const allInventories = await res.json()
         globalInventories.value = allInventories
