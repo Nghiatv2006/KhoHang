@@ -45,34 +45,56 @@ async function loadBadgeCounts() {
     // @ts-ignore
     const myBranchId = user.value?.branchId
 
-    // Nhập kho: phiếu IMPORT chờ duyệt (DRAFT/PENDING_ADMIN) liên quan đến chi nhánh mình
-    badgeImport.value = receipts.filter(r =>
-      r.type === 'IMPORT' &&
-      (r.status === 'DRAFT' || r.status === 'PENDING_ADMIN') &&
-      (r.destBranchId === myBranchId || r.sourceBranchId === myBranchId)
-    ).length
+    const isManager = user.value?.role === 'MANAGER';
+    const isAdmin = user.value?.role === 'ADMIN';
+    const isStaff = user.value?.role === 'STAFF';
 
-    // Hóa đơn: phiếu EXPORT chờ duyệt + chưa thanh toán
-    badgeInvoice.value = receipts.filter(r =>
-      r.type === 'EXPORT' &&
-      r.sourceBranchId === myBranchId &&
-      ((r.status === 'DRAFT' || r.status === 'PENDING_ADMIN') ||
-       (r.status === 'COMPLETED' && (r.paymentStatus === 'UNPAID' || r.paymentStatus === 'Chưa thanh toán')))
-    ).length
+    // Nhập kho
+    badgeImport.value = receipts.filter(r => {
+      if (r.type !== 'IMPORT') return false;
+      const isDest = r.destBranchId === myBranchId;
+      if (r.status === 'DRAFT') return (isManager && isDest) || isAdmin;
+      if (r.status === 'PENDING_ADMIN') return isAdmin;
+      if (r.status === 'PENDING_STOCKTAKE') return isStaff && isDest;
+      if (r.status === 'PENDING_SHORTFALL_MANAGER') return isManager && isDest;
+      if (r.status === 'PENDING_SHORTFALL_ADMIN') return isAdmin;
+      
+      const isSource = r.sourceBranchId === myBranchId;
+      if (r.status === 'PENDING_COMPENSATION') return (isManager && isSource) || isAdmin;
+      return false;
+    }).length
 
-    // Điều chuyển: phiếu TRANSFER chờ xử lý
-    badgeTransfer.value = receipts.filter(r =>
-      r.type === 'TRANSFER' &&
-      (r.status === 'DRAFT' || r.status === 'PENDING_ADMIN' || r.status === 'PENDING_STOCKTAKE') &&
-      (r.destBranchId === myBranchId || r.sourceBranchId === myBranchId)
-    ).length
+    // Hóa đơn
+    badgeInvoice.value = receipts.filter(r => {
+      if (r.type !== 'EXPORT') return false;
+      const isSource = r.sourceBranchId === myBranchId;
+      if (r.status === 'DRAFT') return (isManager && isSource) || isAdmin;
+      if (r.status === 'PENDING_ADMIN') return isAdmin;
+      if (r.status === 'COMPLETED' && (r.paymentStatus === 'UNPAID' || r.paymentStatus === 'Chưa thanh toán')) {
+        return isSource;
+      }
+      return false;
+    }).length
 
-    // Tiêu hủy: phiếu ADJUST_OUT chờ duyệt
-    badgeDisposal.value = receipts.filter(r =>
-      r.type === 'ADJUST_OUT' &&
-      r.status === 'PENDING_ADMIN' &&
-      r.sourceBranchId === myBranchId
-    ).length
+    // Điều chuyển
+    badgeTransfer.value = receipts.filter(r => {
+      if (r.type !== 'TRANSFER') return false;
+      const isSource = r.sourceBranchId === myBranchId;
+      const isDest = r.destBranchId === myBranchId;
+      if (r.status === 'DRAFT') return (isManager && isSource) || isAdmin;
+      if (r.status === 'PENDING_ADMIN') return (isManager && isDest) || isAdmin;
+      if (r.status === 'PENDING_STOCKTAKE') return isStaff && isDest;
+      return false;
+    }).length
+
+    // Tiêu hủy
+    badgeDisposal.value = receipts.filter(r => {
+      if (r.type !== 'ADJUST_OUT') return false;
+      const isSource = r.sourceBranchId === myBranchId;
+      if (r.status === 'DRAFT') return (isManager && isSource) || isAdmin;
+      if (r.status === 'PENDING_ADMIN') return (isManager && isSource) || isAdmin;
+      return false;
+    }).length
   } catch (e) {
     // silent fail
   }

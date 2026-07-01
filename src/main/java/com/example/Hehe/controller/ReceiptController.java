@@ -64,4 +64,15 @@ public class ReceiptController {
     public ResponseEntity<ReceiptResponse> confirmStocktake(@PathVariable Integer id, @RequestBody java.util.Map<String, Object> payload, @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(receiptService.confirmStocktake(id, payload, user));
     }
+
+    @PostMapping("/{id}/approve-shortfall")
+    public ResponseEntity<ReceiptResponse> approveShortfall(@PathVariable Integer id, @RequestBody java.util.Map<String, Boolean> payload, @AuthenticationPrincipal User user) {
+        boolean isApproved = payload.getOrDefault("isApproved", false);
+        return ResponseEntity.ok(receiptService.approveShortfall(id, isApproved, user));
+    }
+
+    @PostMapping("/{id}/compensate-shortfall")
+    public ResponseEntity<ReceiptResponse> compensateShortfall(@PathVariable Integer id, @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(receiptService.compensateShortfall(id, user));
+    }
 }

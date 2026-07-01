@@ -184,9 +184,16 @@ watch(filterTimeRange, (val) => {
 const typeFilteredReceipts = computed(() => {
   let list = receipts.value
   // Lọc Hóa đơn (EXPORT): Chỉ được xem Hóa đơn của chi nhánh mình
+  // Lọc Nhập kho (IMPORT): Chỉ hiển thị cho chi nhánh đích, không hiển thị cho chi nhánh nguồn (Hà Nội) để tránh nhầm lẫn
   list = list.filter(r => {
     if (r.type === 'EXPORT') {
       return r.sourceBranchId === user.value?.branchId
+    }
+    if (r.type === 'IMPORT' && !isAdmin.value) {
+      if (r.status === 'PENDING_COMPENSATION' && r.sourceBranchId === user.value?.branchId) {
+        return true
+      }
+      return r.destBranchId === user.value?.branchId
     }
     return true
   })
@@ -1142,6 +1149,90 @@ async function submitConfirmStocktake() {
 }
 
 // ──────────────────────────────────────────────────────────────
+// APPROVE SHORTFALL
+// ──────────────────────────────────────────────────────────────
+const approvingShortfallId = ref<number | null>(null)
+
+function canApproveShortfall(r: any) {
+  if (r.status === 'PENDING_SHORTFALL_MANAGER') {
+    if (isManager.value && !isAdmin.value && r.destBranchId === user.value?.branchId) return true;
+  }
+  if (r.status === 'PENDING_SHORTFALL_ADMIN') {
+    if (isAdmin.value) return true;
+  }
+  return false;
+}
+
+async function approveShortfall(receipt: any, isApproved: boolean) {
+  if (approvingShortfallId.value === receipt.id) return
+  if (!confirm(`Xác nhận ${isApproved ? 'DUYỆT' : 'TỪ CHỐI'} hao hụt cho phiếu ${receipt.code}?`)) return
+  approvingShortfallId.value = receipt.id
+  try {
+    const payload = { isApproved }
+    const res = await api.post(`/api/receipts/${receipt.id}/approve-shortfall`, payload)
+    if (res.ok) {
+      toast.success(`Đã ${isApproved ? 'duyệt' : 'từ chối'} hao hụt phiếu ${receipt.code}.`)
+      showDetail.value = false
+      await loadData()
+    } else {
+      let errMessage = 'Lỗi khi xử lý hao hụt.'
+      try {
+        const err = await res.json()
+        errMessage = err.message || errMessage
+      } catch {
+        const text = await res.text()
+        errMessage = text ? text.substring(0, 100) + '...' : errMessage
+      }
+      toast.error(errMessage)
+    }
+  } catch (e: any) {
+    toast.error('Lỗi kết nối: ' + e.message)
+  } finally {
+    approvingShortfallId.value = null
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+// COMPENSATE SHORTFALL
+// ──────────────────────────────────────────────────────────────
+const compensatingId = ref<number | null>(null)
+
+function canCompensate(r: any) {
+  if (r.status === 'PENDING_COMPENSATION') {
+    if (isManager.value && r.sourceBranchId === user.value?.branchId) return true;
+  }
+  return false;
+}
+
+async function compensateShortfall(receipt: any) {
+  if (compensatingId.value === receipt.id) return
+  if (!confirm(`Xác nhận tạo Phiếu điều chuyển bù số lượng hao hụt cho phiếu ${receipt.code}?`)) return
+  compensatingId.value = receipt.id
+  try {
+    const res = await api.post(`/api/receipts/${receipt.id}/compensate-shortfall`, {})
+    if (res.ok) {
+      toast.success(`Đã tạo thành công Phiếu điều chuyển bù.`)
+      showDetail.value = false
+      await loadData()
+    } else {
+      let errMessage = 'Lỗi khi tạo phiếu bù hao hụt.'
+      try {
+        const err = await res.json()
+        errMessage = err.message || errMessage
+      } catch {
+        const text = await res.text()
+        errMessage = text ? text.substring(0, 100) + '...' : errMessage
+      }
+      toast.error(errMessage)
+    }
+  } catch (e: any) {
+    toast.error('Lỗi kết nối: ' + e.message)
+  } finally {
+    compensatingId.value = null
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
 // HELPERS
 // ──────────────────────────────────────────────────────────────
 function formatDate(s: string) {
@@ -1194,6 +1285,9 @@ function statusClass(r: any) {
     DRAFT: 'bg-yellow-100 text-yellow-700 border border-yellow-300',
     PENDING_ADMIN: 'bg-blue-100 text-blue-700 border border-blue-300',
     PENDING_STOCKTAKE: 'bg-purple-100 text-purple-700 border border-purple-300',
+    PENDING_SHORTFALL_MANAGER: 'bg-orange-100 text-orange-700 border border-orange-300',
+    PENDING_SHORTFALL_ADMIN: 'bg-rose-100 text-rose-700 border border-rose-300',
+    PENDING_COMPENSATION: 'bg-indigo-100 text-indigo-700 border border-indigo-300',
     COMPLETED: 'bg-green-100 text-green-700 border border-green-300',
     CANCELLED: 'bg-red-100 text-red-600 border border-red-300'
   }
@@ -1220,6 +1314,9 @@ function statusLabel(r: any) {
     }
     return '📦 Chờ kiểm kê';
   }
+  if (s === 'PENDING_SHORTFALL_MANAGER') return '⚠️ Thiếu hụt';
+  if (s === 'PENDING_SHORTFALL_ADMIN') return '⚠️ Thiếu hụt';
+  if (s === 'PENDING_COMPENSATION') return '⏳ Chờ điều chuyển bù';
   if (s === 'COMPLETED') {
     // Hóa đơn (EXPORT) chưa thanh toán → hiện "Chưa thanh toán" thay vì "Đã duyệt"
     if (r?.type === 'EXPORT' && (r.paymentStatus === 'UNPAID' || r.paymentStatus === 'Chưa thanh toán')) {
@@ -1635,8 +1732,8 @@ function getCustomerName(receipt: any) {
                       <th class="px-4 py-2.5 text-left font-bold">Sản phẩm</th>
                       <th class="px-4 py-2.5 text-center font-bold">NSX</th>
                       <th class="px-4 py-2.5 text-center font-bold">HSD</th>
-                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.status === 'COMPLETED' && selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)">SL Gửi</th>
-                      <th class="px-4 py-2.5 text-right font-bold text-teal-600" v-if="selectedReceipt.status === 'COMPLETED' && selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)">SL Nhận</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)">SL Gửi</th>
+                      <th class="px-4 py-2.5 text-right font-bold text-teal-600" v-if="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)">SL Nhận</th>
                       <th class="px-4 py-2.5 text-right font-bold" v-else>SL</th>
                       <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Đơn giá</th>
                       <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Thành tiền</th>
@@ -1649,8 +1746,8 @@ function getCustomerName(receipt: any) {
                       </td>
                       <td class="px-4 py-3 text-center text-[#8094ae]">{{ formatDate(d.manufacturingDate) }}</td>
                       <td class="px-4 py-3 text-center text-[#8094ae]">{{ formatDate(d.expirationDate) }}</td>
-                      <td class="px-4 py-3 text-right font-bold" v-if="d.receivedQuantity !== null && selectedReceipt.status === 'COMPLETED'">{{ d.quantity }}</td>
-                      <td class="px-4 py-3 text-right font-bold text-teal-600" v-if="d.receivedQuantity !== null && selectedReceipt.status === 'COMPLETED'">
+                      <td class="px-4 py-3 text-right font-bold" v-if="d.receivedQuantity !== null">{{ d.quantity }}</td>
+                      <td class="px-4 py-3 text-right font-bold text-teal-600" v-if="d.receivedQuantity !== null">
                         {{ d.receivedQuantity !== null ? d.receivedQuantity : d.quantity }}
                         <span v-if="d.receivedQuantity !== null && d.receivedQuantity < d.quantity" class="text-xs text-amber-500 block">
                           (-{{ d.quantity - d.receivedQuantity }})
@@ -1663,7 +1760,7 @@ function getCustomerName(receipt: any) {
                   </tbody>
                   <tfoot v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">
                     <tr class="bg-[#f8f9fa]">
-                      <td :colspan="(selectedReceipt.status === 'COMPLETED' && selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)) ? 6 : 5" class="px-4 py-2.5 text-right font-bold text-[#8094ae] text-xs uppercase">Tổng cộng</td>
+                      <td :colspan="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null) ? 6 : 5" class="px-4 py-2.5 text-right font-bold text-[#8094ae] text-xs uppercase">Tổng cộng</td>
                       <td class="px-4 py-2.5 text-right font-extrabold text-[#4361ee]">
                         {{ formatVND((selectedReceipt.details || []).reduce((s: number, d: any) => s + d.quantity * d.price, 0)) }}
                       </td>
@@ -1677,7 +1774,7 @@ function getCustomerName(receipt: any) {
                 <div class="text-xs font-bold text-red-600 uppercase mb-2 flex items-center gap-1.5"><i class="fas fa-exclamation-circle"></i> Lý do hao hụt</div>
                 <div class="space-y-1.5">
                   <div v-for="d in selectedReceipt.details.filter((x: any) => x.receivedQuantity !== null && x.receivedQuantity < x.quantity)" :key="'reason-'+d.id" class="text-sm">
-                    <span class="font-bold text-red-700">- {{ d.productName }}:</span>
+                    <span class="font-bold text-red-700">- {{ d.productName }} (Thiếu {{ d.quantity - d.receivedQuantity }}):</span>
                     <span class="text-red-600 ml-1 whitespace-pre-wrap break-words">{{ d.shortfallReason }}</span>
                   </div>
                 </div>
@@ -1730,6 +1827,31 @@ function getCustomerName(receipt: any) {
                 <i class="fas fa-boxes"></i> Thực hiện Kiểm kê & Chấp nhận
               </button>
               <p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle"></i> Vui lòng đếm lại thực tế hàng hóa tại kho trước khi xác nhận cộng kho.</p>
+            </div>
+
+            <!-- Approve Shortfall (Hao hụt) -->
+            <div v-if="canApproveShortfall(selectedReceipt)" class="mt-8 pt-5 border-t flex flex-wrap gap-4">
+              <button @click="approveShortfall(selectedReceipt, true)" :disabled="approvingShortfallId === selectedReceipt.id"
+                class="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-check-circle" v-if="approvingShortfallId !== selectedReceipt.id"></i>
+                <i class="fas fa-spinner fa-spin" v-else></i> 
+                Duyệt Hao Hụt
+              </button>
+              <button v-if="selectedReceipt.status === 'PENDING_SHORTFALL_MANAGER'" @click="approveShortfall(selectedReceipt, false)" :disabled="approvingShortfallId === selectedReceipt.id"
+                class="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-ban"></i> Từ chối Hao Hụt
+              </button>
+            </div>
+
+            <!-- Compensate Shortfall (Điều chuyển bù) -->
+            <div v-if="canCompensate(selectedReceipt)" class="mt-8 pt-5 border-t">
+              <button @click="compensateShortfall(selectedReceipt)" :disabled="compensatingId === selectedReceipt.id"
+                class="px-5 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-truck-loading" v-if="compensatingId !== selectedReceipt.id"></i>
+                <i class="fas fa-spinner fa-spin" v-else></i>
+                Tạo Phiếu Điều Chuyển Bù
+              </button>
+              <p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle"></i> Sẽ tạo một phiếu Điều chuyển mới có số lượng bằng đúng số lượng hao hụt. Phiếu cũ sẽ được đóng.</p>
             </div>
           </div>
         </div>
