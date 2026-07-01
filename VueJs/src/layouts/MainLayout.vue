@@ -29,11 +29,68 @@ const hasCrudPermission = computed(() => {
   return user.value.role === 'ADMIN'
 })
 
+// ──────────────────────────────────────────────────────────────
+// NOTIFICATION BADGES — Đếm phiếu cần xử lý
+// ──────────────────────────────────────────────────────────────
+const badgeImport = ref(0)
+const badgeInvoice = ref(0)
+const badgeTransfer = ref(0)
+const badgeDisposal = ref(0)
+
+async function loadBadgeCounts() {
+  try {
+    const res = await api.get('/api/receipts')
+    if (!res.ok) return
+    const receipts: any[] = await res.json()
+    // @ts-ignore
+    const myBranchId = user.value?.branchId
+
+    // Nhập kho: phiếu IMPORT chờ duyệt (DRAFT/PENDING_ADMIN) liên quan đến chi nhánh mình
+    badgeImport.value = receipts.filter(r =>
+      r.type === 'IMPORT' &&
+      (r.status === 'DRAFT' || r.status === 'PENDING_ADMIN') &&
+      (r.destBranchId === myBranchId || r.sourceBranchId === myBranchId)
+    ).length
+
+    // Hóa đơn: phiếu EXPORT chờ duyệt + chưa thanh toán
+    badgeInvoice.value = receipts.filter(r =>
+      r.type === 'EXPORT' &&
+      r.sourceBranchId === myBranchId &&
+      ((r.status === 'DRAFT' || r.status === 'PENDING_ADMIN') ||
+       (r.status === 'COMPLETED' && (r.paymentStatus === 'UNPAID' || r.paymentStatus === 'Chưa thanh toán')))
+    ).length
+
+    // Điều chuyển: phiếu TRANSFER chờ xử lý
+    badgeTransfer.value = receipts.filter(r =>
+      r.type === 'TRANSFER' &&
+      (r.status === 'DRAFT' || r.status === 'PENDING_ADMIN' || r.status === 'PENDING_STOCKTAKE') &&
+      (r.destBranchId === myBranchId || r.sourceBranchId === myBranchId)
+    ).length
+
+    // Tiêu hủy: phiếu ADJUST_OUT chờ duyệt
+    badgeDisposal.value = receipts.filter(r =>
+      r.type === 'ADJUST_OUT' &&
+      r.status === 'PENDING_ADMIN' &&
+      r.sourceBranchId === myBranchId
+    ).length
+  } catch (e) {
+    // silent fail
+  }
+}
+
+let badgeTimer: ReturnType<typeof setInterval>
+
 const mainNavItems = computed(() => {
-  const items = [
+  const items: { label: string; to: string; icon: string; badge?: number }[] = [
     { label: 'Tổng quan', to: '/dashboard', icon: 'fas fa-chart-pie' },
-    { label: 'Phiếu Nhập', to: '/receipts', icon: 'fas fa-file-invoice' }
+    { label: 'Nhập kho', to: '/imports', icon: 'fas fa-download', badge: badgeImport.value },
+    { label: 'Hóa đơn', to: '/invoices', icon: 'fas fa-file-invoice-dollar', badge: badgeInvoice.value },
+    { label: 'Điều chuyển', to: '/transfers', icon: 'fas fa-exchange-alt', badge: badgeTransfer.value }
   ]
+  // @ts-ignore
+  if (!user.value || user.value.role !== 'ADMIN') {
+    items.push({ label: 'Tiêu hủy', to: '/disposals', icon: 'fas fa-trash-alt', badge: badgeDisposal.value })
+  }
   if (hasCrudPermission.value) {
     items.push({ label: 'Sản phẩm', to: '/products', icon: 'fas fa-box-open' })
   }
@@ -74,8 +131,6 @@ const adminNavItems = computed(() => {
   return items
 })
 
-
-
 async function logout() {
   try {
     await api.post('/api/auth/logout', {})
@@ -98,10 +153,14 @@ const updateTime = () => {
 onMounted(() => {
   updateTime()
   timer = setInterval(updateTime, 1000)
+  // Load badge counts
+  loadBadgeCounts()
+  badgeTimer = setInterval(loadBadgeCounts, 3000) // Refresh mỗi 3 giây
 })
 
 onUnmounted(() => {
   if (timer) clearInterval(timer)
+  if (badgeTimer) clearInterval(badgeTimer)
 })
 </script>
 
@@ -129,11 +188,18 @@ onUnmounted(() => {
             v-for="item in mainNavItems"
             :key="item.to"
             :to="item.to"
-            class="flex items-center font-semibold px-6 py-[0.9rem] mx-4 my-1 rounded-xl transition-all duration-300 group"
+            class="relative flex items-center font-semibold px-6 py-[0.9rem] mx-4 my-1 rounded-xl transition-all duration-300 group"
             :class="route.path.startsWith(item.to) && item.to !== '/' ? 'bg-gradient-to-br from-[#4361ee] to-[#4cc9f0] text-white shadow-[0_6px_15px_rgba(67,97,238,0.35)]' : 'text-[#364a63] hover:translate-x-1 hover:shadow-[-4px_4px_10px_rgba(67,97,238,0.05)] hover:text-[#4361ee]'"
           >
             <i :class="item.icon" class="w-6 text-[1.2rem] mr-3 text-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6"></i>
             <span>{{ item.label }}</span>
+            <!-- Notification Badge (Messenger/TikTok style) -->
+            <span
+              v-if="item.badge && item.badge > 0"
+              class="absolute top-1.5 right-2 min-w-[20px] h-[20px] flex items-center justify-center px-1 text-[10px] font-extrabold text-white bg-[#ef476f] rounded-full shadow-[0_2px_8px_rgba(239,71,111,0.5)] animate-badge-pop"
+            >
+              {{ item.badge > 99 ? '99+' : item.badge }}
+            </span>
           </RouterLink>
 
           <div class="text-[0.75rem] font-extrabold uppercase tracking-widest text-[#8094ae] px-7 mt-6 mb-2">Quản lý</div>
@@ -228,5 +294,13 @@ onUnmounted(() => {
 .animate-gradient-x {
   background-size: 200% auto;
   animation: gradient-x 3s linear infinite;
+}
+@keyframes badge-pop {
+  0% { transform: scale(0); }
+  50% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+.animate-badge-pop {
+  animation: badge-pop 0.4s ease-out;
 }
 </style>

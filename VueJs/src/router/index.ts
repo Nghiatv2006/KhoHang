@@ -75,8 +75,31 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: '/receipts',
-        name: 'Receipts',
+        redirect: '/imports',
+      },
+      {
+        path: '/imports',
+        name: 'Imports',
         component: () => import('../views/ReceiptsView.vue'),
+        props: { receiptType: 'IMPORT' },
+      },
+      {
+        path: '/invoices',
+        name: 'Invoices',
+        component: () => import('../views/ReceiptsView.vue'),
+        props: { receiptType: 'EXPORT' },
+      },
+      {
+        path: '/transfers',
+        name: 'Transfers',
+        component: () => import('../views/ReceiptsView.vue'),
+        props: { receiptType: 'TRANSFER' },
+      },
+      {
+        path: '/disposals',
+        name: 'disposals',
+        component: () => import('../views/ReceiptsView.vue'),
+        props: { receiptType: 'ADJUST_OUT' },
       },
       {
         path: '/audit-logs',
