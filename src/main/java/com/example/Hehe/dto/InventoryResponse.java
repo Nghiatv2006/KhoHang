@@ -28,7 +28,9 @@ public class InventoryResponse {
         this.expirationDate = inventory.getExpirationDate();
         this.lastUpdated = inventory.getLastUpdated();
         this.batchCode = inventory.getBatchCode();
-        this.hasExpiry = inventory.getHasExpiry();
+        this.hasExpiry = (inventory.getProduct() != null && inventory.getProduct().getHasExpiry() != null) 
+                            ? inventory.getProduct().getHasExpiry() 
+                            : inventory.getHasExpiry();
         this.expiryWarningDays = inventory.getExpiryWarningDays();
 
         if (inventory.getBranch() != null) {

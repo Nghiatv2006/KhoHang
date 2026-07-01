@@ -1,28 +1,147 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<mxfile host="Electron" modified="2024-01-01T00:00:00.000Z" agent="JS Script" type="device">
-  <diagram id="Xác thực &amp; Phiên làm việc" name="Xác thực &amp; Phiên làm việc">
-    <mxGraphModel dx="1000" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1">
+<?xml version="1.0" encoding="utf-8"?>
+<mxfile host="Electron" type="device">
+  <diagram id="01_xac_thuc_staff" name="STAFF – Xác thực &amp; Phiên làm việc">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1"
+        connect="1" arrows="1" fold="1" page="1" pageScale="1"
+        pageWidth="1169" pageHeight="827" math="0" shadow="0">
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
-        <mxCell id="act" value="STAFF&amp;#xa;(Nhân viên kho)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;" vertex="1" parent="1">
-          <mxGeometry x="50" y="200" width="30" height="60" as="geometry"/>
+        
+        <!-- System Boundary -->
+        <mxCell id="sys" value="Xác thực &amp; Phiên làm việc" vertex="1" parent="1"
+            style="swimlane;startSize=35;whiteSpace=wrap;html=1;fontStyle=1;fontSize=13;
+                   fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;fontColor=#333333;align=center;">
+          <mxGeometry x="230" y="30" width="650" height="520" as="geometry"/>
         </mxCell>
-        <mxCell id="sys" value="WareHub System" style="shape=rect;html=1;verticalAlign=top;fontStyle=1;fillColor=none;" vertex="1" parent="1">
-          <mxGeometry x="150" y="50" width="400" height="400" as="geometry"/>
+        
+        <!-- Actor -->
+        <mxCell id="act" value="Nhân Viên&#xa;(Staff)" vertex="1" parent="1"
+            style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;
+                   outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;
+                   fontColor=#1a1a1a;fontStyle=1;fontSize=11;">
+          <mxGeometry x="60" y="225" width="50" height="90" as="geometry"/>
         </mxCell>
-        <mxCell id="uc1" value="Đăng nhập" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="sys">
-          <mxGeometry x="50" y="50" width="140" height="60" as="geometry"/>
+
+        <!-- ==================== MAIN USE CASES ==================== -->
+
+        <!-- UC Đăng nhập -->
+        <mxCell id="uc_login" value="Đăng nhập" vertex="1" parent="sys" 
+            style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;">
+          <mxGeometry x="30" y="60" width="160" height="60" as="geometry"/>
         </mxCell>
-        <mxCell id="uc2" value="Đăng xuất" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="sys">
-          <mxGeometry x="50" y="130" width="140" height="60" as="geometry"/>
+        
+        <!-- UC Quên mật khẩu -->
+        <mxCell id="uc_forgot" value="Quên mật khẩu" vertex="1" parent="sys" 
+            style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;">
+          <mxGeometry x="30" y="230" width="160" height="60" as="geometry"/>
         </mxCell>
-        <mxCell id="edge_0" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="act" target="uc1">
+        
+        <!-- UC Đăng xuất -->
+        <mxCell id="uc_logout" value="Đăng xuất" vertex="1" parent="sys" 
+            style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;">
+          <mxGeometry x="30" y="410" width="160" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== INCLUDED USE CASES ==================== -->
+        
+        <!-- Đăng nhập includes -->
+        <mxCell id="uc_validate" value="Xác thực&#xa;tài khoản &amp; mật khẩu" vertex="1" parent="sys" 
+            style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;fontSize=11;align=center;">
+          <mxGeometry x="330" y="40" width="180" height="60" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="uc_jwt" value="Cấp Token JWT&#xa;(HttpOnly Cookie)" vertex="1" parent="sys" 
+            style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;fontSize=11;align=center;">
+          <mxGeometry x="330" y="120" width="180" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Quên mật khẩu includes -->
+        <mxCell id="uc_find_account" value="Tìm tài khoản&#xa;qua Email" vertex="1" parent="sys" 
+            style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;fontSize=11;align=center;">
+          <mxGeometry x="330" y="210" width="180" height="60" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="uc_send_otp" value="Gửi mã OTP&#xa;qua Email" vertex="1" parent="sys" 
+            style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;fontSize=11;align=center;">
+          <mxGeometry x="330" y="290" width="180" height="60" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="uc_verify_otp" value="Xác minh OTP&#xa;&amp; Đặt lại mật khẩu" vertex="1" parent="sys" 
+            style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;fontSize=11;align=center;">
+          <mxGeometry x="330" y="370" width="180" height="60" as="geometry"/>
+        </mxCell>
+        
+        <!-- Đăng xuất includes -->
+        <mxCell id="uc_clear_cookie" value="Xóa Cookie&#xa;&amp; Kết thúc phiên" vertex="1" parent="sys" 
+            style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;fontSize=11;align=center;">
+          <mxGeometry x="330" y="450" width="180" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== EXTEND USE CASE ==================== -->
+
+        <mxCell id="uc_brute" value="Chống đăng nhập&#xa;Brute-force&#xa;(Khóa tạm thời)" vertex="1" parent="sys" 
+            style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=1.5;fontSize=10;align=center;fontStyle=2;">
+          <mxGeometry x="440" y="40" width="180" height="65" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== CONNECTIONS ==================== -->
+        
+        <!-- Actor → Main Use Cases -->
+        <mxCell id="edge_login" value="" edge="1" parent="1" source="act" target="uc_login"
+            style="endArrow=classic;html=1;strokeColor=#3b82f6;strokeWidth=2;rounded=0;">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="edge_1" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="act" target="uc2">
+        
+        <mxCell id="edge_forgot" value="" edge="1" parent="1" source="act" target="uc_forgot"
+            style="endArrow=classic;html=1;strokeColor=#3b82f6;strokeWidth=2;rounded=0;">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
+        
+        <mxCell id="edge_logout" value="" edge="1" parent="1" source="act" target="uc_logout"
+            style="endArrow=classic;html=1;strokeColor=#3b82f6;strokeWidth=2;rounded=0;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Include: Đăng nhập -->
+        <mxCell id="inc_validate" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" edge="1" parent="1" source="uc_login" target="uc_validate"
+            style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;strokeColor=#666666;strokeWidth=1.5;labelBackgroundColor=#ffffff;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="inc_jwt" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" edge="1" parent="1" source="uc_login" target="uc_jwt"
+            style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;strokeColor=#666666;strokeWidth=1.5;labelBackgroundColor=#ffffff;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Include: Quên mật khẩu -->
+        <mxCell id="inc_find" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" edge="1" parent="1" source="uc_forgot" target="uc_find_account"
+            style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;strokeColor=#666666;strokeWidth=1.5;labelBackgroundColor=#ffffff;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="inc_otp" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" edge="1" parent="1" source="uc_forgot" target="uc_send_otp"
+            style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;strokeColor=#666666;strokeWidth=1.5;labelBackgroundColor=#ffffff;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="inc_verify" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" edge="1" parent="1" source="uc_forgot" target="uc_verify_otp"
+            style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;strokeColor=#666666;strokeWidth=1.5;labelBackgroundColor=#ffffff;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Include: Đăng xuất -->
+        <mxCell id="inc_clear" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" edge="1" parent="1" source="uc_logout" target="uc_clear_cookie"
+            style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;strokeColor=#666666;strokeWidth=1.5;labelBackgroundColor=#ffffff;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Extend: Brute-force -->
+        <mxCell id="ext_brute" value="&amp;lt;&amp;lt;extend&amp;gt;&amp;gt;" edge="1" parent="1" source="uc_brute" target="uc_validate"
+            style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;strokeColor=#b85450;strokeWidth=1.5;labelBackgroundColor=#ffffff;fontColor=#b85450;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
       </root>
     </mxGraphModel>
   </diagram>

@@ -13,6 +13,8 @@ const user = ref<{
   fullName: string
   branchName: string
   roles: string[]
+  role?: string
+  branchId?: number
 } | null>(null)
 
 onMounted(() => {
@@ -34,11 +36,90 @@ const hasCrudPermission = computed(() => {
 let stocktakeTimer: ReturnType<typeof setInterval>
 // ─────────────────────────────────────────────────────────────
 
+// ──────────────────────────────────────────────────────────────
+// NOTIFICATION BADGES — Đếm phiếu cần xử lý
+// ──────────────────────────────────────────────────────────────
+const badgeImport = ref(0)
+const badgeInvoice = ref(0)
+const badgeTransfer = ref(0)
+const badgeDisposal = ref(0)
+
+async function loadBadgeCounts() {
+  try {
+    const res = await api.get('/api/receipts')
+    if (!res.ok) return
+    const receipts: any[] = await res.json()
+    // @ts-ignore
+    const myBranchId = user.value?.branchId
+
+    const isManager = user.value?.role === 'MANAGER';
+    const isAdmin = user.value?.role === 'ADMIN';
+    const isStaff = user.value?.role === 'STAFF';
+
+    // Nhập kho
+    badgeImport.value = receipts.filter(r => {
+      if (r.type !== 'IMPORT') return false;
+      const isDest = r.destBranchId === myBranchId;
+      if (r.status === 'DRAFT') return (isManager && isDest) || isAdmin;
+      if (r.status === 'PENDING_ADMIN') return isAdmin;
+      if (r.status === 'PENDING_STOCKTAKE') return isStaff && isDest;
+      if (r.status === 'PENDING_SHORTFALL_MANAGER') return isManager && isDest;
+      if (r.status === 'PENDING_SHORTFALL_ADMIN') return isAdmin;
+      
+      const isSource = r.sourceBranchId === myBranchId;
+      if (r.status === 'PENDING_COMPENSATION') return (isManager && isSource) || isAdmin;
+      return false;
+    }).length
+
+    // Hóa đơn
+    badgeInvoice.value = receipts.filter(r => {
+      if (r.type !== 'EXPORT') return false;
+      const isSource = r.sourceBranchId === myBranchId;
+      if (r.status === 'DRAFT') return (isManager && isSource) || isAdmin;
+      if (r.status === 'PENDING_ADMIN') return isAdmin;
+      if (r.status === 'COMPLETED' && (r.paymentStatus === 'UNPAID' || r.paymentStatus === 'Chưa thanh toán')) {
+        return isSource;
+      }
+      return false;
+    }).length
+
+    // Điều chuyển
+    badgeTransfer.value = receipts.filter(r => {
+      if (r.type !== 'TRANSFER') return false;
+      const isSource = r.sourceBranchId === myBranchId;
+      const isDest = r.destBranchId === myBranchId;
+      if (r.status === 'DRAFT') return (isManager && isSource) || isAdmin;
+      if (r.status === 'PENDING_ADMIN') return (isManager && isDest) || isAdmin;
+      if (r.status === 'PENDING_STOCKTAKE') return isStaff && isDest;
+      return false;
+    }).length
+
+    // Tiêu hủy
+    badgeDisposal.value = receipts.filter(r => {
+      if (r.type !== 'ADJUST_OUT') return false;
+      const isSource = r.sourceBranchId === myBranchId;
+      if (r.status === 'DRAFT') return (isManager && isSource) || isAdmin;
+      if (r.status === 'PENDING_ADMIN') return (isManager && isSource) || isAdmin;
+      return false;
+    }).length
+  } catch (e) {
+    // silent fail
+  }
+}
+
+let badgeTimer: ReturnType<typeof setInterval>
+
 const mainNavItems = computed(() => {
-  const items = [
+  const items: { label: string; to: string; icon: string; badge?: number }[] = [
     { label: 'Tổng quan', to: '/dashboard', icon: 'fas fa-chart-pie' },
-    { label: 'Phiếu Nhập', to: '/receipts', icon: 'fas fa-file-invoice' }
+    { label: 'Nhập kho', to: '/imports', icon: 'fas fa-download', badge: badgeImport.value },
+    { label: 'Hóa đơn', to: '/invoices', icon: 'fas fa-file-invoice-dollar', badge: badgeInvoice.value },
+    { label: 'Điều chuyển', to: '/transfers', icon: 'fas fa-exchange-alt', badge: badgeTransfer.value }
   ]
+  // @ts-ignore
+  if (!user.value || user.value.role !== 'ADMIN') {
+    items.push({ label: 'Tiêu hủy', to: '/disposals', icon: 'fas fa-trash-alt', badge: badgeDisposal.value })
+  }
   if (hasCrudPermission.value) {
     items.push({ label: 'Sản phẩm', to: '/products', icon: 'fas fa-box-open' })
   }
@@ -112,11 +193,15 @@ onMounted(() => {
     refreshStocktakeBadge()
     stocktakeTimer = setInterval(refreshStocktakeBadge, 10_000)
   }
+  // Load badge counts
+  loadBadgeCounts()
+  badgeTimer = setInterval(loadBadgeCounts, 3000) // Refresh mỗi 3 giây
 })
 
 onUnmounted(() => {
   if (timer) clearInterval(timer)
   if (stocktakeTimer) clearInterval(stocktakeTimer)
+  if (badgeTimer) clearInterval(badgeTimer)
 })
 </script>
 
@@ -144,11 +229,18 @@ onUnmounted(() => {
             v-for="item in mainNavItems"
             :key="item.to"
             :to="item.to"
-            class="flex items-center font-semibold px-6 py-[0.9rem] mx-4 my-1 rounded-xl transition-all duration-300 group"
+            class="relative flex items-center font-semibold px-6 py-[0.9rem] mx-4 my-1 rounded-xl transition-all duration-300 group"
             :class="route.path.startsWith(item.to) && item.to !== '/' ? 'nav-active' : 'nav-idle'"
           >
             <i :class="item.icon" class="w-6 text-[1.2rem] mr-3 text-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6"></i>
             <span>{{ item.label }}</span>
+            <!-- Notification Badge (Messenger/TikTok style) -->
+            <span
+              v-if="item.badge && item.badge > 0"
+              class="absolute top-1.5 right-2 min-w-[20px] h-[20px] flex items-center justify-center px-1 text-[10px] font-extrabold text-white bg-[#ef476f] rounded-full shadow-[0_2px_8px_rgba(239,71,111,0.5)] animate-badge-pop"
+            >
+              {{ item.badge > 99 ? '99+' : item.badge }}
+            </span>
           </RouterLink>
 
           <!-- Kiểm kê kho – render riêng để gắn badge -->
@@ -256,6 +348,7 @@ onUnmounted(() => {
   background-size: 200% auto;
   animation: gradient-x 3s linear infinite;
 }
+<<<<<<< HEAD
 
 /* ── Nav item hover & active ─────────────────────────────── */
 .nav-idle {
@@ -309,5 +402,14 @@ onUnmounted(() => {
   font-weight: 800;
   box-shadow: 0 2px 5px rgba(245,158,11,0.4);
   z-index: 10;
+}
+
+@keyframes badge-pop {
+  0% { transform: scale(0); }
+  50% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+.animate-badge-pop {
+  animation: badge-pop 0.4s ease-out;
 }
 </style>
