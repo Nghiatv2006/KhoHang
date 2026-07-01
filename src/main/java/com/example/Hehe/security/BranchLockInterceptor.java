@@ -26,6 +26,7 @@ public class BranchLockInterceptor implements HandlerInterceptor {
         // 1. Ngoại trừ các API phục hồi dữ liệu hoặc đăng nhập/đăng xuất/lấy thông tin cá nhân
         if (uri.startsWith("/api/backup/import") ||
             uri.startsWith("/api/backup/restore") ||
+            uri.startsWith("/api/backup/wipe-branch-data") ||
             uri.startsWith("/api/auth") ||
             uri.startsWith("/api/users/me")) {
             return true;

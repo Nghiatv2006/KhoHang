@@ -328,6 +328,29 @@ async function executeSysDelete() {
   finally { sysTargetDeleteId.value = null }
 }
 
+// Confirmation Modals State — Wipe
+const showWipeConfirm = ref(false)
+const wiping = ref(false)
+
+async function executeBranchWipe() {
+  showWipeConfirm.value = false
+  wiping.value = true
+  try {
+    const res = await api.post('/api/backup/wipe-branch-data', {})
+    if (res.ok) {
+      toast.success('Đã xóa toàn bộ dữ liệu giao dịch chi nhánh!')
+      loadHistory()
+    } else {
+      const err = await res.json().catch(() => ({}))
+      toast.error(err.message || 'Xóa dữ liệu thất bại.')
+    }
+  } catch (e) {
+    toast.error('Lỗi kết nối máy chủ.')
+  } finally {
+    wiping.value = false
+  }
+}
+
 onMounted(() => {
   loadHistory()
   if (isAdmin.value) loadSysHistory()
@@ -370,7 +393,7 @@ onMounted(() => {
           <h1 class="page-header__title">Sao lưu &amp; Phục hồi</h1>
           <p class="page-header__sub">
             {{ isAdmin ? 'Quản lý cấu hình toàn hệ thống' : 'Quản lý dữ liệu chi nhánh' }}
-            với mã hoá <span class="badge-enc">AES-256-GCM</span>
+            với <span class="badge-enc">GZIP</span> + <span class="badge-enc">AES-256-GCM</span>
           </p>
         </div>
       </div>
@@ -402,6 +425,7 @@ onMounted(() => {
       <div class="sec-badge"><i class="fas fa-fingerprint"></i><span>HMAC-SHA256</span></div>
       <div class="sec-badge"><i class="fas fa-file-archive"></i><span>Định dạng .wbk</span></div>
       <div class="sec-badge"><i class="fas fa-calendar-alt"></i><span>Lưu trữ 14 ngày</span></div>
+      <div class="sec-badge sec-badge--gzip"><i class="fas fa-compress-arrows-alt"></i><span>GZIP Nén</span></div>
     </div>
 
     <!-- ═══ MAIN GRID (Manager only) ═══════════════════════════════════════════ -->
@@ -493,6 +517,34 @@ onMounted(() => {
             <span class="btn-action__icon"><i class="fas fa-undo-alt"></i></span>
             <span>Phục hồi từ tệp tin</span>
             <span v-if="selectedFile" class="btn-action__arrow">→</span>
+          </button>
+        </div>
+
+        <!-- ── Wipe Branch Data Card (Demo) ── -->
+        <div class="card card--wipe">
+          <div class="card__glow card__glow--red"></div>
+          <div class="card__header">
+            <div class="card__icon card__icon--red">
+              <i class="fas fa-skull-crossbones"></i>
+            </div>
+            <div>
+              <h2 class="card__title">Xóa dữ liệu (Demo)</h2>
+              <p class="card__subtitle">Test khôi phục từ bản sao lưu</p>
+            </div>
+          </div>
+          <p class="card__desc">
+            Xóa <strong>toàn bộ dữ liệu giao dịch</strong> của chi nhánh gồm:
+            tồn kho, phiếu kho, kiểm kê, khách hàng và nhân viên khác.
+            <strong>Chỉ giữ lại tài khoản bạn đang đăng nhập.</strong>
+            Dùng để test quá trình khôi phục từ bản sao lưu.
+          </p>
+          <button @click="showWipeConfirm = true" :disabled="wiping"
+            class="btn-action btn-action--red">
+            <span class="btn-action__icon">
+              <i class="fas fa-trash-alt" :class="{ 'fa-spin': wiping }"></i>
+            </span>
+            <span>{{ wiping ? 'Đang xóa dữ liệu...' : 'Xóa toàn bộ dữ liệu chi nhánh' }}</span>
+            <span v-if="!wiping" class="btn-action__arrow">→</span>
           </button>
         </div>
 
@@ -943,6 +995,56 @@ onMounted(() => {
             <button @click="showDeleteConfirm = false" class="btn btn--cancel">Huỷ</button>
             <button @click="executeDelete" class="btn btn--confirm-danger">
               <i class="fas fa-trash-alt"></i> Xác nhận xoá
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ═══ CONFIRM WIPE MODAL ═════════════════════════════════════════════════ -->
+    <Transition name="modal">
+      <div v-if="showWipeConfirm" class="modal-backdrop" @click.self="showWipeConfirm = false">
+        <div class="modal modal--danger">
+          <div class="modal__header modal__header--danger">
+            <div class="modal__header-icon modal__header-icon--danger">
+              <i class="fas fa-skull-crossbones"></i>
+            </div>
+            <div>
+              <h3 class="modal__title">Xóa toàn bộ dữ liệu chi nhánh</h3>
+              <p class="modal__subtitle modal__subtitle--danger">Thao tác chỉ dành cho Demo/Test</p>
+            </div>
+          </div>
+
+          <div class="modal__body">
+            <div class="modal__info-grid">
+              <div class="modal__info-row">
+                <span class="modal__info-label">Hành động</span>
+                <span class="modal__info-value">Xóa sạch dữ liệu giao dịch chi nhánh</span>
+              </div>
+              <div class="modal__info-row">
+                <span class="modal__info-label">Dữ liệu bị xóa</span>
+                <span class="modal__info-value">Tồn kho · Phiếu kho · Kiểm kê · Khách hàng · Nhân viên</span>
+              </div>
+              <div class="modal__info-row">
+                <span class="modal__info-label">Giữ lại</span>
+                <span class="modal__info-value">Tài khoản đang đăng nhập · Thông tin chi nhánh · Bản sao lưu</span>
+              </div>
+            </div>
+
+            <div class="modal__alert modal__alert--danger">
+              <i class="fas fa-radiation-alt"></i>
+              <span>
+                Toàn bộ dữ liệu sẽ bị <strong>XÓA SẠCH</strong>.
+                Chi nhánh bị <strong>KHÓA GIAO DỊCH</strong> trong quá trình xóa.
+                Bạn có thể <strong>khôi phục lại</strong> từ bản sao lưu đã tạo trước đó.
+              </span>
+            </div>
+          </div>
+
+          <div class="modal__footer">
+            <button @click="showWipeConfirm = false" class="btn btn--cancel">Huỷ bỏ</button>
+            <button @click="executeBranchWipe" class="btn btn--confirm-danger">
+              <i class="fas fa-skull-crossbones"></i> Xác nhận xóa sạch
             </button>
           </div>
         </div>
@@ -1514,6 +1616,7 @@ onMounted(() => {
 /* History footer */
 .history-footer {
   display: flex; justify-content: space-between; align-items: center;
+  margin-top: auto;
   padding: 0.75rem 1.5rem;
   border-top: 1px solid #f1f5f9;
   font-size: 0.72rem; font-weight: 600; color: #94a3b8;
@@ -1786,8 +1889,37 @@ onMounted(() => {
   .sys-grid { grid-template-columns: 1fr; }
 }
 
-/* Responsive sys-grid */
-@media (max-width: 900px) {
-  .sys-grid { grid-template-columns: 1fr; }
+/* ═══ WIPE CARD ═════════════════════════════════════════════════════════════ */
+.card--wipe {
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.03) 0%, rgba(185, 28, 28, 0.05) 100%);
 }
+.card--wipe:hover { border-color: rgba(239, 68, 68, 0.5); }
+.card__glow--red {
+  background: radial-gradient(ellipse at top left, rgba(239, 68, 68, 0.15) 0%, transparent 60%);
+}
+.card__icon--red {
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.35);
+}
+.btn-action--red {
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.25);
+}
+.btn-action--red:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4);
+}
+.btn-action--red:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* GZIP security badge */
+.sec-badge--gzip {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.2);
+  color: #059669;
+}
+
 </style>
