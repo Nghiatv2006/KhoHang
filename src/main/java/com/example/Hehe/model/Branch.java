@@ -25,6 +25,9 @@ public class Branch {
     @Column(name = "tax_code", length = 50)
     private String taxCode;
 
+    @Column(name = "is_locked", nullable = false)
+    private Boolean isLocked = false;
+
     // Getters and Setters
     public String getTaxCode() {
         return taxCode;
@@ -70,5 +73,13 @@ public class Branch {
 
     public void setLowStockThreshold(Integer lowStockThreshold) {
         this.lowStockThreshold = lowStockThreshold;
+    }
+
+    public Boolean getIsLocked() {
+        return isLocked;
+    }
+
+    public void setIsLocked(Boolean isLocked) {
+        this.isLocked = isLocked;
     }
 }

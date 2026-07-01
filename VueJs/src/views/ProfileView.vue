@@ -28,8 +28,8 @@ async function changePassword() {
   if (!pwForm.currentPassword || !pwForm.newPassword || !pwForm.confirmPassword) {
     pwError.value = 'Vui lòng nhập đầy đủ tất cả các trường.'; return
   }
-  if (pwForm.newPassword.length < 6) {
-    pwError.value = 'Mật khẩu mới phải có ít nhất 6 ký tự.'; return
+  if (pwForm.newPassword.length < 8) {
+    pwError.value = 'Mật khẩu mới phải có ít nhất 8 ký tự.'; return
   }
   if (pwForm.newPassword !== pwForm.confirmPassword) {
     pwError.value = 'Mật khẩu mới và xác nhận không khớp.'; return
@@ -39,6 +39,7 @@ async function changePassword() {
     const res = await api.put('/api/users/me/change-password', {
       currentPassword: pwForm.currentPassword,
       newPassword: pwForm.newPassword,
+      confirmPassword: pwForm.confirmPassword,
     })
     const data = await res.json()
     if (res.ok) {
@@ -141,7 +142,7 @@ onMounted(refreshUser)
             <input
               v-model="pwForm.newPassword"
               :type="showPwds.new ? 'text' : 'password'"
-              placeholder="Tối thiểu 6 ký tự..."
+              placeholder="Tối thiểu 8 ký tự..."
               class="w-full h-11 pl-11 pr-11 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] transition-all"
             />
             <button type="button" class="absolute right-4 top-1/2 -translate-y-1/2 text-[#8094ae] hover:text-[#364a63] transition-colors cursor-pointer" @click="showPwds.new = !showPwds.new">

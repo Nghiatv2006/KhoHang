@@ -30,6 +30,11 @@ public class ReceiptController {
         return ResponseEntity.ok(receiptService.getReceiptById(id, currentUser));
     }
 
+    @GetMapping("/customer/{customerId}")
+    public ResponseEntity<List<ReceiptResponse>> getReceiptsByCustomer(@PathVariable Integer customerId, @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(receiptService.getReceiptsByCustomer(customerId, currentUser));
+    }
+
     @PostMapping
     public ResponseEntity<ReceiptResponse> createReceipt(@RequestBody ReceiptSaveRequest request, @AuthenticationPrincipal User currentUser) {
         return ResponseEntity.ok(receiptService.createReceipt(request, currentUser));
@@ -38,5 +43,25 @@ public class ReceiptController {
     @PostMapping("/{id}/cancel")
     public ResponseEntity<ReceiptResponse> cancelReceipt(@PathVariable Integer id, @AuthenticationPrincipal User currentUser) {
         return ResponseEntity.ok(receiptService.cancelReceipt(id, currentUser));
+    }
+
+    @PostMapping("/{id}/approve")
+    public ResponseEntity<ReceiptResponse> approveReceipt(@PathVariable Integer id, @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(receiptService.approveReceipt(id, currentUser));
+    }
+
+    @PostMapping("/{id}/mark-paid")
+    public ResponseEntity<ReceiptResponse> markPaid(@PathVariable Integer id, @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(receiptService.markPaid(id, currentUser));
+    }
+
+    @PostMapping("/{id}/confirm-transfer")
+    public ResponseEntity<ReceiptResponse> confirmTransfer(@PathVariable Integer id, @RequestBody java.util.Map<String, Object> payload, @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(receiptService.confirmTransfer(id, payload, user));
+    }
+
+    @PostMapping("/{id}/confirm-stocktake")
+    public ResponseEntity<ReceiptResponse> confirmStocktake(@PathVariable Integer id, @RequestBody java.util.Map<String, Object> payload, @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(receiptService.confirmStocktake(id, payload, user));
     }
 }

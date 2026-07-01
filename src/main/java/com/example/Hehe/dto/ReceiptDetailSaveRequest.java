@@ -5,6 +5,7 @@ import java.time.LocalDate;
 
 public class ReceiptDetailSaveRequest {
     private Integer productId;
+    private String batchCode;
     private LocalDate manufacturingDate;
     private LocalDate expirationDate;
     private Integer quantity;
@@ -12,6 +13,9 @@ public class ReceiptDetailSaveRequest {
 
     public Integer getProductId() { return productId; }
     public void setProductId(Integer productId) { this.productId = productId; }
+
+    public String getBatchCode() { return batchCode; }
+    public void setBatchCode(String batchCode) { this.batchCode = batchCode; }
 
     public LocalDate getManufacturingDate() { return manufacturingDate; }
     public void setManufacturingDate(LocalDate manufacturingDate) { this.manufacturingDate = manufacturingDate; }

@@ -86,7 +86,12 @@ public class InventoryServiceImpl implements InventoryService {
         Inventory inventory = inventoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy lô hàng tồn kho với ID: " + id));
 
-        // Phân quyền: STAFF/MANAGER chỉ được chỉnh sửa tồn kho của chi nhánh mình
+        // Phân quyền: STAFF không được trực tiếp nhập thêm tồn kho
+        if (currentUser.getRole() == UserRole.STAFF) {
+            throw new RuntimeException("Nhân viên không có quyền thực hiện thao tác này.");
+        }
+
+        // STAFF/MANAGER chỉ được chỉnh sửa tồn kho của chi nhánh mình
         if (currentUser.getRole() != UserRole.ADMIN) {
             if (currentUser.getBranch() == null || !currentUser.getBranch().getId().equals(inventory.getBranch().getId())) {
                 throw new RuntimeException("Bạn không có quyền cập nhật tồn kho của chi nhánh này.");
@@ -127,6 +132,9 @@ public class InventoryServiceImpl implements InventoryService {
         }
 
         // Kiểm tra quyền của currentUser
+        if (currentUser.getRole() == UserRole.STAFF) {
+            throw new RuntimeException("Nhân viên không có quyền thực hiện thao tác này.");
+        }
         if (currentUser.getRole() != UserRole.ADMIN) {
             if (currentUser.getBranch() == null || !currentUser.getBranch().getId().equals(request.getBranchId())) {
                 throw new RuntimeException("Bạn không có quyền thêm tồn kho vào chi nhánh này.");
@@ -227,6 +235,9 @@ public class InventoryServiceImpl implements InventoryService {
                 .orElseGet(() -> branchRepository.findById(1)
                         .orElseThrow(() -> new RuntimeException("Không tìm thấy Kho Tổng trong hệ thống.")));
 
+        if (currentUser.getRole() == UserRole.STAFF) {
+            throw new RuntimeException("Nhân viên không có quyền thực hiện thao tác này.");
+        }
         if (currentUser.getRole() != UserRole.ADMIN) {
             if (currentUser.getBranch() == null || !currentUser.getBranch().getId().equals(headBranch.getId())) {
                 throw new RuntimeException("Bạn không có quyền thêm sản phẩm mới vào Kho Tổng.");
@@ -299,7 +310,12 @@ public class InventoryServiceImpl implements InventoryService {
         Inventory inventory = inventoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy lô hàng tồn kho với ID: " + id));
 
-        // Phân quyền: STAFF/MANAGER chỉ được chỉnh sửa cấu hình của chi nhánh mình
+        // Phân quyền: STAFF không được phép cập nhật cấu hình cảnh báo hạn dùng
+        if (currentUser.getRole() == UserRole.STAFF) {
+            throw new RuntimeException("Nhân viên không có quyền thực hiện thao tác này.");
+        }
+
+        // STAFF/MANAGER chỉ được chỉnh sửa cấu hình của chi nhánh mình
         if (currentUser.getRole() != UserRole.ADMIN) {
             if (currentUser.getBranch() == null || !currentUser.getBranch().getId().equals(inventory.getBranch().getId())) {
                 throw new RuntimeException("Bạn không có quyền cập nhật cấu hình của chi nhánh này.");
@@ -332,7 +348,12 @@ public class InventoryServiceImpl implements InventoryService {
         Inventory inventory = inventoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy dòng tồn kho với ID: " + id));
 
-        // Kiểm tra quyền (chỉ ADMIN hoặc Quản lý của chi nhánh đó mới được xoá)
+        // Kiểm tra quyền: STAFF không được phép xoá tồn kho
+        if (currentUser.getRole() == UserRole.STAFF) {
+            throw new RuntimeException("Nhân viên không có quyền thực hiện thao tác này.");
+        }
+
+        // chỉ ADMIN hoặc Quản lý của chi nhánh đó mới được xoá
         if (currentUser.getRole() != com.example.Hehe.model.UserRole.ADMIN) {
             if (currentUser.getBranch() == null || !currentUser.getBranch().getId().equals(inventory.getBranch().getId())) {
                 throw new RuntimeException("Bạn không có quyền xoá dữ liệu tồn kho của chi nhánh này.");

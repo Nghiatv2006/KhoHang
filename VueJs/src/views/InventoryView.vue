@@ -67,9 +67,7 @@ const showDetailPanel = ref(false)
 const selectedInv = ref<any>(null)
 
 // Add Stock Modal state
-const showAddStockModal = ref(false)
-const submittingAddStock = ref(false)
-const addStockForm = ref({ quantity: 1 })
+
 
 // Create Inventory Modal state (Thêm sản phẩm vào Kho Tổng)
 const showCreateModal = ref(false)
@@ -331,41 +329,6 @@ async function saveThreshold() {
 function openDetails(inv: any) {
   selectedInv.value = inv
   showDetailPanel.value = true
-}
-
-function openAddStockModal() {
-  addStockForm.value.quantity = 1
-  showAddStockModal.value = true
-}
-
-async function submitAddStock() {
-  if (!selectedInv.value) return
-  const qty = addStockForm.value.quantity
-  if (!qty || qty <= 0) {
-    toast.error('Số lượng nhập thêm phải lớn hơn 0.')
-    return
-  }
-
-  submittingAddStock.value = true
-  try {
-    const res = await api.patch(`/api/inventories/${selectedInv.value.id}/add-stock`, {
-      quantityToAdd: qty
-    })
-
-    if (res.ok) {
-      toast.success(`Nhập thêm hàng cùng lô thành công!`)
-      showAddStockModal.value = false
-      showDetailPanel.value = false
-      await loadData()
-    } else {
-      const errData = await res.json()
-      toast.error(errData.message || 'Lỗi khi nhập thêm hàng.')
-    }
-  } catch (err: any) {
-    toast.error('Lỗi kết nối: ' + err.message)
-  } finally {
-    submittingAddStock.value = false
-  }
 }
 
 async function deleteInventory() {
@@ -684,7 +647,8 @@ function exportExcel() {
 
         <!-- Add Product to Head Branch -->
         <button 
-          v-if="activeTab === 'head' && (isAdmin || userIsAtHeadBranch)"
+          v-if="activeTab === 'head' && !isAdmin && userIsAtHeadBranch"
+
           @click="openCreateInventoryModal" 
           class="h-[42px] bg-[#4361ee] hover:bg-[#3a0ca3] text-white px-5 rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-2"
         >
@@ -716,25 +680,36 @@ function exportExcel() {
       <!-- Distinct products -->
       <div 
         @click="clearFilters"
-        class="bg-white rounded-2xl p-6 border border-[#f1f5f9] hover:border-blue-300 hover:shadow-md cursor-pointer transition-all flex items-center justify-between group"
-        title="Nhấp để hiển thị tất cả mặt hàng"
+        class="bg-white rounded-2xl p-6 border border-[#f1f5f9] hover:border-blue-300 hover:shadow-md cursor-pointer transition-all flex items-center justify-between gap-4 group relative"
       >
-        <div>
-          <div class="text-[0.75rem] font-bold text-[#8094ae] uppercase tracking-wider mb-1">Mặt hàng tồn kho</div>
-          <div class="text-2xl font-extrabold text-[#364a63] group-hover:text-[#4361ee] transition-colors">{{ totalDistinctProducts }}</div>
+        <!-- Custom Tooltip Bubble -->
+        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-blue-200 text-[#4361ee] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(67,97,238,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
+          <span>Xem tất cả {{ totalDistinctProducts }} mặt hàng</span>
+          <div class="w-2.5 h-2.5 bg-white border-r border-b border-blue-200 rotate-45 absolute -bottom-[5.5px] left-1/2 -translate-x-1/2"></div>
         </div>
-        <div class="w-12 h-12 rounded-xl bg-blue-50 text-[#4361ee] flex items-center justify-center text-xl shadow-sm group-hover:scale-110 transition-transform">
+
+        <div class="min-w-0">
+          <div class="text-[0.75rem] font-bold text-[#8094ae] uppercase tracking-wider mb-1 truncate">Mặt hàng tồn kho</div>
+          <div class="text-2xl font-extrabold text-[#364a63] group-hover:text-[#4361ee] transition-colors truncate">{{ totalDistinctProducts }}</div>
+        </div>
+        <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-blue-50 text-[#4361ee] flex items-center justify-center text-xl shadow-sm group-hover:scale-110 transition-transform">
           <i class="fas fa-box"></i>
         </div>
       </div>
 
       <!-- Total value -->
-      <div class="bg-white rounded-2xl p-6 border border-[#f1f5f9] shadow-sm flex items-center justify-between">
-        <div>
-          <div class="text-[0.75rem] font-bold text-[#8094ae] uppercase tracking-wider mb-1">Tổng giá trị kho</div>
-          <div class="text-2xl font-extrabold text-[#05b171]">{{ formatVND(totalInventoryValue) }}</div>
+      <div class="bg-white rounded-2xl p-6 border border-[#f1f5f9] shadow-sm flex items-center justify-between gap-4 group relative">
+        <!-- Custom Tooltip Bubble -->
+        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-emerald-200 text-[#05b171] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(5,177,113,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
+          <span class="font-mono text-sm">{{ formatVND(totalInventoryValue) }}</span>
+          <div class="w-2.5 h-2.5 bg-white border-r border-b border-emerald-200 rotate-45 absolute -bottom-[5.5px] left-1/2 -translate-x-1/2"></div>
         </div>
-        <div class="w-12 h-12 rounded-xl bg-emerald-50 text-[#05b171] flex items-center justify-center text-xl shadow-sm">
+
+        <div class="min-w-0">
+          <div class="text-[0.75rem] font-bold text-[#8094ae] uppercase tracking-wider mb-1 truncate">Tổng giá trị kho</div>
+          <div class="text-xl lg:text-2xl font-extrabold text-[#05b171] truncate">{{ formatVND(totalInventoryValue) }}</div>
+        </div>
+        <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-emerald-50 text-[#05b171] flex items-center justify-center text-xl shadow-sm">
           <i class="fas fa-wallet"></i>
         </div>
       </div>
@@ -743,21 +718,26 @@ function exportExcel() {
       <div 
         @click="toggleOnlyWarning"
         :class="[
-          'bg-white rounded-2xl p-6 border transition-all flex items-center justify-between cursor-pointer select-none group', 
+          'bg-white rounded-2xl p-6 border transition-all flex items-center justify-between gap-4 cursor-pointer select-none group relative', 
           onlyWarning 
             ? 'border-yellow-400 ring-2 ring-yellow-400/20 shadow-md' 
             : 'border-[#f1f5f9] hover:border-yellow-300 hover:shadow-md'
         ]"
-        title="Nhấp để lọc nhanh danh sách cảnh báo tồn thấp"
       >
-        <div>
-          <div class="text-[0.75rem] font-bold text-[#8094ae] uppercase tracking-wider mb-1">Cảnh báo tồn thấp</div>
-          <div :class="['text-2xl font-extrabold transition-colors', totalWarningsCount > 0 || onlyWarning ? 'text-yellow-500' : 'text-[#364a63]']">
+        <!-- Custom Tooltip Bubble -->
+        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-yellow-200 text-[#d9a80c] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(217,168,12,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
+          <span>{{ onlyWarning ? 'Nhấp để bỏ lọc cảnh báo' : 'Lọc danh sách cảnh báo tồn thấp' }}</span>
+          <div class="w-2.5 h-2.5 bg-white border-r border-b border-yellow-200 rotate-45 absolute -bottom-[5.5px] left-1/2 -translate-x-1/2"></div>
+        </div>
+
+        <div class="min-w-0">
+          <div class="text-[0.75rem] font-bold text-[#8094ae] uppercase tracking-wider mb-1 truncate">Cảnh báo tồn thấp</div>
+          <div :class="['text-2xl font-extrabold transition-colors truncate', totalWarningsCount > 0 || onlyWarning ? 'text-yellow-500' : 'text-[#364a63]']">
             {{ totalWarningsCount }}
           </div>
         </div>
         <div 
-          :class="['w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm transition-transform group-hover:scale-110', 
+          :class="['flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm transition-transform group-hover:scale-110', 
                    totalWarningsCount > 0 || onlyWarning ? 'bg-yellow-50 text-yellow-500' : 'bg-slate-50 text-[#8094ae]']"
         >
           <i :class="['fas fa-exclamation-triangle', { 'animate-pulse': totalWarningsCount > 0 }]"></i>
@@ -768,21 +748,26 @@ function exportExcel() {
       <div 
         @click="toggleOnlyExpired"
         :class="[
-          'bg-white rounded-2xl p-6 border transition-all flex items-center justify-between cursor-pointer select-none group', 
+          'bg-white rounded-2xl p-6 border transition-all flex items-center justify-between gap-4 cursor-pointer select-none group relative', 
           onlyExpired 
             ? 'border-[#ea4f52] ring-2 ring-[#ea4f52]/20 shadow-md' 
             : 'border-[#f1f5f9] hover:border-red-300 hover:shadow-md'
         ]"
-        title="Nhấp để lọc nhanh danh sách lô hàng đã hết hạn"
       >
-        <div>
-          <div class="text-[0.75rem] font-bold text-[#8094ae] uppercase tracking-wider mb-1">Lô hàng hết hạn</div>
-          <div :class="['text-2xl font-extrabold transition-colors', totalExpiredCount > 0 || onlyExpired ? 'text-[#ea4f52]' : 'text-[#364a63]']">
+        <!-- Custom Tooltip Bubble -->
+        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-red-200 text-[#ea4f52] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(234,79,82,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
+          <span>{{ onlyExpired ? 'Nhấp để bỏ lọc hết hạn' : 'Lọc danh sách lô hàng hết hạn' }}</span>
+          <div class="w-2.5 h-2.5 bg-white border-r border-b border-red-200 rotate-45 absolute -bottom-[5.5px] left-1/2 -translate-x-1/2"></div>
+        </div>
+
+        <div class="min-w-0">
+          <div class="text-[0.75rem] font-bold text-[#8094ae] uppercase tracking-wider mb-1 truncate">Lô hàng hết hạn</div>
+          <div :class="['text-2xl font-extrabold transition-colors truncate', totalExpiredCount > 0 || onlyExpired ? 'text-[#ea4f52]' : 'text-[#364a63]']">
             {{ totalExpiredCount }}
           </div>
         </div>
         <div 
-          :class="['w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm transition-transform group-hover:scale-110', 
+          :class="['flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm transition-transform group-hover:scale-110', 
                    totalExpiredCount > 0 || onlyExpired ? 'bg-red-50 text-[#ea4f52]' : 'bg-slate-50 text-[#8094ae]']"
         >
           <i :class="['fas fa-hourglass-end', { 'animate-pulse': totalExpiredCount > 0 }]"></i>
@@ -1073,7 +1058,6 @@ function exportExcel() {
             class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
           />
         </div>
-
         <!-- Checkbox quản lý theo hạn dùng -->
         <div class="flex items-center gap-2 py-1">
           <input 
@@ -1233,16 +1217,17 @@ function exportExcel() {
               <div v-if="selectedInv.hasExpiry" class="flex justify-between py-1 items-center group/warning">
                 <span class="text-[#8094ae] font-semibold flex items-center gap-1">
                   Cảnh báo hết hạn trước
-                  <i class="fas fa-pen text-[10px] text-slate-300 group-hover/warning:text-[#4361ee] transition-colors"></i>
+                  <i v-if="user?.role !== 'STAFF'" class="fas fa-pen text-[10px] text-slate-300 group-hover/warning:text-[#4361ee] transition-colors"></i>
                 </span>
                 <div class="flex items-center gap-1.5">
                   <input 
                     v-model="selectedInv.expiryWarningDays" 
                     type="number" 
                     min="1"
+                    :disabled="user?.role === 'STAFF'"
                     @blur="updateExpiryWarning(selectedInv)"
                     @keyup.enter="($event.target as any).blur()"
-                    class="w-14 h-7 px-1 text-right border border-[#e2e8f0] bg-[#f8f9fa] hover:bg-white focus:bg-white rounded text-sm font-bold text-[#4361ee] focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all shadow-sm"
+                    class="w-14 h-7 px-1 text-right border border-[#e2e8f0] bg-[#f8f9fa] hover:bg-white focus:bg-white rounded text-sm font-bold text-[#4361ee] focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                   <span class="text-xs font-bold text-[#364a63]">ngày</span>
                 </div>
@@ -1277,7 +1262,6 @@ function exportExcel() {
                 <span class="text-[#8094ae] font-semibold">Tổng giá trị nhập</span>
                 <span class="font-bold text-amber-600">{{ formatVND(selectedInv.totalImportValue) }}</span>
               </div>
-
               <!-- Last Updated -->
               <div class="flex justify-between py-1">
                 <span class="text-[#8094ae] font-semibold">Lần cuối cập nhật</span>
@@ -1289,6 +1273,7 @@ function exportExcel() {
           <!-- Footer -->
           <div class="p-6 border-t border-[#f1f5f9] bg-[#f8fafc] flex gap-3">
             <button 
+              v-if="user?.role !== 'STAFF'"
               class="h-11 px-4 bg-white border border-[#ea4f52] hover:bg-[#ea4f52] text-[#ea4f52] hover:text-white rounded-xl text-sm font-bold transition-all shadow-sm group" 
               title="Xoá dòng tồn kho này"
               @click="deleteInventory"
@@ -1301,71 +1286,11 @@ function exportExcel() {
             >
               Đóng
             </button>
-            <button 
-              class="flex-1 h-11 bg-[#05b171] hover:bg-[#04965f] text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2"
-              @click="openAddStockModal"
-            >
-              <i class="fas fa-plus"></i> Nhập thêm
-            </button>
           </div>
         </div>
       </Transition>
 
-      <!-- Add Stock Modal -->
-      <AppModal 
-        :show="showAddStockModal" 
-        title="Nhập thêm hàng cùng lô" 
-        size="sm" 
-        @close="showAddStockModal = false"
-      >
-        <div class="p-6 space-y-4 text-sm">
-          <div class="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-2">
-            <div class="flex justify-between">
-              <span class="text-[#8094ae] font-medium">Sản phẩm:</span>
-              <span class="font-bold text-[#364a63] text-right">{{ selectedInv?.productName }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-[#8094ae] font-medium">Lô sản xuất:</span>
-              <span class="font-bold text-[#364a63] font-mono text-xs">{{ selectedInv?.batchCode }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-[#8094ae] font-medium">Chi nhánh:</span>
-              <span class="font-bold text-[#364a63]">{{ selectedInv?.branchName }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-[#8094ae] font-medium">Tồn hiện tại:</span>
-              <span class="font-bold text-[#364a63]">{{ selectedInv?.quantity }} {{ selectedInv?.unit }}</span>
-            </div>
-          </div>
 
-          <div>
-            <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số lượng nhập thêm</label>
-            <input 
-              v-model="addStockForm.quantity" 
-              type="number" 
-              min="1" 
-              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#05b171]/20 focus:border-[#05b171] text-[#364a63] font-semibold transition-all" 
-            />
-          </div>
-
-          <div class="flex gap-3 pt-4 border-t border-[#f1f5f9]">
-            <button 
-              class="flex-1 h-11 bg-[#f8f9fa] hover:bg-[#e2e8f0] text-[#364a63] rounded-xl text-sm font-bold transition-colors" 
-              @click="showAddStockModal = false"
-            >
-              Hủy bỏ
-            </button>
-            <button 
-              class="flex-1 h-11 bg-[#05b171] hover:bg-[#04965f] text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2" 
-              :disabled="submittingAddStock"
-              @click="submitAddStock"
-            >
-              <i v-if="submittingAddStock" class="fas fa-spinner fa-spin"></i>
-              Xác nhận nhập
-            </button>
-          </div>
-        </div>
-      </AppModal>
     </Teleport>
   </div>
 </template>

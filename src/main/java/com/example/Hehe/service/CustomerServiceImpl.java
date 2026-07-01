@@ -30,12 +30,16 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<CustomerResponse> searchCustomers(String keyword, String status) {
+    public List<CustomerResponse> searchCustomers(String keyword, String status, User currentUser) {
         String pattern = (keyword != null && !keyword.trim().isEmpty()) ? "%" + keyword.trim().toLowerCase() + "%" : null;
         String filterStatus = (status != null && !status.trim().isEmpty()) ? status.trim().toUpperCase() : null;
 
         return customerRepository.searchCustomers(pattern, filterStatus)
                 .stream()
+                .filter(c -> {
+                    if (currentUser.getRole() == com.example.Hehe.model.UserRole.ADMIN) return true;
+                    return currentUser.getBranch() != null && c.getBranch() != null && c.getBranch().getId().equals(currentUser.getBranch().getId());
+                })
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
@@ -53,13 +57,23 @@ public class CustomerServiceImpl implements CustomerService {
         if (request.getName() == null || request.getName().trim().isEmpty()) {
             throw new RuntimeException("Tên khách hàng không được để trống.");
         }
+        
+        if (request.getContactInfo() != null && !request.getContactInfo().trim().isEmpty()) {
+            String phone = request.getContactInfo().trim();
+            if (customerRepository.findFirstByContactInfo(phone).isPresent()) {
+                throw new RuntimeException("Số điện thoại đã tồn tại trong hệ thống. Vui lòng sử dụng số khác.");
+            }
+        }
 
         Customer customer = new Customer();
         customer.setName(request.getName().trim());
         customer.setContactInfo(request.getContactInfo() != null ? request.getContactInfo().trim() : null);
+        customer.setEmail(request.getEmail() != null ? request.getEmail().trim() : null);
+        customer.setTaxCode(request.getTaxCode() != null ? request.getTaxCode().trim() : null);
         customer.setAddress(request.getAddress() != null ? request.getAddress().trim() : null);
         customer.setDebt(request.getDebt() != null ? request.getDebt() : BigDecimal.ZERO);
         customer.setStatus("ACTIVE");
+        customer.setBranch(currentUser.getBranch());
 
         Customer savedCustomer = customerRepository.save(customer);
 
@@ -79,9 +93,19 @@ public class CustomerServiceImpl implements CustomerService {
         if (request.getName() == null || request.getName().trim().isEmpty()) {
             throw new RuntimeException("Tên khách hàng không được để trống.");
         }
+        
+        if (request.getContactInfo() != null && !request.getContactInfo().trim().isEmpty()) {
+            String phone = request.getContactInfo().trim();
+            java.util.Optional<Customer> existing = customerRepository.findFirstByContactInfo(phone);
+            if (existing.isPresent() && !existing.get().getId().equals(id)) {
+                throw new RuntimeException("Số điện thoại đã tồn tại trong hệ thống. Vui lòng sử dụng số khác.");
+            }
+        }
 
         customer.setName(request.getName().trim());
         customer.setContactInfo(request.getContactInfo() != null ? request.getContactInfo().trim() : null);
+        customer.setEmail(request.getEmail() != null ? request.getEmail().trim() : null);
+        customer.setTaxCode(request.getTaxCode() != null ? request.getTaxCode().trim() : null);
         customer.setAddress(request.getAddress() != null ? request.getAddress().trim() : null);
         if (request.getDebt() != null) {
             customer.setDebt(request.getDebt());
@@ -102,24 +126,23 @@ public class CustomerServiceImpl implements CustomerService {
         Customer customer = customerRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy khách hàng với ID: " + id));
 
-        // Kiểm tra xem đối tác đã có giao dịch phát sinh chưa (phiếu kho liên kết)
-        Number count = (Number) entityManager.createNativeQuery(
-                "SELECT COUNT(*) FROM receipts WHERE customer_id = ?")
-                .setParameter(1, id)
-                .getSingleResult();
-        if (count != null && count.longValue() > 0) {
-            throw new RuntimeException("Đối tác đã phát sinh giao dịch trong hệ thống, không thể xóa. Vui lòng chuyển trạng thái sang NGỪNG HOẠT ĐỘNG (INACTIVE).");
+        if (!"INACTIVE".equals(customer.getStatus())) {
+            throw new RuntimeException("Chỉ có thể xóa khách hàng sau khi đã chuyển trạng thái sang NGỪNG HOẠT ĐỘNG (INACTIVE).");
         }
 
         try {
+            entityManager.createNativeQuery("UPDATE receipts SET customer_id = NULL WHERE customer_id = ?")
+                    .setParameter(1, id)
+                    .executeUpdate();
+
             customerRepository.delete(customer);
             
             // Ghi audit log
             logAudit(currentUser.getId(), "DELETE_CUSTOMER", "customers",
                     id.toString(),
                     "Xóa khách hàng: " + customer.getName());
-        } catch (DataIntegrityViolationException ex) {
-            throw new RuntimeException("Đối tác đã phát sinh giao dịch trong hệ thống, không thể xóa. Vui lòng chuyển trạng thái sang NGỪNG HOẠT ĐỘNG (INACTIVE).");
+        } catch (Exception ex) {
+            throw new RuntimeException("Lỗi khi xóa khách hàng: " + ex.getMessage());
         }
     }
 
@@ -129,6 +152,11 @@ public class CustomerServiceImpl implements CustomerService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy khách hàng với ID: " + id));
 
         String newStatus = "ACTIVE".equals(customer.getStatus()) ? "INACTIVE" : "ACTIVE";
+        
+        if ("INACTIVE".equals(newStatus) && customer.getDebt() != null && customer.getDebt().compareTo(BigDecimal.ZERO) > 0) {
+            throw new RuntimeException("Không thể ngừng hoạt động khách hàng khi khách hàng vẫn còn nợ.");
+        }
+
         customer.setStatus(newStatus);
 
         Customer savedCustomer = customerRepository.save(customer);
@@ -151,7 +179,17 @@ public class CustomerServiceImpl implements CustomerService {
         }
 
         BigDecimal oldDebt = customer.getDebt() != null ? customer.getDebt() : BigDecimal.ZERO;
+        
+        if (amount.compareTo(BigDecimal.ZERO) < 0 && amount.abs().compareTo(oldDebt) > 0) {
+            throw new RuntimeException("Số tiền giảm nợ không được vượt quá số nợ hiện tại (" + oldDebt + " VNĐ).");
+        }
+        
         BigDecimal newDebt = oldDebt.add(amount);
+
+        if (newDebt.compareTo(BigDecimal.ZERO) < 0) {
+            throw new RuntimeException("Công nợ không được điều chỉnh xuống mức âm (Số tiền giảm tối đa là " + oldDebt + " VNĐ).");
+        }
+
         customer.setDebt(newDebt);
 
         Customer savedCustomer = customerRepository.save(customer);
@@ -187,6 +225,8 @@ public class CustomerServiceImpl implements CustomerService {
                 c.getAddress(),
                 c.getDebt(),
                 c.getStatus(),
+                c.getEmail(),
+                c.getTaxCode(),
                 c.getCreatedAt()
         );
     }

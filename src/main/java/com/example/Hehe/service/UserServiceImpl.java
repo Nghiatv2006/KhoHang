@@ -61,12 +61,32 @@ public class UserServiceImpl implements UserService {
         // Lấy tất cả user thoả mãn từ khoá/role/status (bỏ qua branchId từ query UI)
         List<User> users = userRepository.searchUsers(pattern, filterRole, null, filterStatus);
 
-        // Cách ly dữ liệu hoàn toàn bằng Java Stream:
-        // Chỉ giữ lại những người dùng có branchId trùng với isolatedBranchId của người đang đăng nhập.
-        // Những user nào trong DB chưa có branch (như tài khoản admin cũ), ta quy ước họ thuộc chi nhánh tổng.
+        // Cách ly dữ liệu theo vai trò nghiệp vụ:
+        // - ADMIN: thấy bản thân + nhân viên chi nhánh mình + các manager ở chi nhánh con (isHead != true)
+        // - MANAGER: thấy nhân viên thuộc chi nhánh của mình
+        // - STAFF: không có quyền (đã chặn ở trên)
         users = users.stream().filter(u -> {
-            Integer targetUserBranchId = u.getBranch() != null ? u.getBranch().getId() : headBranchId;
-            return isolatedBranchId != null && isolatedBranchId.equals(targetUserBranchId);
+            if (currentUser.getRole() == UserRole.ADMIN) {
+                // Thấy bản thân
+                if (u.getId().equals(currentUser.getId())) {
+                    return true;
+                }
+                // Nhân viên chi nhánh mình
+                Integer targetUserBranchId = u.getBranch() != null ? u.getBranch().getId() : headBranchId;
+                if (isolatedBranchId != null && isolatedBranchId.equals(targetUserBranchId)) {
+                    return true;
+                }
+                // Các manager ở chi nhánh con
+                if (u.getRole() == UserRole.MANAGER && u.getBranch() != null && !Boolean.TRUE.equals(u.getBranch().getIsHead())) {
+                    return true;
+                }
+                return false;
+            } else if (currentUser.getRole() == UserRole.MANAGER) {
+                // Thấy nhân viên thuộc chi nhánh của mình
+                Integer targetUserBranchId = u.getBranch() != null ? u.getBranch().getId() : headBranchId;
+                return isolatedBranchId != null && isolatedBranchId.equals(targetUserBranchId);
+            }
+            return false;
         }).collect(Collectors.toList());
 
         return users.stream()
@@ -97,14 +117,11 @@ public class UserServiceImpl implements UserService {
             throw new RuntimeException("Tên đăng nhập '" + request.getUsername().trim() + "' đã tồn tại.");
         }
 
-        // Kiểm tra trùng email (nếu gửi lên)
+        // Kiểm tra định dạng email (nếu gửi lên)
         if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
             String email = request.getEmail().trim();
             if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
                 throw new RuntimeException("Định dạng email không hợp lệ.");
-            }
-            if (userRepository.existsByEmail(email)) {
-                throw new RuntimeException("Email '" + email + "' đã được sử dụng.");
             }
         }
 
@@ -114,6 +131,9 @@ public class UserServiceImpl implements UserService {
             cleanPhone = request.getPhone().trim().replaceAll("[-. ]", "");
             if (!cleanPhone.matches("^(0|\\+84|84)[0-9]{9,11}$")) {
                 throw new RuntimeException("Số điện thoại không hợp lệ (phải bắt đầu bằng 0, 84 hoặc +84 và gồm 10-12 chữ số).");
+            }
+            if (userRepository.existsByPhone(cleanPhone)) {
+                throw new RuntimeException("Số điện thoại '" + cleanPhone + "' đã được sử dụng bởi nhân viên khác.");
             }
         }
 
@@ -209,14 +229,11 @@ public class UserServiceImpl implements UserService {
             user.setUsername(request.getUsername().trim());
         }
 
-        // Sửa Email: kiểm tra trùng lặp
+        // Sửa Email: kiểm tra định dạng
         if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
             String email = request.getEmail().trim();
             if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
                 throw new RuntimeException("Định dạng email không hợp lệ.");
-            }
-            if (userRepository.existsByEmailAndIdNot(email, id)) {
-                throw new RuntimeException("Email '" + email + "' đã được sử dụng.");
             }
             user.setEmail(email);
         } else {
@@ -232,6 +249,9 @@ public class UserServiceImpl implements UserService {
             String phone = request.getPhone().trim().replaceAll("[-. ]", "");
             if (!phone.matches("^(0|\\+84|84)[0-9]{9,11}$")) {
                 throw new RuntimeException("Số điện thoại không hợp lệ (phải bắt đầu bằng 0, 84 hoặc +84 và gồm 10-12 chữ số).");
+            }
+            if (userRepository.existsByPhoneAndIdNot(phone, id)) {
+                throw new RuntimeException("Số điện thoại '" + phone + "' đã được sử dụng bởi nhân viên khác.");
             }
             user.setPhone(phone);
         } else {

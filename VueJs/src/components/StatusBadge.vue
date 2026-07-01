@@ -15,6 +15,9 @@ const roleConfig: Record<string, { label: string; cls: string }> = {
 const statusConfig: Record<string, { label: string; cls: string; dot: string }> = {
   ACTIVE: { label: 'Hoạt động', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
   INACTIVE: { label: 'Ngừng HĐ', cls: 'bg-slate-100 text-slate-500 border-slate-200', dot: 'bg-slate-400' },
+  DRAFT: { label: 'Phiếu nháp', cls: 'bg-yellow-100 text-yellow-700 border-yellow-300', dot: 'bg-yellow-500' },
+  COMPLETED: { label: 'Hoàn thành', cls: 'bg-green-100 text-green-700 border-green-300', dot: 'bg-green-500' },
+  CANCELLED: { label: 'Đã hủy', cls: 'bg-red-100 text-red-700 border-red-300', dot: 'bg-red-500' },
 }
 
 // Transfer request status

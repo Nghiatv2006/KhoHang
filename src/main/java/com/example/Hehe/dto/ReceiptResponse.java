@@ -17,7 +17,12 @@ public class ReceiptResponse {
     private String destBranchName;
     private Integer createdById;
     private String createdByName;
+    private String createdByRole;
+    private Integer stocktakeById;
+    private String stocktakeByName;
     private Integer customerId;
+    private String customerName;
+    private String customerPhone;
     private String description;
     private LocalDateTime createdAt;
     private List<ReceiptDetailResponse> details;
@@ -42,9 +47,17 @@ public class ReceiptResponse {
         if (r.getCreatedBy() != null) {
             this.createdById = r.getCreatedBy().getId();
             this.createdByName = r.getCreatedBy().getFullName();
+            this.createdByRole = r.getCreatedBy().getRole() != null ? r.getCreatedBy().getRole().name() : null;
+        }
+
+        if (r.getStocktakeBy() != null) {
+            this.stocktakeById = r.getStocktakeBy().getId();
+            this.stocktakeByName = r.getStocktakeBy().getFullName();
         }
 
         this.customerId = r.getCustomerId();
+        this.customerName = r.getCustomerName();
+        this.customerPhone = r.getCustomerPhone();
         this.description = r.getDescription();
         this.createdAt = r.getCreatedAt();
         
@@ -64,7 +77,12 @@ public class ReceiptResponse {
     public String getDestBranchName() { return destBranchName; }
     public Integer getCreatedById() { return createdById; }
     public String getCreatedByName() { return createdByName; }
+    public String getCreatedByRole() { return createdByRole; }
+    public Integer getStocktakeById() { return stocktakeById; }
+    public String getStocktakeByName() { return stocktakeByName; }
     public Integer getCustomerId() { return customerId; }
+    public String getCustomerName() { return customerName; }
+    public String getCustomerPhone() { return customerPhone; }
     public String getDescription() { return description; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public List<ReceiptDetailResponse> getDetails() { return details; }

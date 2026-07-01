@@ -77,6 +77,7 @@ public class AuditLogServiceImpl implements AuditLogService {
         // }
         checkAndHandleSpam(user);
 
+
         Integer branchId = resolveBranchId(user);
         AuditLog log = new AuditLog(user, branchId, "LOGOUT", "users", String.valueOf(user.getId()),
                 user.getFullName() + " đã đăng xuất khỏi hệ thống.");

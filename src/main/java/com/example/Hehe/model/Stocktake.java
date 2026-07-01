@@ -23,7 +23,7 @@ public class Stocktake {
     private Branch branch;
 
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "created_by", nullable = false)
+    @JoinColumn(name = "created_by", nullable = true)
     private User createdBy;
 
     @Enumerated(EnumType.STRING)

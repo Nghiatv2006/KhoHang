@@ -41,19 +41,21 @@ public class ProductServiceImpl implements ProductService {
     private final CategoryRepository categoryRepository;
     private final BranchRepository branchRepository;
     private final InventoryRepository inventoryRepository;
-    private final AuditLogService auditLogService;
     private final com.example.Hehe.repository.ReceiptDetailRepository receiptDetailRepository;
+    private final AuditLogService auditLogService;
 
-    public ProductServiceImpl(ProductRepository productRepository, CategoryRepository categoryRepository,
-                               BranchRepository branchRepository, InventoryRepository inventoryRepository,
-                               AuditLogService auditLogService,
-                               com.example.Hehe.repository.ReceiptDetailRepository receiptDetailRepository) {
+    public ProductServiceImpl(ProductRepository productRepository,
+                              CategoryRepository categoryRepository,
+                              BranchRepository branchRepository,
+                              InventoryRepository inventoryRepository,
+                              com.example.Hehe.repository.ReceiptDetailRepository receiptDetailRepository,
+                              AuditLogService auditLogService) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.branchRepository = branchRepository;
         this.inventoryRepository = inventoryRepository;
-        this.auditLogService = auditLogService;
         this.receiptDetailRepository = receiptDetailRepository;
+        this.auditLogService = auditLogService;
     }
 
 

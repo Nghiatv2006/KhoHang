@@ -39,9 +39,19 @@ public class Receipt {
     @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "stocktake_by_id")
+    private User stocktakeBy;
+
     // TODO: Link Customer when Customer entity exists
     @Column(name = "customer_id")
     private Integer customerId;
+
+    @Column(name = "customer_name")
+    private String customerName;
+
+    @Column(name = "customer_phone")
+    private String customerPhone;
 
     @Column(name = "description", length = 500)
     private String description;
@@ -76,8 +86,17 @@ public class Receipt {
     public User getCreatedBy() { return createdBy; }
     public void setCreatedBy(User createdBy) { this.createdBy = createdBy; }
 
+    public User getStocktakeBy() { return stocktakeBy; }
+    public void setStocktakeBy(User stocktakeBy) { this.stocktakeBy = stocktakeBy; }
+
     public Integer getCustomerId() { return customerId; }
     public void setCustomerId(Integer customerId) { this.customerId = customerId; }
+
+    public String getCustomerName() { return customerName; }
+    public void setCustomerName(String customerName) { this.customerName = customerName; }
+
+    public String getCustomerPhone() { return customerPhone; }
+    public void setCustomerPhone(String customerPhone) { this.customerPhone = customerPhone; }
 
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }

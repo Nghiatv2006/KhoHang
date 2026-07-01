@@ -32,13 +32,14 @@ const hasCrudPermission = computed(() => {
 const mainNavItems = computed(() => {
   const items = [
     { label: 'Tổng quan', to: '/dashboard', icon: 'fas fa-chart-pie' },
+    { label: 'Phiếu Nhập', to: '/receipts', icon: 'fas fa-file-invoice' }
   ]
   if (hasCrudPermission.value) {
     items.push({ label: 'Sản phẩm', to: '/products', icon: 'fas fa-box-open' })
   }
   items.push({ label: 'Tồn kho', to: '/inventory', icon: 'fas fa-warehouse' })
   // @ts-ignore
-  if (user.value && user.value.role !== 'ADMIN') {
+  if (user.value) {
     items.push({ label: 'Kiểm kê kho', to: '/stocktakes', icon: 'fas fa-clipboard-list' })
   }
   return items
@@ -51,16 +52,24 @@ const isManagerOrAdmin = computed(() => {
 })
 
 const adminNavItems = computed(() => {
-  const items: { label: string; to: string; icon: string }[] = [
-    { label: 'Đối tác', to: '/partners', icon: 'fas fa-handshake' },
-    { label: 'Nhân viên', to: '/users', icon: 'fas fa-users' },
-    { label: 'Chi nhánh', to: '/branches', icon: 'fas fa-building' },
-  ]
+  const items: { label: string; to: string; icon: string }[] = []
+  // @ts-ignore
+  if (!user.value || user.value.role !== 'ADMIN') {
+    items.push({ label: 'Đối tác', to: '/partners', icon: 'fas fa-handshake' })
+  }
   if (isManagerOrAdmin.value) {
-    items.push({ label: 'Nhật ký hoạt động', to: '/audit-logs', icon: 'fas fa-history' })
+    items.push({ label: 'Nhân viên', to: '/users', icon: 'fas fa-users' })
+  }
+  items.push({ label: 'Chi nhánh', to: '/branches', icon: 'fas fa-building' })
+  if (isManagerOrAdmin.value) {
+    items.push(
+      { label: 'Sao lưu & Phục hồi', to: '/backup-restore', icon: 'fas fa-database' },
+      { label: 'Nhật ký hoạt động', to: '/audit-logs', icon: 'fas fa-history' }
+    )
   }
   return items
 })
+
 
 
 async function logout() {

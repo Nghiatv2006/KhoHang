@@ -4,14 +4,14 @@
 -- ==============================================================================
 
 -- DROP TABLE & TYPE (Dùng để reset nhanh database)
-DROP TABLE IF EXISTS audit_logs, stocktake_details, stocktakes, receipt_details, receipts, inventories, products, users, customers, categories, branches CASCADE;
+DROP TABLE IF EXISTS audit_logs, stocktake_details, stocktakes, receipt_details, receipts, inventories, products, users, customers, categories, branches, password_reset_otps CASCADE;
 DROP TYPE IF EXISTS user_role, user_status, receipt_type, receipt_status, stocktake_status CASCADE;
 
 -- 1. ENUM TYPES
 CREATE TYPE user_role AS ENUM ('ADMIN', 'MANAGER', 'STAFF');
 CREATE TYPE user_status AS ENUM ('ACTIVE', 'LOCKED');
 CREATE TYPE receipt_type AS ENUM ('IMPORT', 'EXPORT', 'TRANSFER', 'ADJUST_IN', 'ADJUST_OUT');
-CREATE TYPE receipt_status AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED');
+CREATE TYPE receipt_status AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED', 'PENDING_ADMIN', 'PENDING_STOCKTAKE');
 CREATE TYPE stocktake_status AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED');
 
 -- Bảng Chi nhánh (Branches)
@@ -22,7 +22,8 @@ CREATE TABLE branches (
     address TEXT NOT NULL,
     low_stock_threshold INT NOT NULL DEFAULT 5,
     is_head BOOLEAN NOT NULL DEFAULT FALSE,
-    tax_code VARCHAR(50)
+    tax_code VARCHAR(50),
+    is_locked BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- Bảng Danh mục sản phẩm (Categories)
@@ -38,8 +39,12 @@ CREATE TABLE customers (
     contact_info VARCHAR(255),
     address TEXT,
     debt NUMERIC(15, 2) NOT NULL DEFAULT 0.00,
+    email VARCHAR(255),
+    tax_code VARCHAR(50),
     status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    branch_id INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_customer_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE RESTRICT
 );
 
 -- Bảng Người dùng (Users)
@@ -48,16 +53,28 @@ CREATE TABLE users (
     username VARCHAR(100) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     full_name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE,
+    email VARCHAR(255),
     phone VARCHAR(20),
     role user_role NOT NULL,
     branch_id INT,
     status user_status NOT NULL DEFAULT 'ACTIVE',
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     ban_until TIMESTAMP, -- Thời gian bị phạt SPAM (null = không bị phạt)
     CONSTRAINT fk_user_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE RESTRICT,
     CONSTRAINT chk_user_branch CHECK (role = 'ADMIN' OR branch_id IS NOT NULL)
+);
+
+-- Bảng OTP Khôi phục mật khẩu (Password Reset OTPs)
+CREATE TABLE password_reset_otps (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(100) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    otp_code VARCHAR(6) NOT NULL,
+    expiry_time TIMESTAMP NOT NULL,
+    used BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Bảng Sản phẩm (Products)
@@ -74,6 +91,7 @@ CREATE TABLE products (
     image_url VARCHAR(500),
     mfg_date DATE DEFAULT '1970-01-01',
     exp_date DATE DEFAULT '1970-01-01',
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_product_category FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT,
     CONSTRAINT chk_product_dates CHECK (exp_date >= mfg_date)
@@ -108,12 +126,16 @@ CREATE TABLE receipts (
     dest_branch_id INT,
     created_by INT NOT NULL,
     customer_id INT,
+    customer_name VARCHAR(255),    -- Tên khách hàng (lưu thẳng vào phiếu, không cần JOIN)
+    customer_phone VARCHAR(50),    -- SĐT khách hàng
     description VARCHAR(500),
+    stocktake_by_id INT,           -- Người xác nhận kiểm kê (phiếu PENDING_STOCKTAKE)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_receipt_source_branch FOREIGN KEY (source_branch_id) REFERENCES branches(id) ON DELETE RESTRICT,
     CONSTRAINT fk_receipt_dest_branch FOREIGN KEY (dest_branch_id) REFERENCES branches(id) ON DELETE RESTRICT,
     CONSTRAINT fk_receipt_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
-    CONSTRAINT fk_receipt_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT
+    CONSTRAINT fk_receipt_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_receipt_stocktake_by FOREIGN KEY (stocktake_by_id) REFERENCES users(id)
 );
 
 -- Bảng Chi tiết phiếu kho (Receipt Details)
@@ -126,6 +148,8 @@ CREATE TABLE receipt_details (
     batch_code VARCHAR(100) NOT NULL DEFAULT 'DEFAULT_BATCH',
     quantity INT NOT NULL CHECK (quantity > 0),
     price NUMERIC(15, 2) NOT NULL CHECK (price >= 0),
+    received_quantity INT,          -- Số lượng thực nhận (chỉ điền khi phiếu TRANSFER được xác nhận)
+    shortfall_reason TEXT,          -- Lý do hao hụt nếu received_quantity < quantity
     CONSTRAINT fk_detail_receipt FOREIGN KEY (receipt_id) REFERENCES receipts(id) ON DELETE CASCADE,
     CONSTRAINT fk_detail_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT,
     CONSTRAINT chk_receipt_detail_dates CHECK (exp_date >= mfg_date)
@@ -136,12 +160,12 @@ CREATE TABLE stocktakes (
     id SERIAL PRIMARY KEY,
     code VARCHAR(50) NOT NULL UNIQUE,
     branch_id INT NOT NULL,
-    created_by INT NOT NULL,
+    created_by INT,
     status stocktake_status NOT NULL DEFAULT 'DRAFT',
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_stocktake_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE RESTRICT,
-    CONSTRAINT fk_stocktake_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT
+    CONSTRAINT fk_stocktake_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- Bảng Chi tiết kiểm kê (Stocktake Details)
@@ -189,3 +213,22 @@ CREATE INDEX idx_audit_logs_branch_id  ON audit_logs (branch_id);
 CREATE INDEX idx_audit_logs_user_id    ON audit_logs (user_id);
 CREATE INDEX idx_audit_logs_action     ON audit_logs (action);
 CREATE INDEX idx_audit_logs_created_at ON audit_logs (created_at DESC);
+
+-- Indexes cho Password Reset OTPs
+CREATE INDEX idx_password_reset_otps_username ON password_reset_otps (username);
+CREATE INDEX idx_password_reset_otps_email ON password_reset_otps (email);
+
+-- Bảng Sao lưu dữ liệu (Backups)
+CREATE TABLE backups (
+    id SERIAL PRIMARY KEY,
+    branch_id INT REFERENCES branches(id) ON DELETE CASCADE,
+    filename VARCHAR(255) NOT NULL,
+    filepath VARCHAR(500) NOT NULL,
+    file_size BIGINT NOT NULL,
+    backup_type VARCHAR(50) NOT NULL, -- 'AUTO', 'MANUAL'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by INT REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_backups_branch_id ON backups (branch_id);
+

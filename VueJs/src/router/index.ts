@@ -45,6 +45,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/UsersView.vue'),
       },
       {
+        path: '/backup-restore',
+        name: 'BackupRestore',
+        component: () => import('../views/BackupRestoreView.vue'),
+      },
+      {
         path: '/branches',
         name: 'Branches',
         component: () => import('../views/BranchesView.vue'),
@@ -63,6 +68,11 @@ const routes: RouteRecordRaw[] = [
         path: '/profile',
         name: 'Profile',
         component: () => import('../views/ProfileView.vue'),
+      },
+      {
+        path: '/receipts',
+        name: 'Receipts',
+        component: () => import('../views/ReceiptsView.vue'),
       },
       {
         path: '/audit-logs',
@@ -84,7 +94,7 @@ router.beforeEach((to, _from, next) => {
   const userStr = localStorage.getItem('wh_user')
   const user = userStr ? JSON.parse(userStr) : null
   const isLoggedIn = !!user
-  
+
   if (to.meta.requiresAuth && !isLoggedIn) {
     next('/login')
   } else if (to.path === '/login' && isLoggedIn) {
@@ -93,6 +103,22 @@ router.beforeEach((to, _from, next) => {
     // Chỉ ADMIN mới được vào Products
     const hasCrud = user && user.role === 'ADMIN'
     if (!hasCrud) {
+      next('/dashboard')
+    } else {
+      next()
+    }
+  } else if (to.path === '/users') {
+    // Chỉ ADMIN và MANAGER mới được vào Users
+    const canView = user && ['ADMIN', 'MANAGER'].includes(user.role)
+    if (!canView) {
+      next('/dashboard')
+    } else {
+      next()
+    }
+  } else if (to.path === '/backup-restore') {
+    // ADMIN và MANAGER đều được vào Backup & Restore
+    const canView = user && ['ADMIN', 'MANAGER'].includes(user.role)
+    if (!canView) {
       next('/dashboard')
     } else {
       next()

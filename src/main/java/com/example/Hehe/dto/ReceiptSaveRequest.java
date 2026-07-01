@@ -9,6 +9,8 @@ public class ReceiptSaveRequest {
     private Integer sourceBranchId;
     private Integer destBranchId;
     private Integer customerId;
+    private String customerName;
+    private String customerPhone;
     private String description;
     private List<ReceiptDetailSaveRequest> details;
 
@@ -26,6 +28,12 @@ public class ReceiptSaveRequest {
 
     public Integer getCustomerId() { return customerId; }
     public void setCustomerId(Integer customerId) { this.customerId = customerId; }
+
+    public String getCustomerName() { return customerName; }
+    public void setCustomerName(String customerName) { this.customerName = customerName; }
+
+    public String getCustomerPhone() { return customerPhone; }
+    public void setCustomerPhone(String customerPhone) { this.customerPhone = customerPhone; }
 
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
