@@ -859,18 +859,14 @@ async function submitCreateDraft() {
     const res = await api.post('/api/receipts', payload)
     if (res.ok) {
       const data = await res.json()
-      if (data.id && (isAdmin.value || payload.type === 'EXPORT')) {
+      if (data.id && isAdmin.value && payload.type !== 'EXPORT') {
          await api.post(`/api/receipts/${data.id}/approve`, {})
-         if (isAdmin.value && (payload.type === 'IMPORT' || payload.type === 'TRANSFER')) {
+         if (payload.type === 'IMPORT' || payload.type === 'TRANSFER') {
             await api.post(`/api/receipts/${data.id}/approve`, {})
          }
-         if (payload.type === 'EXPORT') {
-            toast.success('Đã tạo và tự động duyệt hóa đơn bán thành công!')
-         } else {
-            toast.success('Đã tạo và tự động chuyển trạng thái phiếu thành công!')
-         }
+         toast.success('Đã tạo và tự động chuyển trạng thái phiếu thành công!')
       } else {
-         toast.success('Tạo phiếu kho nháp thành công!')
+         toast.success('Tạo phiếu thành công!')
       }
       showCreateModal.value = false
       await loadData()
@@ -1161,6 +1157,9 @@ function typeClass(t: string) {
 }
 function statusClass(r: any) {
   const s = r?.status;
+  if (r?.type === 'EXPORT' && s === 'COMPLETED' && r?.paymentStatus !== 'PAID') {
+    return 'bg-orange-100 text-orange-700 border border-orange-300';
+  }
   if (r?.type === 'TRANSFER' && s === 'PENDING_ADMIN') {
     if (r.sourceBranchId === user.value?.branchId) {
       return 'bg-green-100 text-green-700 border border-green-300';
@@ -1184,6 +1183,9 @@ function statusClass(r: any) {
 }
 
 function statusLabel(r: any) {
+  if (r?.type === 'EXPORT' && r?.status === 'COMPLETED' && r?.paymentStatus !== 'PAID') {
+    return '💸 Chưa thanh toán';
+  }
   const s = r?.status;
   if (s === 'DRAFT') return '⏳ Chờ duyệt';
   if (s === 'PENDING_ADMIN') {
@@ -1619,8 +1621,9 @@ const pageIcon = computed(() => {
                       <th class="px-4 py-2.5 text-left font-bold">Sản phẩm</th>
                       <th class="px-4 py-2.5 text-center font-bold">NSX</th>
                       <th class="px-4 py-2.5 text-center font-bold">HSD</th>
-                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.status === 'COMPLETED' && selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)">SL Gửi</th>
-                      <th class="px-4 py-2.5 text-right font-bold text-teal-600" v-if="selectedReceipt.status === 'COMPLETED' && selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)">SL Nhận</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)">SL Gửi</th>
+                      <th class="px-4 py-2.5 text-right font-bold text-teal-600" v-if="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)">SL Nhận</th>
+                      <th class="px-4 py-2.5 text-right font-bold text-amber-500" v-if="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)">Thiếu</th>
                       <th class="px-4 py-2.5 text-right font-bold" v-else>SL</th>
                       <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Đơn giá</th>
                       <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Thành tiền</th>
@@ -1633,12 +1636,12 @@ const pageIcon = computed(() => {
                       </td>
                       <td class="px-4 py-3 text-center text-[#8094ae]">{{ formatDate(d.manufacturingDate) }}</td>
                       <td class="px-4 py-3 text-center text-[#8094ae]">{{ formatDate(d.expirationDate) }}</td>
-                      <td class="px-4 py-3 text-right font-bold" v-if="d.receivedQuantity !== null && selectedReceipt.status === 'COMPLETED'">{{ d.quantity }}</td>
-                      <td class="px-4 py-3 text-right font-bold text-teal-600" v-if="d.receivedQuantity !== null && selectedReceipt.status === 'COMPLETED'">
-                        {{ d.receivedQuantity !== null ? d.receivedQuantity : d.quantity }}
-                        <span v-if="d.receivedQuantity !== null && d.receivedQuantity < d.quantity" class="text-xs text-amber-500 block">
-                          (-{{ d.quantity - d.receivedQuantity }})
-                        </span>
+                      <td class="px-4 py-3 text-right font-bold" v-if="d.receivedQuantity !== null">{{ d.quantity }}</td>
+                      <td class="px-4 py-3 text-right font-bold text-teal-600" v-if="d.receivedQuantity !== null">
+                        {{ d.receivedQuantity }}
+                      </td>
+                      <td class="px-4 py-3 text-right font-bold text-amber-500" v-if="d.receivedQuantity !== null">
+                        {{ d.quantity > d.receivedQuantity ? (d.quantity - d.receivedQuantity) : '-' }}
                       </td>
                       <td class="px-4 py-3 text-right font-bold" v-else>{{ d.quantity }}</td>
                       <td class="px-4 py-3 text-right" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">{{ formatVND(d.price) }}</td>
@@ -1647,7 +1650,7 @@ const pageIcon = computed(() => {
                   </tbody>
                   <tfoot v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">
                     <tr class="bg-[#f8f9fa]">
-                      <td :colspan="(selectedReceipt.status === 'COMPLETED' && selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)) ? 6 : 5" class="px-4 py-2.5 text-right font-bold text-[#8094ae] text-xs uppercase">Tổng cộng</td>
+                      <td :colspan="(selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)) ? 7 : 5" class="px-4 py-2.5 text-right font-bold text-[#8094ae] text-xs uppercase">Tổng cộng</td>
                       <td class="px-4 py-2.5 text-right font-extrabold text-[#4361ee]">
                         {{ formatVND((selectedReceipt.details || []).reduce((s: number, d: any) => s + d.quantity * d.price, 0)) }}
                       </td>
@@ -1694,7 +1697,7 @@ const pageIcon = computed(() => {
                 class="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
                 <i class="fas fa-check-double" v-if="approvingId !== selectedReceipt.id"></i>
                 <i class="fas fa-spinner fa-spin" v-else></i> 
-                {{ canApproveShortfallAdmin(selectedReceipt) ? 'Duyệt báo thiếu' : 'Duyệt báo thiếu (Gửi Admin)' }}
+                {{ canApproveShortfallAdmin(selectedReceipt) ? 'Duyệt báo thiếu' : (selectedReceipt.type === 'TRANSFER' ? 'Duyệt báo thiếu (Gửi Manager Nguồn)' : 'Duyệt báo thiếu (Gửi Admin)') }}
               </button>
               <button @click="approveShortfall(selectedReceipt, false)" :disabled="approvingId === selectedReceipt.id"
                 class="px-5 py-2.5 bg-gray-500 hover:bg-gray-600 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
