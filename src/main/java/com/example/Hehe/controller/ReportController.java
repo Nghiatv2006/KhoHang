@@ -55,25 +55,25 @@ public class ReportController {
     }
 
     @GetMapping("/dashboard/inventory-age")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF')")
     public ResponseEntity<java.util.Map<String, Object>> getInventoryAgeAnalysis(@AuthenticationPrincipal User currentUser) {
         return ResponseEntity.ok(reportService.getInventoryAgeAnalysis(currentUser));
     }
 
     @GetMapping("/dashboard/stocktake-discrepancy")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF')")
     public ResponseEntity<java.util.List<java.util.Map<String, Object>>> getStocktakeDiscrepancyHistory(@AuthenticationPrincipal User currentUser) {
         return ResponseEntity.ok(reportService.getStocktakeDiscrepancyHistory(currentUser));
     }
 
     @GetMapping("/dashboard/debt-aging")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF')")
     public ResponseEntity<java.util.Map<String, Object>> getDebtAgingAnalysis(@AuthenticationPrincipal User currentUser) {
         return ResponseEntity.ok(reportService.getDebtAgingAnalysis(currentUser));
     }
 
     @GetMapping("/dashboard/branch-sales")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF')")
     public ResponseEntity<java.util.Map<Integer, java.util.List<java.math.BigDecimal>>> getBranchSalesTrend30Days() {
         return ResponseEntity.ok(reportService.getBranchSalesTrend30Days());
     }

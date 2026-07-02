@@ -75,4 +75,9 @@ public class ReceiptController {
     public ResponseEntity<ReceiptResponse> compensateShortfall(@PathVariable Integer id, @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(receiptService.compensateShortfall(id, user));
     }
+
+    @GetMapping("/completed-branch")
+    public ResponseEntity<List<ReceiptResponse>> getCompletedBranchReceipts(@AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(receiptService.getCompletedBranchReceipts(currentUser));
+    }
 }

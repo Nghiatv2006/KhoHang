@@ -43,14 +43,14 @@ const badgeImport = ref(0)
 const badgeInvoice = ref(0)
 const badgeTransfer = ref(0)
 const badgeDisposal = ref(0)
+const badgeReceiptStocktake = ref(0)
 
 async function loadBadgeCounts() {
   try {
     const res = await api.get('/api/receipts')
     if (!res.ok) return
     const receipts: any[] = await res.json()
-    // @ts-ignore
-    const myBranchId = user.value?.branchId
+    const myBranchId = user.value?.branchId || user.value?.branch?.id
 
     const isManager = user.value?.role === 'MANAGER';
     const isAdmin = user.value?.role === 'ADMIN';
@@ -59,14 +59,14 @@ async function loadBadgeCounts() {
     // Nhập kho
     badgeImport.value = receipts.filter(r => {
       if (r.type !== 'IMPORT') return false;
-      const isDest = r.destBranchId === myBranchId;
+      const isDest = myBranchId && Number(r.destBranchId) === Number(myBranchId);
       if (r.status === 'DRAFT') return (isManager && isDest) || isAdmin;
       if (r.status === 'PENDING_ADMIN') return isAdmin;
       if (r.status === 'PENDING_STOCKTAKE') return isStaff && isDest;
       if (r.status === 'PENDING_SHORTFALL_MANAGER') return isManager && isDest;
       if (r.status === 'PENDING_SHORTFALL_ADMIN') return isAdmin;
       
-      const isSource = r.sourceBranchId === myBranchId;
+      const isSource = myBranchId && Number(r.sourceBranchId) === Number(myBranchId);
       if (r.status === 'PENDING_COMPENSATION') return (isManager && isSource) || isAdmin;
       return false;
     }).length
@@ -74,7 +74,7 @@ async function loadBadgeCounts() {
     // Hóa đơn
     badgeInvoice.value = receipts.filter(r => {
       if (r.type !== 'EXPORT') return false;
-      const isSource = r.sourceBranchId === myBranchId;
+      const isSource = myBranchId && Number(r.sourceBranchId) === Number(myBranchId);
       if (r.status === 'DRAFT') return (isManager && isSource) || isAdmin;
       if (r.status === 'PENDING_ADMIN') return isAdmin;
       if (r.status === 'COMPLETED' && (r.paymentStatus === 'UNPAID' || r.paymentStatus === 'Chưa thanh toán')) {
@@ -86,8 +86,8 @@ async function loadBadgeCounts() {
     // Điều chuyển
     badgeTransfer.value = receipts.filter(r => {
       if (r.type !== 'TRANSFER') return false;
-      const isSource = r.sourceBranchId === myBranchId;
-      const isDest = r.destBranchId === myBranchId;
+      const isSource = myBranchId && Number(r.sourceBranchId) === Number(myBranchId);
+      const isDest = myBranchId && Number(r.destBranchId) === Number(myBranchId);
       if (r.status === 'DRAFT') return (isManager && isSource) || isAdmin;
       if (r.status === 'PENDING_ADMIN') return (isManager && isDest) || isAdmin;
       if (r.status === 'PENDING_STOCKTAKE') return isStaff && isDest;
@@ -97,10 +97,17 @@ async function loadBadgeCounts() {
     // Tiêu hủy
     badgeDisposal.value = receipts.filter(r => {
       if (r.type !== 'ADJUST_OUT') return false;
-      const isSource = r.sourceBranchId === myBranchId;
+      const isSource = myBranchId && Number(r.sourceBranchId) === Number(myBranchId);
       if (r.status === 'DRAFT') return (isManager && isSource) || isAdmin;
       if (r.status === 'PENDING_ADMIN') return (isManager && isSource) || isAdmin;
       return false;
+    }).length
+
+    // Kiểm kê nhận hàng
+    badgeReceiptStocktake.value = receipts.filter(r => {
+      if (r.status !== 'PENDING_STOCKTAKE') return false;
+      if (isAdmin) return true;
+      return myBranchId && Number(r.destBranchId) === Number(myBranchId);
     }).length
   } catch (e) {
     // silent fail
@@ -138,6 +145,12 @@ const isManagerOrAdmin = computed(() => {
   if (!user.value) return false
   // @ts-ignore
   return ['ADMIN', 'MANAGER'].includes(user.value.role)
+})
+
+const totalStocktakeBadge = computed(() => {
+  const periodicCount = draftStocktakeCount.value
+  const receiptCount = badgeReceiptStocktake.value
+  return periodicCount + receiptCount
 })
 
 const adminNavItems = computed(() => {
@@ -253,11 +266,11 @@ onUnmounted(() => {
             <i class="fas fa-clipboard-list w-6 text-[1.2rem] mr-3 text-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6"></i>
             <span class="flex-1">Kiểm kê kho</span>
             <span
-              v-if="draftStocktakeCount > 0 && isManagerOrAdmin"
+              v-if="totalStocktakeBadge > 0"
               class="stocktake-badge numeric"
               title="Có phiếu kiểm kê đang chờ xử lý"
             >
-              {{ draftStocktakeCount > 99 ? '99+' : draftStocktakeCount }}
+              {{ totalStocktakeBadge > 99 ? '99+' : totalStocktakeBadge }}
             </span>
           </RouterLink>
 
@@ -348,6 +361,7 @@ onUnmounted(() => {
   background-size: 200% auto;
   animation: gradient-x 3s linear infinite;
 }
+
 /* ── Nav item hover & active ─────────────────────────────── */
 .nav-idle {
   color: #364a63;
