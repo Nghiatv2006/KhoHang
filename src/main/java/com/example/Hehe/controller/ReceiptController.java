@@ -70,9 +70,4 @@ public class ReceiptController {
         boolean isApproved = payload.getOrDefault("isApproved", false);
         return ResponseEntity.ok(receiptService.approveShortfall(id, isApproved, user));
     }
-
-    @PostMapping("/{id}/compensate-shortfall")
-    public ResponseEntity<ReceiptResponse> compensateShortfall(@PathVariable Integer id, @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(receiptService.compensateShortfall(id, user));
-    }
 }

@@ -8,5 +8,6 @@ public enum ReceiptStatus {
     PENDING_SHORTFALL_ADMIN,
     PENDING_COMPENSATION,
     COMPLETED,
-    CANCELLED
+    CANCELLED,
+    RETURN
 }
