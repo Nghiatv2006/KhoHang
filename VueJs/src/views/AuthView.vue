@@ -74,6 +74,10 @@ let renderer: WebGLRenderer | null = null
 let animationFrameId: number | null = null
 let handleResizeListener: (() => void) | null = null
 
+onMounted(() => {
+  document.documentElement.classList.remove('dark-mode')
+})
+
 onBeforeUnmount(() => {
   clearOtpTimers()
   if (animationFrameId) cancelAnimationFrame(animationFrameId)

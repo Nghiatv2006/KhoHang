@@ -169,4 +169,19 @@ public class BackupController {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // DEMO/TEST: Xóa toàn bộ dữ liệu chi nhánh (để test backup)
+    // ═══════════════════════════════════════════════════════════════
+
+    // 12. Xóa dữ liệu giao dịch chi nhánh (giữ lại user đang thao tác)
+    @PostMapping("/wipe-branch-data")
+    public ResponseEntity<?> wipeBranchData(@AuthenticationPrincipal User currentUser) {
+        try {
+            backupService.wipeBranchData(currentUser);
+            return ResponseEntity.ok(Map.of("message", "Đã xóa toàn bộ dữ liệu giao dịch chi nhánh thành công!"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
 }
