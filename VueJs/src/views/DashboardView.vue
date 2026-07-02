@@ -314,11 +314,11 @@ function updateCharts() {
     trendChartInst.setOption({
       tooltip: {
         trigger: 'axis',
-        axisPointer: { type: 'line', lineStyle: { color: '#e2e8f0', width: 1, type: 'dashed' } },
-        backgroundColor: 'rgba(255, 255, 255, 0.98)',
-        borderColor: '#e2e8f0',
+        axisPointer: { type: 'line', lineStyle: { color: document.documentElement.classList.contains('dark-mode') ? '#334155' : '#e2e8f0', width: 1, type: 'dashed' } },
+        backgroundColor: document.documentElement.classList.contains('dark-mode') ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.98)',
+        borderColor: document.documentElement.classList.contains('dark-mode') ? '#475569' : '#e2e8f0',
         borderWidth: 1,
-        textStyle: { color: '#334155', fontSize: 12 },
+        textStyle: { color: document.documentElement.classList.contains('dark-mode') ? '#f8fafc' : '#334155', fontSize: 12 },
         formatter: function (params: any) {
           let res = `<div class="font-bold mb-1.5 text-slate-700">${params[0].name}</div>`
           params.forEach((p: any) => {
@@ -344,7 +344,7 @@ function updateCharts() {
         type: 'value',
         axisLine: { show: false },
         axisTick: { show: false },
-        splitLine: { lineStyle: { color: '#f1f5f9' } },
+        splitLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.15)' } },
         axisLabel: {
           color: '#8094ae',
           fontSize: 11,
@@ -364,7 +364,7 @@ function updateCharts() {
           showSymbol: false,
           data: importValues,
           itemStyle: { color: '#05b171' },
-          lineStyle: { width: 3, shadowColor: 'rgba(5, 177, 113, 0.3)', shadowBlur: 10, shadowOffsetY: 4 },
+          lineStyle: { width: 5, shadowColor: 'rgba(5, 177, 113, 0.3)', shadowBlur: 10, shadowOffsetY: 4 },
           areaStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
               { offset: 0, color: 'rgba(5, 177, 113, 0.2)' },
@@ -379,7 +379,7 @@ function updateCharts() {
           showSymbol: false,
           data: exportValues,
           itemStyle: { color: '#6366f1' },
-          lineStyle: { width: 3, shadowColor: 'rgba(99, 102, 241, 0.3)', shadowBlur: 10, shadowOffsetY: 4 },
+          lineStyle: { width: 5, shadowColor: 'rgba(99, 102, 241, 0.3)', shadowBlur: 10, shadowOffsetY: 4 },
           areaStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
               { offset: 0, color: 'rgba(99, 102, 241, 0.2)' },
@@ -404,10 +404,10 @@ function updateCharts() {
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
-        backgroundColor: 'rgba(255, 255, 255, 0.98)',
-        borderColor: '#e2e8f0',
+        backgroundColor: document.documentElement.classList.contains('dark-mode') ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.98)',
+        borderColor: document.documentElement.classList.contains('dark-mode') ? '#475569' : '#e2e8f0',
         borderWidth: 1,
-        textStyle: { color: '#334155', fontSize: 12 },
+        textStyle: { color: document.documentElement.classList.contains('dark-mode') ? '#f8fafc' : '#334155', fontSize: 12 },
         formatter: function (params: any) {
           const valFormatted = new Intl.NumberFormat('vi-VN').format(params[0].value) + 'đ'
           return `<div class="font-bold mb-1 text-slate-700">${params[0].name}</div>
@@ -430,7 +430,7 @@ function updateCharts() {
       xAxis: { type: 'category', data: names, axisLabel: { color: '#8094ae', width: 90, overflow: 'truncate' } },
       yAxis: {
         type: 'value',
-        splitLine: { lineStyle: { color: '#f1f5f9' } },
+        splitLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.15)' } },
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: {
@@ -506,10 +506,10 @@ function updateCharts() {
           }
           return html
         },
-        backgroundColor: 'rgba(255, 255, 255, 0.98)',
-        borderColor: '#e2e8f0',
+        backgroundColor: document.documentElement.classList.contains('dark-mode') ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.98)',
+        borderColor: document.documentElement.classList.contains('dark-mode') ? '#475569' : '#e2e8f0',
         borderWidth: 1,
-        textStyle: { color: '#334155', fontSize: 12 },
+        textStyle: { color: document.documentElement.classList.contains('dark-mode') ? '#f8fafc' : '#334155', fontSize: 12 },
         padding: [10, 15]
       },
       legend: { show: false }, // Ẩn legend ở dưới, dùng label chỉa ra ngoài cho Pro
@@ -522,7 +522,7 @@ function updateCharts() {
             style: {
               text: 'Tổng thu\n' + totalRevStr,
               textAlign: 'center',
-              fill: '#475569',
+              fill: document.documentElement.classList.contains('dark-mode') ? '#cbd5e1' : '#475569',
               fontSize: 14,
               fontWeight: 'bold',
               lineHeight: 22
@@ -555,9 +555,9 @@ function updateCharts() {
             return `{b|${params.name}}\n{c|${valStr}} {d|(${params.percent}%)}`;
           },
           rich: {
-            b: { color: '#475569', fontSize: 11, fontWeight: 'bold', padding: [0, 0, 4, 0] },
-            c: { color: '#6366f1', fontSize: 11, fontWeight: 'bold' },
-            d: { color: '#10b981', fontSize: 11, fontWeight: 'bold' }
+            b: { color: document.documentElement.classList.contains('dark-mode') ? '#cbd5e1' : '#475569', fontSize: 13, fontWeight: 'bold', padding: [0, 0, 4, 0] },
+            c: { color: document.documentElement.classList.contains('dark-mode') ? '#a5b4fc' : '#6366f1', fontSize: 13, fontWeight: 'bold' },
+            d: { color: document.documentElement.classList.contains('dark-mode') ? '#6ee7b7' : '#10b981', fontSize: 13, fontWeight: 'bold' }
           }
         },
         labelLine: {
@@ -588,9 +588,9 @@ function updateCharts() {
       tooltip: {
         trigger: 'item',
         formatter: '<div class="font-bold mb-1">{b}</div><div class="flex justify-between gap-4"><span class="text-slate-500">Đã bán:</span> <span class="text-indigo-600 font-bold">{c} sp</span></div><div class="flex justify-between gap-4"><span class="text-slate-500">Tỷ trọng:</span> <span class="text-emerald-500 font-bold">{d}%</span></div>',
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderColor: '#e2e8f0',
-        textStyle: { color: '#1e293b' },
+        backgroundColor: document.documentElement.classList.contains('dark-mode') ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+        borderColor: document.documentElement.classList.contains('dark-mode') ? '#475569' : '#e2e8f0',
+        textStyle: { color: document.documentElement.classList.contains('dark-mode') ? '#f8fafc' : '#1e293b' },
         padding: [10, 15]
       },
       // TiÃªu Ä‘á» Typography xá»‹n xÃ² á»Ÿ giá»¯a tÃ¢m
@@ -600,7 +600,7 @@ function updateCharts() {
         left: 'center',
         top: 'center',
         textStyle: {
-          color: '#334155',
+          color: document.documentElement.classList.contains('dark-mode') ? '#f8fafc' : '#334155',
           fontSize: 16,
           fontWeight: '900',
           lineHeight: 24
@@ -624,8 +624,8 @@ function updateCharts() {
             show: true,
             formatter: '{b|{b}}\n{c|{c} sp}',
             rich: {
-              b: { color: '#1e293b', fontSize: 13, fontWeight: '800', padding: [0, 0, 4, 0] },
-              c: { color: '#4f46e5', fontSize: 15, fontWeight: '900', textShadowBlur: 4, textShadowColor: 'rgba(79, 70, 229, 0.2)' }
+              b: { color: document.documentElement.classList.contains('dark-mode') ? '#cbd5e1' : '#1e293b', fontSize: 13, fontWeight: '800', padding: [0, 0, 4, 0] },
+              c: { color: document.documentElement.classList.contains('dark-mode') ? '#a5b4fc' : '#4f46e5', fontSize: 15, fontWeight: '900', textShadowBlur: 4, textShadowColor: 'rgba(79, 70, 229, 0.2)' }
             }
           },
           labelLine: {
@@ -690,11 +690,11 @@ function updateCharts() {
     headBranchImportChartInst.setOption({
       tooltip: {
         trigger: 'axis',
-        axisPointer: { type: 'line', lineStyle: { color: '#e2e8f0', width: 1, type: 'dashed' } },
-        backgroundColor: 'rgba(255, 255, 255, 0.98)',
-        borderColor: '#e2e8f0',
+        axisPointer: { type: 'line', lineStyle: { color: document.documentElement.classList.contains('dark-mode') ? '#334155' : '#e2e8f0', width: 1, type: 'dashed' } },
+        backgroundColor: document.documentElement.classList.contains('dark-mode') ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.98)',
+        borderColor: document.documentElement.classList.contains('dark-mode') ? '#475569' : '#e2e8f0',
         borderWidth: 1,
-        textStyle: { color: '#334155', fontSize: 12 },
+        textStyle: { color: document.documentElement.classList.contains('dark-mode') ? '#f8fafc' : '#334155', fontSize: 12 },
         formatter: function (params: any) {
           let res = `<div class="font-bold mb-1.5 text-slate-700">${params[0].name}</div>`
           params.forEach((p: any) => {
@@ -720,7 +720,7 @@ function updateCharts() {
         type: 'value',
         axisLine: { show: false },
         axisTick: { show: false },
-        splitLine: { lineStyle: { color: '#f1f5f9' } },
+        splitLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.15)' } },
         axisLabel: {
           color: '#8094ae',
           fontSize: 11,
@@ -740,7 +740,7 @@ function updateCharts() {
           showSymbol: false,
           data: importValues,
           itemStyle: { color: '#05b171' },
-          lineStyle: { width: 3, shadowColor: 'rgba(5, 177, 113, 0.3)', shadowBlur: 10, shadowOffsetY: 4 },
+          lineStyle: { width: 5, shadowColor: 'rgba(5, 177, 113, 0.3)', shadowBlur: 10, shadowOffsetY: 4 },
           areaStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
               { offset: 0, color: 'rgba(5, 177, 113, 0.2)' },

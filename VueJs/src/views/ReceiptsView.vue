@@ -1276,28 +1276,28 @@ function statusClass(r: any) {
   const s = r?.status;
   if (r?.type === 'TRANSFER' && s === 'PENDING_ADMIN') {
     if (r.sourceBranchId === user.value?.branchId) {
-      return 'bg-green-100 text-green-700 border border-green-300';
+      return 'bg-green-600 text-white shadow-sm';
     }
-    return 'bg-orange-100 text-orange-700 border border-orange-300';
+    return 'bg-orange-500 text-white shadow-sm';
   }
   if ((s === 'PENDING_ADMIN' || s === 'PENDING_STOCKTAKE') && r?.type === 'TRANSFER') {
-    return 'bg-orange-100 text-orange-700 border border-orange-300';
+    return 'bg-orange-500 text-white shadow-sm';
   }
   // Hóa đơn (EXPORT) chưa thanh toán → màu đỏ thay vì xanh
   if (s === 'COMPLETED' && r?.type === 'EXPORT' && (r.paymentStatus === 'UNPAID' || r.paymentStatus === 'Chưa thanh toán')) {
-    return 'bg-red-100 text-red-600 border border-red-300';
+    return 'bg-red-500 text-white shadow-sm';
   }
   const map: Record<string, string> = {
-    DRAFT: 'bg-yellow-100 text-yellow-700 border border-yellow-300',
-    PENDING_ADMIN: 'bg-blue-100 text-blue-700 border border-blue-300',
-    PENDING_STOCKTAKE: 'bg-purple-100 text-purple-700 border border-purple-300',
-    PENDING_SHORTFALL_MANAGER: 'bg-orange-100 text-orange-700 border border-orange-300',
-    PENDING_SHORTFALL_ADMIN: 'bg-rose-100 text-rose-700 border border-rose-300',
-    PENDING_COMPENSATION: 'bg-indigo-100 text-indigo-700 border border-indigo-300',
-    COMPLETED: 'bg-green-100 text-green-700 border border-green-300',
-    CANCELLED: 'bg-red-100 text-red-600 border border-red-300'
+    DRAFT: 'bg-yellow-500 text-white shadow-sm',
+    PENDING_ADMIN: 'bg-blue-500 text-white shadow-sm',
+    PENDING_STOCKTAKE: 'bg-purple-500 text-white shadow-sm',
+    PENDING_SHORTFALL_MANAGER: 'bg-orange-500 text-white shadow-sm',
+    PENDING_SHORTFALL_ADMIN: 'bg-rose-500 text-white shadow-sm',
+    PENDING_COMPENSATION: 'bg-indigo-500 text-white shadow-sm',
+    COMPLETED: 'bg-green-600 text-white shadow-sm',
+    CANCELLED: 'bg-red-500 text-white shadow-sm'
   }
-  return map[s] || 'bg-gray-100 text-gray-600'
+  return map[s] || 'bg-slate-500 text-white shadow-sm'
 }
 
 function statusLabel(r: any) {
@@ -1402,58 +1402,58 @@ function getCustomerName(receipt: any) {
     <!-- STAT CARDS -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
       <div @click="filterStatus = filterStatus === 'DRAFT' ? '' : 'DRAFT'"
-        :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'DRAFT' ? 'border-yellow-400 ring-2 ring-yellow-200' : 'border-[#f1f5f9] hover:border-yellow-300']">
-        <div class="w-12 h-12 rounded-xl bg-yellow-50 flex items-center justify-center text-yellow-500 text-xl">
+        :class="['bg-white rounded-2xl p-6 border transition-all duration-300 cursor-pointer flex items-center gap-5 hover:-translate-y-1 hover:shadow-lg', filterStatus === 'DRAFT' ? 'border-yellow-400 ring-2 ring-yellow-200 shadow-md' : 'border-[#f1f5f9] hover:border-yellow-300']">
+        <div class="w-14 h-14 rounded-2xl bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center text-yellow-500 text-2xl shadow-sm">
           <i class="fas fa-pencil-alt"></i>
         </div>
         <div>
-          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide">Chờ duyệt</div>
-          <div class="text-2xl font-extrabold text-yellow-500">{{ statDraft }}</div>
+          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide mb-1">Chờ duyệt</div>
+          <div class="text-3xl font-black text-yellow-500">{{ statDraft }}</div>
         </div>
       </div>
       <div @click="filterStatus = filterStatus === 'COMPLETED' ? '' : 'COMPLETED'"
-        :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'COMPLETED' ? 'border-green-400 ring-2 ring-green-200' : 'border-[#f1f5f9] hover:border-green-300']">
-        <div class="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center text-green-500 text-xl">
+        :class="['bg-white rounded-2xl p-6 border transition-all duration-300 cursor-pointer flex items-center gap-5 hover:-translate-y-1 hover:shadow-lg', filterStatus === 'COMPLETED' ? 'border-green-400 ring-2 ring-green-200 shadow-md' : 'border-[#f1f5f9] hover:border-green-300']">
+        <div class="w-14 h-14 rounded-2xl bg-green-500/10 border border-green-500/30 flex items-center justify-center text-green-500 text-2xl shadow-sm">
           <i class="fas fa-check-circle"></i>
         </div>
         <div>
-          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide">Đã duyệt</div>
-          <div class="text-2xl font-extrabold text-green-500">{{ statCompleted }}</div>
+          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide mb-1">Đã duyệt</div>
+          <div class="text-3xl font-black text-green-500">{{ statCompleted }}</div>
         </div>
       </div>
 
       <div @click="filterStatus = filterStatus === 'CANCELLED' ? '' : 'CANCELLED'"
-        :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'CANCELLED' ? 'border-red-400 ring-2 ring-red-200' : 'border-[#f1f5f9] hover:border-red-300']">
-        <div class="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center text-red-400 text-xl">
+        :class="['bg-white rounded-2xl p-6 border transition-all duration-300 cursor-pointer flex items-center gap-5 hover:-translate-y-1 hover:shadow-lg', filterStatus === 'CANCELLED' ? 'border-red-400 ring-2 ring-red-200 shadow-md' : 'border-[#f1f5f9] hover:border-red-300']">
+        <div class="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500 text-2xl shadow-sm">
           <i class="fas fa-times-circle"></i>
         </div>
         <div>
-          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide">Đã hủy</div>
-          <div class="text-2xl font-extrabold text-red-400">{{ statCancelled }}</div>
+          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide mb-1">Đã hủy</div>
+          <div class="text-3xl font-black text-red-500">{{ statCancelled }}</div>
         </div>
       </div>
 
       <!-- Hóa đơn: card Chưa thanh toán -->
       <div v-if="receiptType === 'EXPORT'" @click="filterStatus = filterStatus === 'UNPAID' ? '' : 'UNPAID'"
-        :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'UNPAID' ? 'border-orange-400 ring-2 ring-orange-200' : 'border-[#f1f5f9] hover:border-orange-300']">
-        <div class="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center text-orange-400 text-xl">
+        :class="['bg-white rounded-2xl p-6 border transition-all duration-300 cursor-pointer flex items-center gap-5 hover:-translate-y-1 hover:shadow-lg', filterStatus === 'UNPAID' ? 'border-orange-400 ring-2 ring-orange-200 shadow-md' : 'border-[#f1f5f9] hover:border-orange-300']">
+        <div class="w-14 h-14 rounded-2xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-500 text-2xl shadow-sm">
           <i class="fas fa-file-invoice-dollar"></i>
         </div>
         <div>
-          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide">Chưa thanh toán</div>
-          <div class="text-2xl font-extrabold text-orange-400">{{ statUnpaid }}</div>
+          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide mb-1">Chưa thanh toán</div>
+          <div class="text-3xl font-black text-orange-500">{{ statUnpaid }}</div>
         </div>
       </div>
 
       <!-- Nhập kho / Điều chuyển: card Chờ Admin -->
       <div v-if="receiptType === 'IMPORT' || receiptType === 'TRANSFER'" @click="filterStatus = filterStatus === 'PENDING_ADMIN' ? '' : 'PENDING_ADMIN'"
-        :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'PENDING_ADMIN' ? 'border-blue-400 ring-2 ring-blue-200' : 'border-[#f1f5f9] hover:border-blue-300']">
-        <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500 text-xl">
+        :class="['bg-white rounded-2xl p-6 border transition-all duration-300 cursor-pointer flex items-center gap-5 hover:-translate-y-1 hover:shadow-lg', filterStatus === 'PENDING_ADMIN' ? 'border-blue-400 ring-2 ring-blue-200 shadow-md' : 'border-[#f1f5f9] hover:border-blue-300']">
+        <div class="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-500 text-2xl shadow-sm">
           <i class="fas fa-shield-alt"></i>
         </div>
         <div>
-          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide">Chờ Admin</div>
-          <div class="text-2xl font-extrabold text-blue-500">{{ statPendingAdmin }}</div>
+          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide mb-1">Chờ Admin</div>
+          <div class="text-3xl font-black text-blue-500">{{ statPendingAdmin }}</div>
         </div>
       </div>
     </div>
@@ -1552,26 +1552,26 @@ function getCustomerName(receipt: any) {
       <div v-else class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
-            <tr class="bg-[#f8f9fa] text-[#8094ae] text-xs uppercase tracking-wider">
-              <th class="px-5 py-3 text-left font-bold">Mã phiếu</th>
-              <th v-if="!receiptType" class="px-5 py-3 text-left font-bold">Loại</th>
-              <th class="px-5 py-3 text-left font-bold">Trạng thái</th>
-              <th class="px-5 py-3 text-left font-bold">Chênh lệch</th>
-              <th class="px-5 py-3 text-left font-bold">Chi nhánh nguồn</th>
-              <th class="px-5 py-3 text-left font-bold">Đích / Khách hàng</th>
-              <th class="px-5 py-3 text-left font-bold">Người lập</th>
-              <th class="px-5 py-3 text-left font-bold">Ngày tạo</th>
-              <th class="px-5 py-3 text-center font-bold">Thao tác</th>
+            <tr class="bg-slate-200 text-[#364a63] text-xs uppercase tracking-wider">
+              <th class="px-6 py-4 text-left font-extrabold">Mã phiếu</th>
+              <th v-if="!receiptType" class="px-6 py-4 text-left font-extrabold">Loại</th>
+              <th class="px-6 py-4 text-left font-extrabold">Trạng thái</th>
+              <th class="px-6 py-4 text-left font-extrabold">Chênh lệch</th>
+              <th class="px-6 py-4 text-left font-extrabold">Chi nhánh nguồn</th>
+              <th class="px-6 py-4 text-left font-extrabold">Đích / Khách hàng</th>
+              <th class="px-6 py-4 text-left font-extrabold">Người lập</th>
+              <th class="px-6 py-4 text-left font-extrabold">Ngày tạo</th>
+              <th class="px-6 py-4 text-center font-extrabold">Thao tác</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-[#f1f5f9]">
             <tr v-for="r in paginatedReceipts" :key="r.id"
               @dblclick="openDetail(r)"
               :class="[
-                'hover:bg-[#f8f9fa]/80 cursor-pointer transition-colors group',
+                'hover:bg-[#f8f9fa]/80 cursor-pointer transition-colors group even:bg-slate-50/60',
                 r.hasDeviation && (r.status === 'PENDING_SHORTFALL_MANAGER' || r.status === 'PENDING_SHORTFALL_ADMIN') ? 'bg-rose-50/40 hover:bg-rose-100/40' : ''
               ]">
-              <td class="px-5 py-4">
+              <td class="px-6 py-5">
                 <span class="font-mono font-bold text-[#4361ee] text-xs">{{ r.code }}</span>
               </td>
               <td v-if="!receiptType" class="px-5 py-4">
@@ -1579,7 +1579,7 @@ function getCustomerName(receipt: any) {
                   {{ typeLabel(r.type) }}
                 </span>
               </td>
-              <td class="px-5 py-4">
+              <td class="px-6 py-5">
                 <div class="flex flex-col gap-1">
                   <span :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-bold', statusClass(r)]">
                     {{ statusLabel(r) }}
@@ -1589,7 +1589,7 @@ function getCustomerName(receipt: any) {
                   </span>
                 </div>
               </td>
-              <td class="px-5 py-4">
+              <td class="px-6 py-5">
                 <div v-if="r.hasDeviation" class="flex flex-col max-w-[200px]" :title="r.deviationSummary">
                   <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-rose-50 text-rose-600 border border-rose-100 w-fit">
                     ⚠️ Lệch số lượng
@@ -1605,27 +1605,27 @@ function getCustomerName(receipt: any) {
                 </div>
                 <div v-else class="text-xs text-slate-400">—</div>
               </td>
-              <td class="px-5 py-4">
+              <td class="px-6 py-5">
                 <span class="text-[#364a63] font-medium">{{ r.sourceBranchName || '—' }}</span>
               </td>
-              <td class="px-5 py-4">
+              <td class="px-6 py-5">
                 <span class="text-[#364a63] font-medium" v-if="r.type === 'EXPORT'">{{ getCustomerName(r) }}</span>
                 <span class="text-[#364a63] font-medium" v-else>{{ r.destBranchName || '—' }}</span>
               </td>
-              <td class="px-5 py-4">
+              <td class="px-6 py-5">
                 <div class="text-[#8094ae]">{{ r.createdByName }}</div>
                 <div v-if="r.stocktakeByName" class="text-xs text-purple-600 mt-1 font-semibold" title="Người kiểm kê"><i class="fas fa-clipboard-check"></i> {{ r.stocktakeByName }}</div>
                 <div v-else-if="r.status === 'COMPLETED' && (r.type === 'IMPORT' || r.type === 'TRANSFER') && r.createdByRole === 'STAFF'" class="text-xs text-purple-600 mt-1 font-semibold opacity-60" title="Người kiểm kê (Dữ liệu cũ)"><i class="fas fa-clipboard-check"></i> {{ r.createdByName }}</div>
               </td>
-              <td class="px-5 py-4">
+              <td class="px-6 py-5">
                 <span class="text-[#8094ae] text-xs">{{ formatDateTime(r.createdAt) }}</span>
               </td>
-              <td class="px-5 py-4">
+              <td class="px-6 py-5">
                 <div class="flex items-center justify-center gap-2">
                   <button @click.stop="openDetail(r)"
-                    class="w-8 h-8 flex items-center justify-center rounded-lg bg-[#f1f5f9] hover:bg-[#4361ee] hover:text-white text-[#8094ae] transition-all"
+                    class="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-600 hover:bg-[#4361ee] text-white transition-all shadow-sm"
                     title="Xem chi tiết">
-                    <i class="fas fa-eye text-xs"></i>
+                    <i class="fas fa-eye text-sm"></i>
                   </button>
                   <button v-if="canApproveReceipt(r)"
                     @click.stop="approveReceipt(r)"
@@ -1906,7 +1906,7 @@ function getCustomerName(receipt: any) {
       <Transition name="slide-panel">
         <div v-if="showCreateModal" class="fixed inset-y-0 right-0 z-[101] w-full max-w-[800px] bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] flex flex-col border-l border-[#e2e8f0]">
           <!-- Header -->
-          <div class="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-[#4361ee] to-[#4cc9f0] text-white">
+          <div class="flex items-center justify-between px-6 py-4 bg-[#1e293b] text-white">
             <div>
               <div class="text-xs font-bold opacity-70 uppercase">
                 {{ createForm.type === 'EXPORT' ? 'Lập hóa đơn' : createForm.type === 'TRANSFER' ? 'Lập phiếu điều chuyển' : createForm.type === 'ADJUST_OUT' ? 'Lập phiếu tiêu hủy' : 'Lập phiếu kho' }}

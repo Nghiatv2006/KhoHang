@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, onBeforeUnmount, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api'
 
@@ -64,6 +64,10 @@ function clearOtpTimers() {
   otpExpirySeconds.value = 300
   resendCooldown.value = 0
 }
+
+onMounted(() => {
+  document.documentElement.classList.remove('dark-mode')
+})
 
 onBeforeUnmount(() => {
   clearOtpTimers()
