@@ -510,9 +510,9 @@ onMounted(async () => {
         <button
           v-for="tab in [
             { key: 'periodic', label: 'Kiểm kê định kỳ', icon: 'fas fa-clipboard-list',
-              badge: draftStocktakeCount.value },
+              badge: draftStocktakeCount },
             { key: 'receipt',  label: 'Kiểm kê nhận hàng', icon: 'fas fa-truck-loading',
-              badge: pendingReceiptStocktakesCount.value }
+              badge: pendingReceiptStocktakesCount }
           ]"
           :key="tab.key"
           :class="[

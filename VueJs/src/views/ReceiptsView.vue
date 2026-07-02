@@ -7,6 +7,10 @@ import AppModal from '../components/AppModal.vue'
 
 const route = useRoute()
 
+const props = defineProps<{
+  receiptType?: string
+}>()
+
 const toast = useToast()
 const user = ref<any>(JSON.parse(localStorage.getItem('wh_user') || '{}'))
 const isAdmin = computed(() => user.value?.role === 'ADMIN')
@@ -2052,7 +2056,7 @@ const pageIcon = computed(() => {
                 <div class="flex items-center gap-3">
                   <label class="text-xs text-[#8094ae] whitespace-nowrap">Thực đếm:</label>
                   <input v-model.number="item.actualQuantity" type="number" :min="0" @keydown="(e) => { if(['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault() }"
-                    @input="(e) => { let v = parseInt(e.target.value, 10); if(isNaN(v)||v<0) v=0; if(v>item.sentQty) v=item.sentQty; item.actualQuantity = v; e.target.value = v; }"
+                    @input="(e) => { const target = e.target as HTMLInputElement; let v = parseInt(target.value, 10); if(isNaN(v)||v<0) v=0; if(v>item.sentQty) v=item.sentQty; item.actualQuantity = v; target.value = String(v); }"
                     class="flex-1 h-9 px-3 border rounded-lg text-sm focus:ring-2 focus:ring-purple-400/20 focus:border-purple-400 outline-none"
                     :class="item.actualQuantity < item.sentQty ? 'border-amber-400 bg-amber-50' : 'border-[#e2e8f0]'" />
                   <span v-if="item.actualQuantity < item.sentQty"
@@ -2120,7 +2124,7 @@ const pageIcon = computed(() => {
                 <div class="flex items-center gap-3">
                   <label class="text-xs text-[#8094ae] whitespace-nowrap">Số lượng nhận:</label>
                   <input v-model.number="item.actualQuantity" type="number" :min="0" @keydown="(e) => { if(['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault() }"
-                    @input="(e) => { let v = parseInt(e.target.value, 10); if(isNaN(v)||v<0) v=0; if(v>item.sentQty) v=item.sentQty; item.actualQuantity = v; e.target.value = v; }"
+                    @input="(e) => { const target = e.target as HTMLInputElement; let v = parseInt(target.value, 10); if(isNaN(v)||v<0) v=0; if(v>item.sentQty) v=item.sentQty; item.actualQuantity = v; target.value = String(v); }"
                     class="flex-1 h-9 px-3 border rounded-lg text-sm focus:ring-2 focus:ring-sky-400/20 focus:border-sky-400 outline-none"
                     :class="item.actualQuantity < item.sentQty ? 'border-amber-400 bg-amber-50' : 'border-[#e2e8f0]'" />
                   <span v-if="item.actualQuantity < item.sentQty"

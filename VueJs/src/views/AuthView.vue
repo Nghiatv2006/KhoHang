@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { api } from '../api'
 import {
   Scene, WebGLRenderer, PerspectiveCamera, Color, Group, Mesh,
-  BoxGeometry, MeshStandardMaterial, Object3D, Matrix4, Vector3,
+  BoxGeometry, MeshStandardMaterial,
   AmbientLight, DirectionalLight
 } from 'three'
 
@@ -381,7 +381,7 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 function easeInQuad(t: number) { return t * t }
 function easeOutQuad(t: number) { return t * (2 - t) }
 function easeInOutQuad(t: number) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t }
-function easeOutBack(t: number) { const c = 1.70158; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2) }
+// Removed unused easeOutBack
 function easeOutSine(t: number) { return Math.sin(t * Math.PI / 2) }
 function easeInCubic(t: number) { return t * t * t }
 function easeOutElastic(t: number) {
@@ -430,7 +430,7 @@ function init3DAnimation() {
 
   // ─── Floor tiles ───────────────────────────────────────────────
   const COLS = 31, ROWS = 31
-  const EXPLODE_RADIUS = 10
+  // Removed unused EXPLODE_RADIUS
   const centerCol = Math.floor(COLS / 2)
   const centerRow = Math.floor(ROWS / 2)
 
