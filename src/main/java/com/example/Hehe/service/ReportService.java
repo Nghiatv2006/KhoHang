@@ -12,4 +12,6 @@ public interface ReportService {
     java.util.Map<String, Object> getInventoryAgeAnalysis(User currentUser);
     
     java.util.List<java.util.Map<String, Object>> getStocktakeDiscrepancyHistory(User currentUser);
+    
+    java.util.Map<Integer, java.util.List<java.math.BigDecimal>> getBranchSalesTrend30Days();
 }

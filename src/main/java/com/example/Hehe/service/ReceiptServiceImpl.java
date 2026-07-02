@@ -158,7 +158,7 @@ public class ReceiptServiceImpl implements ReceiptService {
                         boolean isMyReceipt = r.getCreatedBy() != null && r.getCreatedBy().getId().equals(currentUser.getId());
                         boolean isIncoming = (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.TRANSFER) 
                                              && r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId)
-                                             && (r.getStatus() == ReceiptStatus.PENDING_STOCKTAKE || r.getStatus() == ReceiptStatus.COMPLETED);
+                                             && (r.getStatus() != ReceiptStatus.DRAFT && r.getStatus() != ReceiptStatus.PENDING_ADMIN);
                         return isMyReceipt || isIncoming;
                     }
                     
@@ -770,6 +770,8 @@ public class ReceiptServiceImpl implements ReceiptService {
         }
 
         receiptRepository.save(r);
+        auditLogService.logAction(currentUser, "CONFIRM_STOCKTAKE", "receipts", String.valueOf(r.getId()),
+                "Xác nhận kiểm kê nhận hàng cho phiếu " + r.getCode() + ". Kết quả: " + (hasShortfall ? "Có hao hụt" : "Đầy đủ/Khớp"));
         return new ReceiptResponse(r);
     }
 
@@ -881,7 +883,73 @@ public class ReceiptServiceImpl implements ReceiptService {
         } else {
             throw new RuntimeException("Phiếu không ở trạng thái chờ duyệt thiếu hụt.");
         }
+        auditLogService.logAction(currentUser, isApproved ? "APPROVE_SHORTFALL" : "REJECT_SHORTFALL", "receipts", String.valueOf(r.getId()),
+                (isApproved ? "Duyệt" : "Từ chối") + " hao hụt cho phiếu " + r.getCode() + ". Trạng thái mới: " + r.getStatus());
+        return new ReceiptResponse(r);
+    }
+
+    @Transactional
+    @Override
+    public ReceiptResponse compensateShortfall(Integer id, User currentUser) {
+        Receipt r = receiptRepository.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
+        if (r.getStatus() != ReceiptStatus.PENDING_COMPENSATION) {
+            throw new RuntimeException("Phiếu không ở trạng thái chờ bù hao hụt.");
+        }
         
+        if (currentUser.getRole() != UserRole.MANAGER && currentUser.getRole() != UserRole.ADMIN) {
+            throw new RuntimeException("Chỉ Quản lý chi nhánh tổng mới có quyền tạo phiếu điều chuyển bù.");
+        }
+        Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
+        if (currentUser.getRole() == UserRole.MANAGER) {
+            if (r.getSourceBranch() == null || !r.getSourceBranch().getId().equals(myBranchId)) {
+                throw new RuntimeException("Chỉ Quản lý chi nhánh tổng (nguồn) mới được thao tác.");
+            }
+        }
+
+        // Tạo phiếu điều chuyển mới
+        Receipt newTransfer = new Receipt();
+        newTransfer.setCode("COMP-" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+        newTransfer.setType(ReceiptType.TRANSFER);
+        newTransfer.setStatus(ReceiptStatus.PENDING_ADMIN); // Đẩy thẳng lên chờ Admin duyệt
+        newTransfer.setSourceBranch(r.getSourceBranch());
+        newTransfer.setDestBranch(r.getDestBranch());
+        newTransfer.setCreatedBy(currentUser);
+        newTransfer.setCreatedAt(java.time.LocalDateTime.now());
+        newTransfer.setDescription("Phiếu điều chuyển bù hao hụt cho phiếu " + r.getCode());
+        
+        java.util.List<ReceiptDetail> newDetails = new java.util.ArrayList<>();
+        for (ReceiptDetail d : r.getDetails()) {
+            if (d.getReceivedQuantity() != null && d.getReceivedQuantity() < d.getQuantity()) {
+                int shortfallQty = d.getQuantity() - d.getReceivedQuantity();
+                
+                // Trừ tồn kho tại chi nhánh nguồn
+                addInventory(r.getSourceBranch(), d, -shortfallQty);
+                
+                ReceiptDetail newDetail = new ReceiptDetail();
+                newDetail.setReceipt(newTransfer);
+                newDetail.setProduct(d.getProduct());
+                newDetail.setQuantity(shortfallQty);
+                newDetail.setPrice(d.getPrice());
+                newDetail.setManufacturingDate(d.getManufacturingDate());
+                newDetail.setExpirationDate(d.getExpirationDate());
+                newDetails.add(newDetail);
+            }
+        }
+        
+        if (newDetails.isEmpty()) {
+            throw new RuntimeException("Không tìm thấy hàng hóa nào bị thiếu hụt.");
+        }
+        
+        newTransfer.setDetails(newDetails);
+        receiptRepository.save(newTransfer);
+        
+        // Cập nhật phiếu gốc thành COMPLETED
+        r.setStatus(ReceiptStatus.COMPLETED);
+        // Cập nhật công nợ nếu có
+        updateCustomerDebt(r, true, false, false);
+        receiptRepository.save(r);
+        auditLogService.logAction(currentUser, "COMPENSATE_SHORTFALL", "receipts", String.valueOf(r.getId()),
+                "Duyệt tạo phiếu bù điều chuyển hao hụt cho phiếu " + r.getCode() + ". Phiếu bù mới: " + newTransfer.getCode());
         return new ReceiptResponse(r);
     }
 
@@ -967,6 +1035,31 @@ public class ReceiptServiceImpl implements ReceiptService {
 
         r.setPaymentStatus("RECEIVED");
         receiptRepository.save(r);
+        auditLogService.logAction(currentUser, "CONFIRM_TRANSFER", "receipts", String.valueOf(r.getId()),
+                "Xác nhận nhận hàng điều chuyển cho phiếu " + r.getCode() + ". Trạng thái thanh toán/nhận: RECEIVED");
         return new ReceiptResponse(r);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ReceiptResponse> getCompletedBranchReceipts(User currentUser) {
+        boolean isGlobalUser = currentUser.getRole() == UserRole.ADMIN || 
+                               (currentUser.getBranch() != null && currentUser.getBranch().getId() == 1);
+        if (isGlobalUser) {
+            return receiptRepository.findAll().stream()
+                    .filter(r -> r.getStatus() == ReceiptStatus.COMPLETED)
+                    .map(ReceiptResponse::new)
+                    .collect(Collectors.toList());
+        }
+
+        Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
+        if (myBranchId == null) throw new RuntimeException("Bạn chưa thuộc chi nhánh nào.");
+
+        return receiptRepository.findAll().stream()
+                .filter(r -> r.getStatus() == ReceiptStatus.COMPLETED &&
+                             ((r.getSourceBranch() != null && r.getSourceBranch().getId().equals(myBranchId)) ||
+                              (r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId))))
+                .map(ReceiptResponse::new)
+                .collect(Collectors.toList());
     }
 }

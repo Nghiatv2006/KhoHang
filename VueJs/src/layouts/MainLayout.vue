@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
+import { draftStocktakeCount, refreshStocktakeBadge } from '../utils/stocktakeStore'
 
 const route = useRoute()
 const router = useRouter()
@@ -12,6 +13,8 @@ const user = ref<{
   fullName: string
   branchName: string
   roles: string[]
+  role?: string
+  branchId?: number
 } | null>(null)
 
 onMounted(() => {
@@ -29,6 +32,10 @@ const hasCrudPermission = computed(() => {
   return user.value.role === 'ADMIN'
 })
 
+// ── Stocktake draft badge (dùng chung store) ─────────────────
+let stocktakeTimer: ReturnType<typeof setInterval>
+// ─────────────────────────────────────────────────────────────
+
 // ──────────────────────────────────────────────────────────────
 // NOTIFICATION BADGES — Đếm phiếu cần xử lý
 // ──────────────────────────────────────────────────────────────
@@ -36,14 +43,14 @@ const badgeImport = ref(0)
 const badgeInvoice = ref(0)
 const badgeTransfer = ref(0)
 const badgeDisposal = ref(0)
+const badgeReceiptStocktake = ref(0)
 
 async function loadBadgeCounts() {
   try {
     const res = await api.get('/api/receipts')
     if (!res.ok) return
     const receipts: any[] = await res.json()
-    // @ts-ignore
-    const myBranchId = user.value?.branchId
+    const myBranchId = user.value?.branchId || user.value?.branch?.id
 
     const isManager = user.value?.role === 'MANAGER';
     const isAdmin = user.value?.role === 'ADMIN';
@@ -52,14 +59,14 @@ async function loadBadgeCounts() {
     // Nhập kho
     badgeImport.value = receipts.filter(r => {
       if (r.type !== 'IMPORT') return false;
-      const isDest = r.destBranchId === myBranchId;
+      const isDest = myBranchId && Number(r.destBranchId) === Number(myBranchId);
       if (r.status === 'DRAFT') return (isManager && isDest) || isAdmin;
       if (r.status === 'PENDING_ADMIN') return isAdmin;
       if (r.status === 'PENDING_STOCKTAKE') return isStaff && isDest;
       if (r.status === 'PENDING_SHORTFALL_MANAGER') return isManager && isDest;
       if (r.status === 'PENDING_SHORTFALL_ADMIN') return isAdmin;
       
-      const isSource = r.sourceBranchId === myBranchId;
+      const isSource = myBranchId && Number(r.sourceBranchId) === Number(myBranchId);
       if (r.status === 'PENDING_COMPENSATION') return (isManager && isSource) || isAdmin;
       return false;
     }).length
@@ -67,7 +74,7 @@ async function loadBadgeCounts() {
     // Hóa đơn
     badgeInvoice.value = receipts.filter(r => {
       if (r.type !== 'EXPORT') return false;
-      const isSource = r.sourceBranchId === myBranchId;
+      const isSource = myBranchId && Number(r.sourceBranchId) === Number(myBranchId);
       if (r.status === 'DRAFT') return (isManager && isSource) || isAdmin;
       if (r.status === 'PENDING_ADMIN') return isAdmin;
       if (r.status === 'COMPLETED' && (r.paymentStatus === 'UNPAID' || r.paymentStatus === 'Chưa thanh toán')) {
@@ -79,8 +86,8 @@ async function loadBadgeCounts() {
     // Điều chuyển
     badgeTransfer.value = receipts.filter(r => {
       if (r.type !== 'TRANSFER') return false;
-      const isSource = r.sourceBranchId === myBranchId;
-      const isDest = r.destBranchId === myBranchId;
+      const isSource = myBranchId && Number(r.sourceBranchId) === Number(myBranchId);
+      const isDest = myBranchId && Number(r.destBranchId) === Number(myBranchId);
       if (r.status === 'DRAFT') return (isManager && isSource) || isAdmin;
       if (r.status === 'PENDING_ADMIN') return (isManager && isDest) || isAdmin;
       if (r.status === 'PENDING_STOCKTAKE') return isStaff && isDest;
@@ -90,10 +97,17 @@ async function loadBadgeCounts() {
     // Tiêu hủy
     badgeDisposal.value = receipts.filter(r => {
       if (r.type !== 'ADJUST_OUT') return false;
-      const isSource = r.sourceBranchId === myBranchId;
+      const isSource = myBranchId && Number(r.sourceBranchId) === Number(myBranchId);
       if (r.status === 'DRAFT') return (isManager && isSource) || isAdmin;
       if (r.status === 'PENDING_ADMIN') return (isManager && isSource) || isAdmin;
       return false;
+    }).length
+
+    // Kiểm kê nhận hàng
+    badgeReceiptStocktake.value = receipts.filter(r => {
+      if (r.status !== 'PENDING_STOCKTAKE') return false;
+      if (isAdmin) return true;
+      return myBranchId && Number(r.destBranchId) === Number(myBranchId);
     }).length
   } catch (e) {
     // silent fail
@@ -121,17 +135,22 @@ const mainNavItems = computed(() => {
   if (!user.value || user.value.role !== 'ADMIN') {
     items.push({ label: 'Tồn kho HT', to: '/global-inventory', icon: 'fas fa-globe' })
   }
-  // @ts-ignore
-  if (user.value) {
-    items.push({ label: 'Kiểm kê kho', to: '/stocktakes', icon: 'fas fa-clipboard-list' })
-  }
   return items
 })
+
+// Kiểm kê kho được render riêng để gắn badge
+const showStocktakeNav = computed(() => !!user.value)
 
 const isManagerOrAdmin = computed(() => {
   if (!user.value) return false
   // @ts-ignore
   return ['ADMIN', 'MANAGER'].includes(user.value.role)
+})
+
+const totalStocktakeBadge = computed(() => {
+  const periodicCount = draftStocktakeCount.value
+  const receiptCount = badgeReceiptStocktake.value
+  return periodicCount + receiptCount
 })
 
 const adminNavItems = computed(() => {
@@ -172,9 +191,21 @@ const updateTime = () => {
   currentTime.value = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
+// Refresh badge ngay khi user rời khỏi trang /stocktakes
+watch(() => route.path, (newPath, oldPath) => {
+  if (oldPath?.startsWith('/stocktakes') && !newPath?.startsWith('/stocktakes')) {
+    refreshStocktakeBadge()
+  }
+})
+
 onMounted(() => {
   updateTime()
   timer = setInterval(updateTime, 1000)
+  // Check ngay lúc mount; chỉ poll nếu là manager/admin
+  if (isManagerOrAdmin.value) {
+    refreshStocktakeBadge()
+    stocktakeTimer = setInterval(refreshStocktakeBadge, 10_000)
+  }
   // Load badge counts
   loadBadgeCounts()
   badgeTimer = setInterval(loadBadgeCounts, 3000) // Refresh mỗi 3 giây
@@ -182,6 +213,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (timer) clearInterval(timer)
+  if (stocktakeTimer) clearInterval(stocktakeTimer)
   if (badgeTimer) clearInterval(badgeTimer)
 })
 </script>
@@ -211,7 +243,7 @@ onUnmounted(() => {
             :key="item.to"
             :to="item.to"
             class="relative flex items-center font-semibold px-6 py-[0.9rem] mx-4 my-1 rounded-xl transition-all duration-300 group"
-            :class="route.path.startsWith(item.to) && item.to !== '/' ? 'bg-gradient-to-br from-[#4361ee] to-[#4cc9f0] text-white shadow-[0_6px_15px_rgba(67,97,238,0.35)]' : 'text-[#364a63] hover:translate-x-1 hover:shadow-[-4px_4px_10px_rgba(67,97,238,0.05)] hover:text-[#4361ee]'"
+            :class="route.path.startsWith(item.to) && item.to !== '/' ? 'nav-active' : 'nav-idle'"
           >
             <i :class="item.icon" class="w-6 text-[1.2rem] mr-3 text-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6"></i>
             <span>{{ item.label }}</span>
@@ -224,13 +256,31 @@ onUnmounted(() => {
             </span>
           </RouterLink>
 
+          <!-- Kiểm kê kho – render riêng để gắn badge -->
+          <RouterLink
+            v-if="showStocktakeNav"
+            to="/stocktakes"
+            class="flex items-center font-semibold px-6 py-[0.9rem] mx-4 my-1 rounded-xl transition-all duration-300 group relative"
+            :class="route.path.startsWith('/stocktakes') ? 'nav-active' : 'nav-idle'"
+          >
+            <i class="fas fa-clipboard-list w-6 text-[1.2rem] mr-3 text-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6"></i>
+            <span class="flex-1">Kiểm kê kho</span>
+            <span
+              v-if="totalStocktakeBadge > 0"
+              class="stocktake-badge numeric"
+              title="Có phiếu kiểm kê đang chờ xử lý"
+            >
+              {{ totalStocktakeBadge > 99 ? '99+' : totalStocktakeBadge }}
+            </span>
+          </RouterLink>
+
           <div class="text-[0.75rem] font-extrabold uppercase tracking-widest text-[#8094ae] px-7 mt-6 mb-2">Quản lý</div>
           <RouterLink
             v-for="item in adminNavItems"
             :key="item.to"
             :to="item.to"
             class="flex items-center font-semibold px-6 py-[0.9rem] mx-4 my-1 rounded-xl transition-all duration-300 group"
-            :class="route.path.startsWith(item.to) ? 'bg-gradient-to-br from-[#4361ee] to-[#4cc9f0] text-white shadow-[0_6px_15px_rgba(67,97,238,0.35)]' : 'text-[#364a63] hover:translate-x-1 hover:shadow-[-4px_4px_10px_rgba(67,97,238,0.05)] hover:text-[#4361ee]'"
+            :class="route.path.startsWith(item.to) ? 'nav-active' : 'nav-idle'"
           >
             <i :class="item.icon" class="w-6 text-[1.2rem] mr-3 text-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6"></i>
             <span>{{ item.label }}</span>
@@ -239,12 +289,12 @@ onUnmounted(() => {
 
         <div>
           <hr class="mx-8 my-2 border-t border-black/10">
-          <a @click="router.push('/profile')" class="flex items-center font-semibold px-6 py-[0.9rem] mx-4 my-1 rounded-xl transition-all duration-300 text-[#364a63] hover:translate-x-1 hover:shadow-[-4px_4px_10px_rgba(67,97,238,0.05)] hover:text-[#4361ee] cursor-pointer group">
-            <i class="fas fa-user-circle w-6 text-[1.2rem] mr-3 text-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6"></i> 
+          <a @click="router.push('/profile')" class="nav-idle flex items-center font-semibold px-6 py-[0.9rem] mx-4 my-1 rounded-xl transition-all duration-300 text-[#364a63] cursor-pointer group">
+            <i class="fas fa-user-circle w-6 text-[1.2rem] mr-3 text-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6"></i>
             <span>Hồ sơ cá nhân</span>
           </a>
           <a @click="showLogoutDialog = true" class="flex items-center font-semibold px-6 py-[0.9rem] mx-4 my-1 rounded-xl transition-all duration-300 text-[#ef476f] hover:bg-[#fff0f3] hover:text-[#d90429] hover:translate-x-1 cursor-pointer group">
-            <i class="fas fa-sign-out-alt w-6 text-[1.2rem] mr-3 text-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6"></i> 
+            <i class="fas fa-sign-out-alt w-6 text-[1.2rem] mr-3 text-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6"></i>
             <span>Đăng xuất</span>
           </a>
         </div>
@@ -303,20 +353,69 @@ onUnmounted(() => {
 
 <style scoped>
 @keyframes gradient-x {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 .animate-gradient-x {
   background-size: 200% auto;
   animation: gradient-x 3s linear infinite;
 }
+
+/* ── Nav item hover & active ─────────────────────────────── */
+.nav-idle {
+  color: #364a63;
+  position: relative;
+}
+.nav-idle:hover {
+  background: rgba(99, 102, 241, 0.1);
+  color: #4361ee;
+  transform: translateX(4px);
+}
+
+.nav-active {
+  background: linear-gradient(135deg, #4361ee, #4cc9f0);
+  color: white;
+  box-shadow: 0 6px 18px rgba(67, 97, 238, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+/* Shimmer lướt qua item đang active */
+.nav-active::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -80%;
+  width: 50%; height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+  animation: shimmer 2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes shimmer {
+  0%   { left: -80%; }
+  100% { left: 130%; }
+}
+
+/* Badge số lượng phiếu DRAFT */
+.stocktake-badge.numeric {
+  position: absolute;
+  top: 6px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #f59e0b;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 800;
+  box-shadow: 0 2px 5px rgba(245,158,11,0.4);
+  z-index: 10;
+}
+
 @keyframes badge-pop {
   0% { transform: scale(0); }
   50% { transform: scale(1.3); }

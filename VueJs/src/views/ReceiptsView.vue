@@ -121,6 +121,7 @@ const loading = ref(true)
 // FILTER
 // ──────────────────────────────────────────────────────────────
 const defaultFilterType = computed(() => {
+  if (props.receiptType) return props.receiptType
   const p = route.path
   if (p.includes('imports')) return 'IMPORT'
   if (p.includes('invoices')) return 'EXPORT'
@@ -136,12 +137,12 @@ const filterType = ref(defaultFilterType.value)
 watch(defaultFilterType, (val) => {
   filterType.value = val
 }, { immediate: true })
-
 const filterStatus = ref('')
 const searchKeyword = ref('')
 const filterTimeRange = ref('custom')
 const filterStartDate = ref('')
 const filterEndDate = ref('')
+const filterDeviation = ref('')
 
 watch(filterTimeRange, (val) => {
   const today = new Date()
@@ -199,6 +200,13 @@ const filteredReceipts = computed(() => {
       result = result.filter(r => r.status === filterStatus.value || r.paymentStatus === filterStatus.value)
     }
   }
+  if (filterDeviation.value) {
+    if (filterDeviation.value === 'yes') {
+      result = result.filter(r => r.hasDeviation)
+    } else if (filterDeviation.value === 'no') {
+      result = result.filter(r => !r.hasDeviation)
+    }
+  }
   if (searchKeyword.value.trim()) {
     const kw = searchKeyword.value.trim().toLowerCase()
     result = result.filter(r => {
@@ -227,7 +235,7 @@ const filteredReceipts = computed(() => {
 const currentPage = ref(1)
 const itemsPerPage = 50
 
-watch([filterType, filterStatus, searchKeyword, filterTimeRange, filterStartDate, filterEndDate], () => {
+watch([filterType, filterStatus, searchKeyword, filterTimeRange, filterStartDate, filterEndDate, filterDeviation], () => {
   currentPage.value = 1
 })
 
@@ -1147,7 +1155,7 @@ function typeLabel(r: any) {
   const t = r?.type;
   const map: Record<string, string> = {
     IMPORT: 'Nhập kho', EXPORT: 'Xuất bán', TRANSFER: 'Điều chuyển',
-    ADJUST_IN: 'Cân bằng +', ADJUST_OUT: 'Cân bằng -'
+    ADJUST_IN: 'Tăng tồn kho', ADJUST_OUT: 'Giảm tồn kho'
   }
   return map[t] || t
 }
@@ -1372,7 +1380,7 @@ const pageIcon = computed(() => {
     <div class="bg-white rounded-2xl border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-sm overflow-hidden">
       <!-- Toolbar -->
       <div class="p-5 border-b border-[#f1f5f9]">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <!-- Tìm kiếm đa năng -->
           <div class="lg:col-span-2 relative">
             <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae] text-sm"></i>
@@ -1398,6 +1406,15 @@ const pageIcon = computed(() => {
               <option value="COMPLETED">Đã duyệt</option>
               <option value="CANCELLED">Đã hủy</option>
               <option value="RECEIVED">Đã nhận hàng</option>
+            </select>
+          </div>
+          <!-- Lọc hao hụt / chênh lệch -->
+          <div>
+            <select v-model="filterDeviation"
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]">
+              <option value="">-- Tất cả chênh lệch --</option>
+              <option value="yes">Có chênh lệch / Hao hụt</option>
+              <option value="no">Khớp số lượng</option>
             </select>
           </div>
           <!-- Thời gian và Ngày -->
@@ -1426,8 +1443,8 @@ const pageIcon = computed(() => {
             </div>
             <!-- Nút Xóa lọc -->
             <div class="flex items-end">
-              <button v-if="(!isSpecificRoute && filterType) || filterStatus || searchKeyword || filterStartDate || filterEndDate || filterTimeRange !== 'custom'"
-                @click="filterType = isSpecificRoute ? defaultFilterType : ''; filterStatus = ''; searchKeyword = ''; filterTimeRange = 'custom'; filterStartDate = ''; filterEndDate = ''"
+              <button v-if="(!isSpecificRoute && filterType) || filterStatus || searchKeyword || filterStartDate || filterEndDate || filterDeviation || filterTimeRange !== 'custom'"
+                @click="filterType = isSpecificRoute ? defaultFilterType : ''; filterStatus = ''; searchKeyword = ''; filterTimeRange = 'custom'; filterStartDate = ''; filterEndDate = ''; filterDeviation = ''"
                 class="w-full h-11 flex items-center justify-center gap-2 px-6 bg-white border border-[#e2e8f0] rounded-xl text-sm font-semibold text-[#8094ae] hover:text-[#364a63] hover:bg-[#f8f9fa] transition-all shadow-sm">
                 <i class="fas fa-times"></i> Xóa lọc
               </button>
@@ -1457,6 +1474,7 @@ const pageIcon = computed(() => {
               <th class="px-5 py-3 text-left font-bold">Mã phiếu</th>
               <th class="px-5 py-3 text-left font-bold">Loại</th>
               <th class="px-5 py-3 text-left font-bold">Trạng thái</th>
+              <th class="px-5 py-3 text-left font-bold">Chênh lệch</th>
               <th class="px-5 py-3 text-left font-bold">Chi nhánh nguồn</th>
               <th class="px-5 py-3 text-left font-bold">Đích / Khách hàng</th>
               <th class="px-5 py-3 text-left font-bold">Người lập</th>
@@ -1467,7 +1485,10 @@ const pageIcon = computed(() => {
           <tbody class="divide-y divide-[#f1f5f9]">
             <tr v-for="r in paginatedReceipts" :key="r.id"
               @dblclick="openDetail(r)"
-              class="hover:bg-[#f8f9fa]/80 cursor-pointer transition-colors group">
+              :class="[
+                'hover:bg-[#f8f9fa]/80 cursor-pointer transition-colors group',
+                r.hasDeviation && (r.status === 'PENDING_SHORTFALL_MANAGER' || r.status === 'PENDING_SHORTFALL_ADMIN') ? 'bg-rose-50/40 hover:bg-rose-100/40' : ''
+              ]">
               <td class="px-5 py-4">
                 <span class="font-mono font-bold text-[#4361ee] text-xs">{{ r.code }}</span>
               </td>
@@ -1485,6 +1506,22 @@ const pageIcon = computed(() => {
                     📦 Đã nhận hàng
                   </span>
                 </div>
+              </td>
+              <td class="px-5 py-4">
+                <div v-if="r.hasDeviation" class="flex flex-col max-w-[200px]" :title="r.deviationSummary">
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-rose-50 text-rose-600 border border-rose-100 w-fit">
+                    ⚠️ Lệch số lượng
+                  </span>
+                  <span class="text-xs text-rose-500 mt-1 font-medium truncate" :title="r.deviationSummary">
+                    {{ r.deviationSummary }}
+                  </span>
+                </div>
+                <div v-else-if="r.status === 'COMPLETED' || r.status === 'PENDING_COMPENSATION' || r.paymentStatus === 'RECEIVED'" class="text-xs text-emerald-600 font-medium">
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 w-fit">
+                    ✓ Khớp
+                  </span>
+                </div>
+                <div v-else class="text-xs text-slate-400">—</div>
               </td>
               <td class="px-5 py-4">
                 <span class="text-[#364a63] font-medium">{{ r.sourceBranchName || '—' }}</span>

@@ -26,6 +26,8 @@ public class ReceiptResponse {
     private String description;
     private LocalDateTime createdAt;
     private List<ReceiptDetailResponse> details;
+    private Boolean hasDeviation;
+    private String deviationSummary;
 
     public ReceiptResponse(Receipt r) {
         this.id = r.getId();
@@ -61,9 +63,23 @@ public class ReceiptResponse {
         this.description = r.getDescription();
         this.createdAt = r.getCreatedAt();
         
+        this.hasDeviation = false;
+        StringBuilder sb = new StringBuilder();
         if (r.getDetails() != null) {
             this.details = r.getDetails().stream().map(ReceiptDetailResponse::new).collect(Collectors.toList());
+            for (com.example.Hehe.model.ReceiptDetail d : r.getDetails()) {
+                if (d.getReceivedQuantity() != null && !d.getReceivedQuantity().equals(d.getQuantity())) {
+                    this.hasDeviation = true;
+                    int diff = d.getReceivedQuantity() - d.getQuantity();
+                    if (sb.length() > 0) sb.append(", ");
+                    sb.append(diff > 0 ? "+" : "").append(diff).append(" ").append(d.getProduct() != null ? d.getProduct().getName() : "SP");
+                    if (d.getShortfallReason() != null && !d.getShortfallReason().trim().isEmpty()) {
+                        sb.append(" (").append(d.getShortfallReason().trim()).append(")");
+                    }
+                }
+            }
         }
+        this.deviationSummary = sb.length() > 0 ? sb.toString() : null;
     }
 
     public Integer getId() { return id; }
@@ -86,4 +102,6 @@ public class ReceiptResponse {
     public String getDescription() { return description; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public List<ReceiptDetailResponse> getDetails() { return details; }
+    public Boolean getHasDeviation() { return hasDeviation; }
+    public String getDeviationSummary() { return deviationSummary; }
 }
