@@ -48,6 +48,11 @@ public class ReceiptServiceImpl implements ReceiptService {
                             boolean isCreator = r.getCreatedBy() != null && r.getCreatedBy().getId().equals(currentUser.getId());
                             return isMyBranch || isCreator;
                         }
+                        if (r.getType() == ReceiptType.TRANSFER) {
+                            if (myBranchId == null) return false;
+                            return (r.getSourceBranch() != null && r.getSourceBranch().getId().equals(myBranchId)) ||
+                                   (r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId));
+                        }
                         return true;
                     })
                     .map(ReceiptResponse::new)
@@ -65,10 +70,13 @@ public class ReceiptServiceImpl implements ReceiptService {
                     if (!relatedToBranch) return false;
                     
                     if (currentUser.getRole() == UserRole.STAFF) {
+                        if (r.getType() == ReceiptType.TRANSFER && r.getSourceBranch() != null && r.getSourceBranch().getId().equals(myBranchId)) {
+                            return false;
+                        }
                         boolean isMyReceipt = r.getCreatedBy() != null && r.getCreatedBy().getId().equals(currentUser.getId());
                         boolean isIncoming = (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.TRANSFER) 
                                              && r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId)
-                                             && (r.getStatus() != ReceiptStatus.DRAFT && r.getStatus() != ReceiptStatus.PENDING_ADMIN);
+                                             && (r.getStatus() == ReceiptStatus.PENDING_STOCKTAKE || r.getStatus() == ReceiptStatus.COMPLETED || r.getStatus() == ReceiptStatus.PENDING_SHORTFALL_MANAGER || r.getStatus() == ReceiptStatus.PENDING_SHORTFALL_ADMIN);
                         return isMyReceipt || isIncoming;
                     }
                     
@@ -83,13 +91,19 @@ public class ReceiptServiceImpl implements ReceiptService {
     public ReceiptResponse getReceiptById(Integer id, User currentUser) {
         Receipt r = receiptRepository.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
         if (currentUser.getRole() == UserRole.ADMIN) {
+            Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
             if (r.getType() == ReceiptType.IMPORT && r.getStatus() == ReceiptStatus.DRAFT) {
-                Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
                 boolean isMyBranch = myBranchId != null && r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId);
                 boolean isCreator = r.getCreatedBy() != null && r.getCreatedBy().getId().equals(currentUser.getId());
                 if (!isMyBranch && !isCreator) {
                     throw new RuntimeException("Phiếu nhập kho này chưa được quản lý chi nhánh duyệt.");
                 }
+            }
+            if (r.getType() == ReceiptType.TRANSFER) {
+                if (myBranchId == null) throw new RuntimeException("Bạn không có quyền xem phiếu này.");
+                boolean hasPerm = (r.getSourceBranch() != null && r.getSourceBranch().getId().equals(myBranchId)) ||
+                                  (r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId));
+                if (!hasPerm) throw new RuntimeException("Bạn không có quyền xem phiếu này.");
             }
         }
         if (currentUser.getRole() != UserRole.ADMIN) {
@@ -101,10 +115,13 @@ public class ReceiptServiceImpl implements ReceiptService {
             if (!hasPerm) throw new RuntimeException("Bạn không có quyền xem phiếu này.");
             
             if (currentUser.getRole() == UserRole.STAFF) {
+                if (r.getType() == ReceiptType.TRANSFER && r.getSourceBranch() != null && r.getSourceBranch().getId().equals(myBranchId)) {
+                    throw new RuntimeException("Bạn không có quyền xem phiếu này.");
+                }
                 boolean isMyReceipt = r.getCreatedBy() != null && r.getCreatedBy().getId().equals(currentUser.getId());
                 boolean isIncoming = (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.TRANSFER) 
                                      && r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId)
-                                     && (r.getStatus() != ReceiptStatus.DRAFT && r.getStatus() != ReceiptStatus.PENDING_ADMIN);
+                                     && (r.getStatus() == ReceiptStatus.PENDING_STOCKTAKE || r.getStatus() == ReceiptStatus.COMPLETED || r.getStatus() == ReceiptStatus.PENDING_SHORTFALL_MANAGER || r.getStatus() == ReceiptStatus.PENDING_SHORTFALL_ADMIN);
                 if (!isMyReceipt && !isIncoming) {
                     throw new RuntimeException("Bạn không có quyền xem phiếu này.");
                 }
@@ -135,6 +152,9 @@ public class ReceiptServiceImpl implements ReceiptService {
                     if (!relatedToBranch) return false;
                     
                     if (currentUser.getRole() == UserRole.STAFF) {
+                        if (r.getType() == ReceiptType.TRANSFER && r.getSourceBranch() != null && r.getSourceBranch().getId().equals(myBranchId)) {
+                            return false;
+                        }
                         boolean isMyReceipt = r.getCreatedBy() != null && r.getCreatedBy().getId().equals(currentUser.getId());
                         boolean isIncoming = (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.TRANSFER) 
                                              && r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId)
@@ -235,17 +255,17 @@ public class ReceiptServiceImpl implements ReceiptService {
             Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
             if (myBranchId == null) throw new RuntimeException("Bạn chưa thuộc chi nhánh nào.");
 
-            if (request.getType() == ReceiptType.IMPORT && currentUser.getRole() == UserRole.MANAGER) {
-                throw new RuntimeException("Manager không được phép tạo phiếu nhập kho, chỉ có Staff mới được phép.");
+            if (currentUser.getRole() == UserRole.MANAGER) {
+                throw new RuntimeException("Quản lý chỉ được phép duyệt phiếu, việc lập phiếu do Nhân viên thực hiện.");
             }
 
-            if (request.getType() == ReceiptType.IMPORT || request.getType() == ReceiptType.ADJUST_IN) {
+            if (request.getType() == ReceiptType.IMPORT || request.getType() == ReceiptType.ADJUST_IN || request.getType() == ReceiptType.TRANSFER) {
                 if (request.getDestBranchId() == null || !request.getDestBranchId().equals(myBranchId)) {
                     throw new RuntimeException("Bạn chỉ được phép lập phiếu cho chi nhánh đích là chi nhánh của mình.");
                 }
             } else {
                 if (request.getSourceBranchId() == null || !request.getSourceBranchId().equals(myBranchId)) {
-                    throw new RuntimeException("Bạn chỉ được phép lập phiếu xuất/điều chuyển/giảm từ kho của chi nhánh mình.");
+                    throw new RuntimeException("Bạn chỉ được phép lập phiếu xuất/giảm từ kho của chi nhánh mình.");
                 }
             }
         }
@@ -533,10 +553,13 @@ public class ReceiptServiceImpl implements ReceiptService {
             throw new RuntimeException("Phiếu không ở trạng thái có thể duyệt.");
         }
         
+        if (currentUser.getRole() == UserRole.ADMIN && r.getType() == ReceiptType.TRANSFER) {
+            throw new RuntimeException("Admin không được quyền can thiệp vào phiếu điều chuyển giữa các chi nhánh.");
+        }
 
         if (currentUser.getRole() == UserRole.STAFF) {
-            if (r.getType() != ReceiptType.ADJUST_OUT) {
-                throw new RuntimeException("Nhân viên không có quyền duyệt phiếu, ngoại trừ phiếu Tiêu hủy (nhỏ hoặc khẩn cấp).");
+            if (r.getType() != ReceiptType.ADJUST_OUT && r.getType() != ReceiptType.EXPORT) {
+                throw new RuntimeException("Nhân viên không có quyền duyệt phiếu, ngoại trừ phiếu Tiêu hủy (nhỏ hoặc khẩn cấp) và Xuất bán.");
             }
         }
         
@@ -563,12 +586,12 @@ public class ReceiptServiceImpl implements ReceiptService {
                 }
             } else if (r.getType() == ReceiptType.TRANSFER) {
                 if (r.getStatus() == ReceiptStatus.DRAFT) {
-                    if (r.getSourceBranch() == null || !r.getSourceBranch().getId().equals(myBranchId)) {
-                        throw new RuntimeException("Chỉ Quản lý chi nhánh nguồn mới có quyền duyệt phiếu điều chuyển nháp.");
+                    if (r.getDestBranch() == null || !r.getDestBranch().getId().equals(myBranchId)) {
+                        throw new RuntimeException("Chỉ Quản lý chi nhánh đích mới có quyền duyệt yêu cầu xin hàng.");
                     }
                 } else if (r.getStatus() == ReceiptStatus.PENDING_ADMIN) {
-                    if (r.getDestBranch() == null || !r.getDestBranch().getId().equals(myBranchId)) {
-                        throw new RuntimeException("Chỉ Quản lý chi nhánh đích mới có quyền duyệt phiếu điều chuyển từ chi nhánh khác.");
+                    if (r.getSourceBranch() == null || !r.getSourceBranch().getId().equals(myBranchId)) {
+                        throw new RuntimeException("Chỉ Quản lý chi nhánh nguồn mới có quyền duyệt xuất kho.");
                     }
                 }
             } else if (r.getType() == ReceiptType.ADJUST_IN) {
@@ -605,19 +628,19 @@ public class ReceiptServiceImpl implements ReceiptService {
                     }
                     // Nếu là Manager/Admin hoặc Staff (dưới 45tr/Sữa), phiếu ADJUST_OUT sẽ bỏ qua PENDING_ADMIN và chạy xuống dòng 618 để COMPLETED
                 } else {
-                    if (currentUser.getRole() != UserRole.MANAGER && currentUser.getRole() != UserRole.ADMIN) {
+                    if (currentUser.getRole() != UserRole.MANAGER && currentUser.getRole() != UserRole.ADMIN && currentUser.getRole() != UserRole.STAFF) {
                         throw new RuntimeException("Bạn không có quyền duyệt phiếu ở bước này.");
                     }
-                    
-                    if (r.getType() == ReceiptType.TRANSFER) {
-                        for (ReceiptDetail d : r.getDetails()) {
-                            addInventory(r.getSourceBranch(), d, -d.getQuantity());
+                    if (r.getType() == ReceiptType.EXPORT) {
+                        // Bỏ qua PENDING_ADMIN để chạy xuống cuối hàm và set COMPLETED
+                    } else {
+                        if (r.getType() == ReceiptType.TRANSFER) {
+                            // Không trừ tồn kho ở bước xin hàng, chờ chi nhánh Nguồn duyệt mới trừ
                         }
+                        r.setStatus(ReceiptStatus.PENDING_ADMIN);
+                        receiptRepository.save(r);
+                        return new ReceiptResponse(r);
                     }
-
-                    r.setStatus(ReceiptStatus.PENDING_ADMIN);
-                    receiptRepository.save(r);
-                    return new ReceiptResponse(r);
                 }
             } else if (r.getStatus() == ReceiptStatus.PENDING_ADMIN) {
                 if (r.getType() == ReceiptType.ADJUST_OUT) {
@@ -640,8 +663,9 @@ public class ReceiptServiceImpl implements ReceiptService {
                             }
                         }
                     } else if (r.getType() == ReceiptType.TRANSFER) {
-                        if (currentUser.getRole() != UserRole.MANAGER && currentUser.getRole() != UserRole.ADMIN) {
-                            throw new RuntimeException("Chỉ Manager chi nhánh đích mới có quyền duyệt lên bước Kiểm kê.");
+                        // Manager nguồn duyệt xuất kho -> trừ tồn kho
+                        for (ReceiptDetail d : r.getDetails()) {
+                            addInventory(r.getSourceBranch(), d, -d.getQuantity());
                         }
                     }
 
@@ -714,8 +738,8 @@ public class ReceiptServiceImpl implements ReceiptService {
             }
             d.setReceivedQuantity(actualQty);
             if (actualQty < d.getQuantity()) {
-                if (r.getType() != ReceiptType.IMPORT) {
-                    throw new RuntimeException("Chức năng báo hao hụt hiện tại chỉ áp dụng cho phiếu Nhập kho.");
+                if (r.getType() != ReceiptType.IMPORT && r.getType() != ReceiptType.TRANSFER) {
+                    throw new RuntimeException("Chức năng báo hao hụt hiện tại chỉ áp dụng cho phiếu Nhập kho và Điều chuyển.");
                 }
                 String reason = shortfallReasons.get(detailIdStr);
                 if (reason == null || reason.trim().isEmpty()) {
@@ -794,21 +818,74 @@ public class ReceiptServiceImpl implements ReceiptService {
                 receiptRepository.save(r);
             }
         } else if (r.getStatus() == ReceiptStatus.PENDING_SHORTFALL_ADMIN) {
-            if (currentUser.getRole() != UserRole.ADMIN) {
-                throw new RuntimeException("Chỉ Admin mới có quyền duyệt thiếu hụt bước cuối.");
+            if (r.getType() == ReceiptType.TRANSFER) {
+                if (currentUser.getRole() != UserRole.MANAGER) {
+                    throw new RuntimeException("Chỉ Quản lý chi nhánh nguồn mới có quyền duyệt đền bù thiếu hụt.");
+                }
+                Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
+                if (r.getSourceBranch() == null || !r.getSourceBranch().getId().equals(myBranchId)) {
+                    throw new RuntimeException("Chỉ Quản lý chi nhánh nguồn mới được duyệt đền bù thiếu hụt.");
+                }
+            } else {
+                if (currentUser.getRole() != UserRole.ADMIN) {
+                    throw new RuntimeException("Chỉ Admin mới có quyền duyệt thiếu hụt bước cuối.");
+                }
             }
             if (!isApproved) {
                 throw new RuntimeException("Admin không thể từ chối phiếu thiếu hụt (phiếu đã lên Admin thì không thể hủy được).");
             }
             
-            // Admin approves -> COMPLETED (or PENDING_COMPENSATION if source branch exists)
+            // Admin approves -> Tự động sinh phiếu bù và hoàn tất phiếu gốc
             boolean isInternalTransfer = r.getSourceBranch() != null;
             if (isInternalTransfer) {
-                r.setStatus(ReceiptStatus.PENDING_COMPENSATION);
-            } else {
-                r.setStatus(ReceiptStatus.COMPLETED);
-                updateCustomerDebt(r, true, false, false);
+                // Tạo phiếu điều chuyển bù
+                Receipt newTransfer = new Receipt();
+                newTransfer.setCode("COMP-" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+                newTransfer.setType(ReceiptType.TRANSFER);
+                if (r.getType() == ReceiptType.TRANSFER) {
+                    newTransfer.setStatus(ReceiptStatus.COMPLETED); // Cộng thẳng vào kho đích
+                } else {
+                    newTransfer.setStatus(ReceiptStatus.PENDING_STOCKTAKE); // Đẩy thẳng lên chờ Kiểm kê (hàng đang trên đường đi)
+                }
+                newTransfer.setSourceBranch(r.getSourceBranch());
+                newTransfer.setDestBranch(r.getDestBranch());
+                newTransfer.setCreatedBy(currentUser);
+                newTransfer.setCreatedAt(java.time.LocalDateTime.now());
+                newTransfer.setDescription("Phiếu điều chuyển bù hao hụt cho phiếu " + r.getCode());
+                
+                java.util.List<ReceiptDetail> newDetails = new java.util.ArrayList<>();
+                for (ReceiptDetail d : r.getDetails()) {
+                    if (d.getReceivedQuantity() != null && d.getReceivedQuantity() < d.getQuantity()) {
+                        int shortfallQty = d.getQuantity() - d.getReceivedQuantity();
+                        
+                        // Trừ tồn kho tại chi nhánh nguồn
+                        addInventory(r.getSourceBranch(), d, -shortfallQty);
+                        
+                        if (r.getType() == ReceiptType.TRANSFER) {
+                            // Cộng thẳng tồn kho cho chi nhánh đích
+                            addInventory(r.getDestBranch(), d, shortfallQty);
+                        }
+                        
+                        ReceiptDetail newDetail = new ReceiptDetail();
+                        newDetail.setReceipt(newTransfer);
+                        newDetail.setProduct(d.getProduct());
+                        newDetail.setQuantity(shortfallQty);
+                        newDetail.setPrice(d.getPrice());
+                        newDetail.setManufacturingDate(d.getManufacturingDate());
+                        newDetail.setExpirationDate(d.getExpirationDate());
+                        newDetails.add(newDetail);
+                    }
+                }
+                
+                if (newDetails.isEmpty()) {
+                    throw new RuntimeException("Không tìm thấy hàng hóa nào bị thiếu hụt.");
+                }
+                
+                newTransfer.setDetails(newDetails);
+                receiptRepository.save(newTransfer);
             }
+            r.setStatus(ReceiptStatus.COMPLETED);
+            updateCustomerDebt(r, true, false, false);
             receiptRepository.save(r);
         } else {
             throw new RuntimeException("Phiếu không ở trạng thái chờ duyệt thiếu hụt.");
