@@ -840,11 +840,7 @@ public class ReceiptServiceImpl implements ReceiptService {
                 Receipt newTransfer = new Receipt();
                 newTransfer.setCode("COMP-" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase());
                 newTransfer.setType(ReceiptType.TRANSFER);
-                if (r.getType() == ReceiptType.TRANSFER) {
-                    newTransfer.setStatus(ReceiptStatus.COMPLETED); // Cộng thẳng vào kho đích
-                } else {
-                    newTransfer.setStatus(ReceiptStatus.PENDING_STOCKTAKE); // Đẩy thẳng lên chờ Kiểm kê (hàng đang trên đường đi)
-                }
+                newTransfer.setStatus(ReceiptStatus.PENDING_STOCKTAKE); // Đẩy thẳng lên chờ Kiểm kê (hàng đang trên đường đi)
                 newTransfer.setSourceBranch(r.getSourceBranch());
                 newTransfer.setDestBranch(r.getDestBranch());
                 newTransfer.setCreatedBy(currentUser);
@@ -859,10 +855,7 @@ public class ReceiptServiceImpl implements ReceiptService {
                         // Trừ tồn kho tại chi nhánh nguồn
                         addInventory(r.getSourceBranch(), d, -shortfallQty);
                         
-                        if (r.getType() == ReceiptType.TRANSFER) {
-                            // Cộng thẳng tồn kho cho chi nhánh đích
-                            addInventory(r.getDestBranch(), d, shortfallQty);
-                        }
+                        // Không cộng thẳng vào kho đích nữa, để cho staff kiểm kê phiếu bù
                         
                         ReceiptDetail newDetail = new ReceiptDetail();
                         newDetail.setReceipt(newTransfer);
