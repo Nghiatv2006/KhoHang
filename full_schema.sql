@@ -11,7 +11,7 @@ DROP TYPE IF EXISTS user_role, user_status, receipt_type, receipt_status, stockt
 CREATE TYPE user_role AS ENUM ('ADMIN', 'MANAGER', 'STAFF');
 CREATE TYPE user_status AS ENUM ('ACTIVE', 'LOCKED');
 CREATE TYPE receipt_type AS ENUM ('IMPORT', 'EXPORT', 'TRANSFER', 'ADJUST_IN', 'ADJUST_OUT');
-CREATE TYPE receipt_status AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED', 'PENDING_ADMIN', 'PENDING_STOCKTAKE', 'PENDING_SHORTFALL_MANAGER', 'PENDING_SHORTFALL_ADMIN');
+CREATE TYPE receipt_status AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED', 'PENDING_ADMIN', 'PENDING_STOCKTAKE', 'PENDING_SHORTFALL_MANAGER', 'PENDING_SHORTFALL_ADMIN', 'RETURN');
 CREATE TYPE stocktake_status AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED');
 
 -- Bảng Chi nhánh (Branches)
@@ -231,4 +231,7 @@ CREATE TABLE backups (
 );
 
 CREATE INDEX idx_backups_branch_id ON backups (branch_id);
+
+-- Migration command to apply update on existing database
+-- ALTER TYPE receipt_status ADD VALUE 'RETURN';
 
