@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8"/>
+  <style>
+    @page {
+      size: 80mm auto;
+      margin: 4mm 4mm 6mm 4mm;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "DejaVu Sans", Arial, sans-serif;
+      font-size: 11px;
+      color: #000;
+      width: 72mm;
+    }
+
+    /* ===== HEADER ===== */
+    .header {
+      text-align: center;
+      margin-bottom: 6px;
+    }
+    .header .shop-name {
+      font-size: 15px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .header .branch-name {
+      font-size: 11px;
+      font-weight: bold;
+    }
+    .header .contact {
+      font-size: 10px;
+      color: #333;
+    }
+    .header .title {
+      font-size: 14px;
+      font-weight: bold;
+      text-transform: uppercase;
+      margin-top: 6px;
+      border-top: 1px dashed #000;
+      border-bottom: 1px dashed #000;
+      padding: 3px 0;
+    }
+
+    /* ===== INFO BLOCK ===== */
+    .info-block {
+      margin: 5px 0;
+      font-size: 10.5px;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 2px;
+    }
+    .info-row .label {
+      color: #555;
+      min-width: 42%;
+    }
+    .info-row .value {
+      font-weight: bold;
+      text-align: right;
+      flex: 1;
+    }
+
+    /* ===== SEPARATOR ===== */
+    .separator {
+      border: none;
+      border-top: 1px dashed #000;
+      margin: 5px 0;
+    }
+
+    /* ===== PRODUCT TABLE ===== */
+    .product-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10.5px;
+      margin: 3px 0;
+    }
+    .product-table th {
+      font-weight: bold;
+      text-align: left;
+      padding: 2px 1px;
+      border-bottom: 1px solid #000;
+    }
+    .product-table th.right,
+    .product-table td.right {
+      text-align: right;
+    }
+    .product-table td {
+      padding: 2px 1px;
+      vertical-align: top;
+    }
+    .product-table .product-name {
+      font-weight: bold;
+    }
+    .product-table .product-detail {
+      font-size: 10px;
+      color: #333;
+    }
+    .product-table tr:nth-child(even) td {
+      background-color: #f7f7f7;
+    }
+
+    /* ===== TOTALS ===== */
+    .totals {
+      margin-top: 5px;
+      font-size: 10.5px;
+    }
+    .totals .row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 2px;
+    }
+    .totals .row .lbl {
+      color: #333;
+    }
+    .totals .row .val {
+      font-weight: bold;
+    }
+    .totals .grand-total {
+      font-size: 13px;
+      font-weight: bold;
+      border-top: 1px dashed #000;
+      padding-top: 3px;
+      margin-top: 3px;
+    }
+
+    /* ===== PAYMENT STATUS STAMP ===== */
+    .stamp-unpaid {
+      border: 2px solid #cc0000;
+      border-radius: 4px;
+      color: #cc0000;
+      font-size: 12px;
+      font-weight: bold;
+      text-align: center;
+      padding: 4px 0;
+      margin: 6px 0;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .stamp-unpaid .debt-amount {
+      font-size: 10.5px;
+      font-weight: normal;
+      margin-top: 2px;
+    }
+    .stamp-paid {
+      border: 2px solid #006600;
+      border-radius: 4px;
+      color: #006600;
+      font-size: 12px;
+      font-weight: bold;
+      text-align: center;
+      padding: 4px 0;
+      margin: 6px 0;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .stamp-partial {
+      border: 2px solid #cc6600;
+      border-radius: 4px;
+      color: #cc6600;
+      font-size: 12px;
+      font-weight: bold;
+      text-align: center;
+      padding: 4px 0;
+      margin: 6px 0;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .stamp-partial .debt-amount {
+      font-size: 10.5px;
+      font-weight: normal;
+      margin-top: 2px;
+    }
+
+    /* ===== FOOTER ===== */
+    .footer {
+      text-align: center;
+      font-size: 10px;
+      color: #444;
+      margin-top: 6px;
+      padding-top: 5px;
+      border-top: 1px dashed #000;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="shop-name">[[${shopName}]]</div>
+    <div class="branch-name">[[${branchName}]]</div>
+    <div class="contact">[[${branchAddress}]]</div>
+    <div class="title">Hóa đơn bán hàng</div>
+  </div>
+
+  <!-- TRANSACTION INFO -->
+  <div class="info-block">
+    <div class="info-row">
+      <span class="label">Mã phiếu:</span>
+      <span class="value">[[${receiptCode}]]</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Ngày giờ:</span>
+      <span class="value">[[${createdAt}]]</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Khách hàng:</span>
+      <span class="value">[[${customerName}]]</span>
+    </div>
+    <th:block th:if="${customerPhone != null and !#strings.isEmpty(customerPhone)}">
+      <div class="info-row">
+        <span class="label">SĐT:</span>
+        <span class="value">[[${customerPhone}]]</span>
+      </div>
+    </th:block>
+    <div class="info-row">
+      <span class="label">Nhân viên:</span>
+      <span class="value">[[${createdBy}]]</span>
+    </div>
+  </div>
+
+  <hr class="separator"/>
+
+  <!-- PRODUCT TABLE -->
+  <table class="product-table">
+    <thead>
+      <tr>
+        <th style="width:45%">Sản phẩm</th>
+        <th class="right" style="width:18%">SL</th>
+        <th class="right" style="width:37%">Thành tiền</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr th:each="item : ${items}">
+        <td>
+          <div class="product-name">[[${item.productName}]]</div>
+          <div class="product-detail">[[${#numbers.formatDecimal(item.unitPrice, 0, 'COMMA', 0, 'POINT')}]]đ / cái</div>
+        </td>
+        <td class="right">[[${item.quantity}]]</td>
+        <td class="right">[[${#numbers.formatDecimal(item.subtotal, 0, 'COMMA', 0, 'POINT')}]]đ</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <hr class="separator"/>
+
+  <!-- TOTALS -->
+  <div class="totals">
+    <div class="row">
+      <span class="lbl">Tổng số mặt hàng:</span>
+      <span class="val">[[${totalItems}]]</span>
+    </div>
+    <div class="row grand-total">
+      <span>TỔNG CỘNG:</span>
+      <span>[[${#numbers.formatDecimal(grandTotal, 0, 'COMMA', 0, 'POINT')}]]đ</span>
+    </div>
+  </div>
+
+  <!-- PAYMENT STATUS STAMP -->
+  <th:block th:switch="${paymentStatus}">
+    <div th:case="'UNPAID'" class="stamp-unpaid">
+      ⚠ CHƯA THANH TOÁN
+      <div class="debt-amount">Số tiền còn nợ: [[${#numbers.formatDecimal(grandTotal, 0, 'COMMA', 0, 'POINT')}]]đ</div>
+    </div>
+    <div th:case="'PARTIAL'" class="stamp-partial">
+      ⚠ THANH TOÁN MỘT PHẦN
+      <div class="debt-amount">Còn nợ: [[${#numbers.formatDecimal(debtAmount, 0, 'COMMA', 0, 'POINT')}]]đ</div>
+    </div>
+    <div th:case="'PAID'" class="stamp-paid">
+      ✔ ĐÃ THANH TOÁN
+    </div>
+  </th:block>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <th:block th:if="${description != null and !#strings.isEmpty(description)}">
+      <div style="margin-bottom:3px;font-style:italic;">Ghi chú: [[${description}]]</div>
+    </th:block>
+    <div>Cảm ơn Quý khách &amp; Hẹn gặp lại!</div>
+    <div style="margin-top:3px;">In lúc: [[${printedAt}]]</div>
+  </div>
+
+</body>
+</html>

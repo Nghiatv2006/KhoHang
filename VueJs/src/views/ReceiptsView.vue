@@ -149,6 +149,7 @@ const searchKeyword = ref('')
 const filterTimeRange = ref('custom')
 const filterStartDate = ref('')
 const filterEndDate = ref('')
+const filterDeviation = ref('')
 
 watch(filterTimeRange, (val) => {
   const today = new Date()
@@ -213,6 +214,13 @@ const filteredReceipts = computed(() => {
       result = result.filter(r => r.status === filterStatus.value || r.paymentStatus === filterStatus.value)
     }
   }
+  if (filterDeviation.value) {
+    if (filterDeviation.value === 'yes') {
+      result = result.filter(r => r.hasDeviation)
+    } else if (filterDeviation.value === 'no') {
+      result = result.filter(r => !r.hasDeviation)
+    }
+  }
   if (searchKeyword.value.trim()) {
     const kw = searchKeyword.value.trim().toLowerCase()
     result = result.filter(r => {
@@ -241,7 +249,7 @@ const filteredReceipts = computed(() => {
 const currentPage = ref(1)
 const itemsPerPage = 50
 
-watch([filterType, filterStatus, searchKeyword, filterTimeRange, filterStartDate, filterEndDate], () => {
+watch([filterType, filterStatus, searchKeyword, filterTimeRange, filterStartDate, filterEndDate, filterDeviation], () => {
   currentPage.value = 1
 })
 
@@ -1252,7 +1260,7 @@ function formatVND(v: number) {
 function typeLabel(t: string) {
   const map: Record<string, string> = {
     IMPORT: 'Nhập kho', EXPORT: 'Xuất bán', TRANSFER: 'Điều chuyển',
-    ADJUST_IN: 'Cân bằng +', ADJUST_OUT: 'Cân bằng -'
+    ADJUST_IN: 'Tăng tồn kho', ADJUST_OUT: 'Giảm tồn kho'
   }
   return map[t] || t
 }
@@ -1361,6 +1369,76 @@ function getCustomerName(receipt: any) {
   return c ? `${c.name} - ${c.contactInfo || 'Không có SĐT'}` : '—'
 }
 
+// ──────────────────────────────────────────────────────────────
+// EXPORT FUNCTIONS
+// ──────────────────────────────────────────────────────────────
+const exportingPdfId = ref<number | null>(null)
+const exportingExcel = ref(false)
+
+async function exportPdf(receiptId: number) {
+  exportingPdfId.value = receiptId
+  try {
+    const res = await api.get(`/api/invoices/${receiptId}/export-pdf`)
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Lỗi xuất PDF' }))
+      toast.error(err.message || 'Lỗi xuất PDF')
+      return
+    }
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Hoa_Don_${receiptId}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('Xuất hóa đơn PDF thành công!')
+  } catch (e: any) {
+    toast.error('Lỗi kết nối: ' + e.message)
+  } finally {
+    exportingPdfId.value = null
+  }
+}
+
+async function exportExcel() {
+  if (!isAdmin.value && !isManager.value) {
+    toast.error('Bạn không có quyền xuất danh sách hóa đơn.')
+    return
+  }
+  exportingExcel.value = true
+  try {
+    let url = '/api/invoices/export-excel'
+    const params: string[] = []
+    if (filterStartDate.value) params.push(`startDate=${filterStartDate.value}`)
+    if (filterEndDate.value)   params.push(`endDate=${filterEndDate.value}`)
+    if (params.length > 0) url += '?' + params.join('&')
+
+    const res = await api.get(url)
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Lỗi xuất Excel' }))
+      toast.error(err.message || 'Lỗi xuất Excel')
+      return
+    }
+    const blob = await res.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    if (!filterStartDate.value && !filterEndDate.value) {
+      a.download = 'Danh_Sach_Hoa_Don_Ban_Hang.xlsx'
+    } else {
+      const from = filterStartDate.value?.replace(/-/g, '') || 'TuDau'
+      const to   = filterEndDate.value?.replace(/-/g, '')   || 'DenNay'
+      a.download = `Danh_Sach_Hoa_Don_${from}_${to}.xlsx`
+    }
+    a.click()
+    URL.revokeObjectURL(blobUrl)
+    toast.success('Xuất danh sách hóa đơn Excel thành công!')
+  } catch (e: any) {
+    toast.error('Lỗi kết nối: ' + e.message)
+  } finally {
+    exportingExcel.value = false
+  }
+}
+
 </script>
 
 <template>
@@ -1382,6 +1460,17 @@ function getCustomerName(receipt: any) {
           class="h-[42px] bg-[#05b171] hover:bg-[#04965e] text-white px-5 rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-2"
         >
           <i class="fas fa-box-open"></i> Thêm sản phẩm
+        </button>
+        <!-- Nút Xuất Excel danh sách hóa đơn (chỉ hiện khi xem trang Hóa Đơn và là Admin/Manager) -->
+        <button
+          v-if="receiptType === 'EXPORT' && (isAdmin || isManager)"
+          @click="exportExcel"
+          :disabled="exportingExcel"
+          class="h-[42px] bg-[#17c671] hover:bg-[#13ab60] text-white px-5 rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-2 disabled:opacity-60"
+        >
+          <i class="fas fa-file-excel"></i>
+          <span v-if="exportingExcel"><i class="fas fa-spinner fa-spin"></i> Đang xuất...</span>
+          <span v-else>Xuất Excel</span>
         </button>
         <button
           v-if="!isAdmin && !(receiptType === 'ADJUST_OUT' && isManager)"
@@ -1456,7 +1545,7 @@ function getCustomerName(receipt: any) {
     <div class="bg-white rounded-2xl border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-sm overflow-hidden">
       <!-- Toolbar -->
       <div class="p-5 border-b border-[#f1f5f9]">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <!-- Tìm kiếm đa năng -->
           <div class="lg:col-span-2 relative">
             <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae] text-sm"></i>
@@ -1482,6 +1571,15 @@ function getCustomerName(receipt: any) {
               <option value="COMPLETED">Đã duyệt</option>
               <option value="CANCELLED">Đã hủy</option>
               <option value="RECEIVED">Đã nhận hàng</option>
+            </select>
+          </div>
+          <!-- Lọc hao hụt / chênh lệch -->
+          <div>
+            <select v-model="filterDeviation"
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]">
+              <option value="">-- Tất cả chênh lệch --</option>
+              <option value="yes">Có chênh lệch / Hao hụt</option>
+              <option value="no">Khớp số lượng</option>
             </select>
           </div>
           <!-- Thời gian và Ngày -->
@@ -1510,8 +1608,8 @@ function getCustomerName(receipt: any) {
             </div>
             <!-- Nút Xóa lọc -->
             <div class="flex items-end">
-              <button v-if="filterType || filterStatus || searchKeyword || filterStartDate || filterEndDate || filterTimeRange !== 'custom'"
-                @click="filterType = ''; filterStatus = ''; searchKeyword = ''; filterTimeRange = 'custom'; filterStartDate = ''; filterEndDate = ''"
+              <button v-if="filterType || filterStatus || searchKeyword || filterStartDate || filterEndDate || filterDeviation || filterTimeRange !== 'custom'"
+                @click="filterType = ''; filterStatus = ''; searchKeyword = ''; filterTimeRange = 'custom'; filterStartDate = ''; filterEndDate = ''; filterDeviation = ''"
                 class="w-full h-11 flex items-center justify-center gap-2 px-6 bg-white border border-[#e2e8f0] rounded-xl text-sm font-semibold text-[#8094ae] hover:text-[#364a63] hover:bg-[#f8f9fa] transition-all shadow-sm">
                 <i class="fas fa-times"></i> Xóa lọc
               </button>
@@ -1541,6 +1639,7 @@ function getCustomerName(receipt: any) {
               <th class="px-5 py-3 text-left font-bold">Mã phiếu</th>
               <th v-if="!receiptType" class="px-5 py-3 text-left font-bold">Loại</th>
               <th class="px-5 py-3 text-left font-bold">Trạng thái</th>
+              <th class="px-5 py-3 text-left font-bold">Chênh lệch</th>
               <th class="px-5 py-3 text-left font-bold">Chi nhánh nguồn</th>
               <th class="px-5 py-3 text-left font-bold">Đích / Khách hàng</th>
               <th class="px-5 py-3 text-left font-bold">Người lập</th>
@@ -1551,7 +1650,10 @@ function getCustomerName(receipt: any) {
           <tbody class="divide-y divide-[#f1f5f9]">
             <tr v-for="r in paginatedReceipts" :key="r.id"
               @dblclick="openDetail(r)"
-              class="hover:bg-[#f8f9fa]/80 cursor-pointer transition-colors group">
+              :class="[
+                'hover:bg-[#f8f9fa]/80 cursor-pointer transition-colors group',
+                r.hasDeviation && (r.status === 'PENDING_SHORTFALL_MANAGER' || r.status === 'PENDING_SHORTFALL_ADMIN') ? 'bg-rose-50/40 hover:bg-rose-100/40' : ''
+              ]">
               <td class="px-5 py-4">
                 <span class="font-mono font-bold text-[#4361ee] text-xs">{{ r.code }}</span>
               </td>
@@ -1569,6 +1671,22 @@ function getCustomerName(receipt: any) {
                     📦 Đã nhận hàng
                   </span>
                 </div>
+              </td>
+              <td class="px-5 py-4">
+                <div v-if="r.hasDeviation" class="flex flex-col max-w-[200px]" :title="r.deviationSummary">
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-rose-50 text-rose-600 border border-rose-100 w-fit">
+                    ⚠️ Lệch số lượng
+                  </span>
+                  <span class="text-xs text-rose-500 mt-1 font-medium truncate" :title="r.deviationSummary">
+                    {{ r.deviationSummary }}
+                  </span>
+                </div>
+                <div v-else-if="r.status === 'COMPLETED' || r.status === 'PENDING_COMPENSATION' || r.paymentStatus === 'RECEIVED'" class="text-xs text-emerald-600 font-medium">
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 w-fit">
+                    ✓ Khớp
+                  </span>
+                </div>
+                <div v-else class="text-xs text-slate-400">—</div>
               </td>
               <td class="px-5 py-4">
                 <span class="text-[#364a63] font-medium">{{ r.sourceBranchName || '—' }}</span>
@@ -1604,6 +1722,17 @@ function getCustomerName(receipt: any) {
                     class="w-8 h-8 flex items-center justify-center rounded-lg bg-purple-50 hover:bg-purple-500 hover:text-white text-purple-600 transition-all"
                     title="Thực hiện kiểm kê">
                     <i class="fas fa-boxes text-xs"></i>
+                  </button>
+                  <!-- Nút Xuất PDF (chỉ hiện với phiếu EXPORT đã hoàn thành) -->
+                  <button
+                    v-if="r.type === 'EXPORT' && r.status === 'COMPLETED'"
+                    @click.stop="exportPdf(r.id)"
+                    :disabled="exportingPdfId === r.id"
+                    class="w-8 h-8 flex items-center justify-center rounded-lg bg-orange-50 hover:bg-orange-500 hover:text-white text-orange-500 transition-all disabled:opacity-50"
+                    title="Xuất hóa đơn PDF"
+                  >
+                    <i v-if="exportingPdfId === r.id" class="fas fa-spinner fa-spin text-xs"></i>
+                    <i v-else class="fas fa-file-pdf text-xs"></i>
                   </button>
                   <button v-if="canCancelReceipt(r)"
                     @click.stop="cancelReceipt(r)"

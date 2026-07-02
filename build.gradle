@@ -27,6 +27,10 @@ dependencies {
 	// Apache POI for Excel Import
 	implementation 'org.apache.poi:poi:5.2.3'
 	implementation 'org.apache.poi:poi-ooxml:5.2.3'
+
+	// PDF Export – openhtmltopdf (render HTML template → PDF, Java 17 compatible)
+	implementation 'com.openhtmltopdf:openhtmltopdf-core:1.0.10'
+	implementation 'com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10'
 	
 	// PostgreSQL Driver
 	implementation 'org.postgresql:postgresql'
