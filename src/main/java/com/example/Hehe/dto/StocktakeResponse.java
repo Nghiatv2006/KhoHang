@@ -16,6 +16,8 @@ public class StocktakeResponse {
     private String notes;
     private LocalDateTime createdAt;
     private List<StocktakeDetailResponse> details;
+    private Boolean hasDeviation;
+    private String deviationSummary;
 
     public StocktakeResponse(Stocktake s) {
         this.id = s.getId();
@@ -31,9 +33,20 @@ public class StocktakeResponse {
             this.createdById = s.getCreatedBy().getId();
             this.createdByName = s.getCreatedBy().getFullName();
         }
+        this.hasDeviation = false;
+        StringBuilder sb = new StringBuilder();
         if (s.getDetails() != null) {
             this.details = s.getDetails().stream().map(StocktakeDetailResponse::new).collect(Collectors.toList());
+            for (com.example.Hehe.model.StocktakeDetail d : s.getDetails()) {
+                if (d.getActualQuantity() != null && d.getExpectedQuantity() != null && !d.getActualQuantity().equals(d.getExpectedQuantity())) {
+                    this.hasDeviation = true;
+                    int diff = d.getActualQuantity() - d.getExpectedQuantity();
+                    if (sb.length() > 0) sb.append(", ");
+                    sb.append(diff > 0 ? "+" : "").append(diff).append(" ").append(d.getProduct() != null ? d.getProduct().getName() : "SP");
+                }
+            }
         }
+        this.deviationSummary = sb.length() > 0 ? sb.toString() : null;
     }
 
     public Integer getId() { return id; }
@@ -46,4 +59,6 @@ public class StocktakeResponse {
     public String getNotes() { return notes; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public List<StocktakeDetailResponse> getDetails() { return details; }
+    public Boolean getHasDeviation() { return hasDeviation; }
+    public String getDeviationSummary() { return deviationSummary; }
 }

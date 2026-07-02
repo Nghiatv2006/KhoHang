@@ -550,7 +550,9 @@ public class ReportServiceImpl implements ReportService {
     @Override
     public java.util.Map<String, Object> getDebtAgingAnalysis(User currentUser) {
         List<Receipt> unpaidReceipts;
-        if (currentUser.getRole() == UserRole.MANAGER) {
+        boolean isGlobalUser = currentUser.getRole() == UserRole.ADMIN || 
+                               (currentUser.getBranch() != null && currentUser.getBranch().getId() == 1);
+        if (!isGlobalUser) {
             unpaidReceipts = receiptRepository.findByTypeAndStatusAndPaymentStatusAndSourceBranchId(
                     ReceiptType.EXPORT, ReceiptStatus.COMPLETED, "UNPAID", currentUser.getBranch().getId());
         } else {
@@ -590,7 +592,9 @@ public class ReportServiceImpl implements ReportService {
     @Override
     public java.util.Map<String, Object> getInventoryAgeAnalysis(User currentUser) {
         List<Inventory> inventories;
-        if (currentUser.getRole() == UserRole.MANAGER) {
+        boolean isGlobalUser = currentUser.getRole() == UserRole.ADMIN || 
+                               (currentUser.getBranch() != null && currentUser.getBranch().getId() == 1);
+        if (!isGlobalUser) {
             inventories = inventoryRepository.findByBranchId(currentUser.getBranch().getId());
         } else {
             inventories = inventoryRepository.findAll();
@@ -627,7 +631,9 @@ public class ReportServiceImpl implements ReportService {
     @Override
     public java.util.List<java.util.Map<String, Object>> getStocktakeDiscrepancyHistory(User currentUser) {
         List<Stocktake> stocktakes;
-        if (currentUser.getRole() == UserRole.MANAGER) {
+        boolean isGlobalUser = currentUser.getRole() == UserRole.ADMIN || 
+                               (currentUser.getBranch() != null && currentUser.getBranch().getId() == 1);
+        if (!isGlobalUser) {
             stocktakes = stocktakeRepository.findByBranchIdOrderByCreatedAtDesc(currentUser.getBranch().getId());
         } else {
             stocktakes = stocktakeRepository.findAllByOrderByCreatedAtDesc();
