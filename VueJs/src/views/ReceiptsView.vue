@@ -191,6 +191,10 @@ const filteredReceipts = computed(() => {
   if (filterStatus.value) {
     if (filterStatus.value === 'UNPAID') {
       result = result.filter(r => r.type === 'EXPORT' && r.status === 'COMPLETED' && (r.paymentStatus === 'UNPAID' || r.paymentStatus === 'Chưa thanh toán'))
+    } else if (filterStatus.value === 'COMPENSATION') {
+      result = result.filter(r => r.type === 'TRANSFER' && r.code?.startsWith('COMP-'))
+    } else if (filterStatus.value === 'SHORTFALL') {
+      result = result.filter(r => r.status === 'PENDING_SHORTFALL_MANAGER' || r.status === 'PENDING_SHORTFALL_ADMIN')
     } else {
       result = result.filter(r => r.status === filterStatus.value || r.paymentStatus === filterStatus.value)
     }
@@ -274,6 +278,8 @@ const statCompleted = computed(() => receipts.value.filter(r => r.status === 'CO
 const statCancelled = computed(() => receipts.value.filter(r => r.status === 'CANCELLED').length)
 
 const statUnpaid = computed(() => receipts.value.filter(r => r.type === 'EXPORT' && r.status === 'COMPLETED' && (r.paymentStatus === 'UNPAID' || r.paymentStatus === 'Chưa thanh toán')).length)
+const statCompensation = computed(() => receipts.value.filter(r => r.type === 'TRANSFER' && r.code?.startsWith('COMP-')).length)
+const statShortfall = computed(() => receipts.value.filter(r => r.type === 'IMPORT' && (r.status === 'PENDING_SHORTFALL_MANAGER' || r.status === 'PENDING_SHORTFALL_ADMIN')).length)
 
 // ──────────────────────────────────────────────────────────────
 // DETAIL PANEL
@@ -1145,7 +1151,8 @@ function typeLabel(r: any) {
   }
   return map[t] || t
 }
-function typeClass(t: string) {
+function typeClass(r: any) {
+  if (r?.type === 'TRANSFER' && r?.code?.startsWith('COMP-')) return 'bg-pink-100 text-pink-700'
   const map: Record<string, string> = {
     IMPORT: 'bg-blue-100 text-blue-700',
     EXPORT: 'bg-purple-100 text-purple-700',
@@ -1153,7 +1160,7 @@ function typeClass(t: string) {
     ADJUST_IN: 'bg-emerald-100 text-emerald-700',
     ADJUST_OUT: 'bg-rose-100 text-rose-700'
   }
-  return map[t] || 'bg-gray-100 text-gray-600'
+  return map[r?.type] || 'bg-gray-100 text-gray-600'
 }
 function statusClass(r: any) {
   const s = r?.status;
@@ -1329,7 +1336,7 @@ const pageIcon = computed(() => {
           <div class="text-2xl font-extrabold text-red-400">{{ statCancelled }}</div>
         </div>
       </div>
-      <div @click="filterStatus = filterStatus === 'UNPAID' ? '' : 'UNPAID'"
+      <div v-if="filterType === 'EXPORT' || !filterType" @click="filterStatus = filterStatus === 'UNPAID' ? '' : 'UNPAID'"
         :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'UNPAID' ? 'border-orange-400 ring-2 ring-orange-200' : 'border-[#f1f5f9] hover:border-orange-300']">
         <div class="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center text-orange-400 text-xl">
           <i class="fas fa-file-invoice-dollar"></i>
@@ -1337,6 +1344,26 @@ const pageIcon = computed(() => {
         <div>
           <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide">Chưa thanh toán</div>
           <div class="text-2xl font-extrabold text-orange-400">{{ statUnpaid }}</div>
+        </div>
+      </div>
+      <div v-else-if="filterType === 'TRANSFER'" @click="filterStatus = filterStatus === 'COMPENSATION' ? '' : 'COMPENSATION'"
+        :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'COMPENSATION' ? 'border-pink-400 ring-2 ring-pink-200' : 'border-[#f1f5f9] hover:border-pink-300']">
+        <div class="w-12 h-12 rounded-xl bg-pink-50 flex items-center justify-center text-pink-400 text-xl">
+          <i class="fas fa-exchange-alt"></i>
+        </div>
+        <div>
+          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide">Điều chuyển bù</div>
+          <div class="text-2xl font-extrabold text-pink-400">{{ statCompensation }}</div>
+        </div>
+      </div>
+      <div v-else-if="filterType === 'IMPORT'" @click="filterStatus = filterStatus === 'SHORTFALL' ? '' : 'SHORTFALL'"
+        :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'SHORTFALL' ? 'border-red-400 ring-2 ring-red-200' : 'border-[#f1f5f9] hover:border-red-300']">
+        <div class="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center text-red-400 text-xl">
+          <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <div>
+          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide">Thiếu hụt</div>
+          <div class="text-2xl font-extrabold text-red-400">{{ statShortfall }}</div>
         </div>
       </div>
     </div>
@@ -1445,7 +1472,7 @@ const pageIcon = computed(() => {
                 <span class="font-mono font-bold text-[#4361ee] text-xs">{{ r.code }}</span>
               </td>
               <td class="px-5 py-4">
-                <span :class="['inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold', typeClass(r.type)]">
+                <span :class="['inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold', typeClass(r)]">
                   {{ typeLabel(r) }}
                 </span>
               </td>
@@ -1562,7 +1589,7 @@ const pageIcon = computed(() => {
             <div class="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Loại phiếu</div>
-                <span :class="['inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold', typeClass(selectedReceipt.type)]">
+                <span :class="['inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold', typeClass(selectedReceipt)]">
                   {{ typeLabel(selectedReceipt) }}
                 </span>
               </div>
