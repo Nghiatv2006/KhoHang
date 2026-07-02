@@ -15,5 +15,7 @@ public interface ReceiptService {
     ReceiptResponse markPaid(Integer id, User currentUser);
     ReceiptResponse confirmTransfer(Integer id, java.util.Map<String, Object> payload, User currentUser);
     ReceiptResponse confirmStocktake(Integer id, java.util.Map<String, Object> payload, User currentUser);
+    ReceiptResponse approveShortfall(Integer id, boolean isApproved, User currentUser);
+    ReceiptResponse compensateShortfall(Integer id, User currentUser);
     List<ReceiptResponse> getReceiptsByCustomer(Integer customerId, User currentUser);
 }

@@ -44,7 +44,8 @@ run_warehub.bat
 
 
 ### Uploads & Backups ###
-uploads/
+uploads/*
+!uploads/images/
 
 # Temporary business logic notes
 nghiep_vu_temp.md

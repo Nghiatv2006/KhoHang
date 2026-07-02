@@ -75,5 +75,11 @@ public class ReportController {
 
         return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
     }
+
+    @GetMapping("/dashboard/branch-sales")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<java.util.Map<Integer, java.util.List<java.math.BigDecimal>>> getBranchSalesTrend30Days() {
+        return ResponseEntity.ok(reportService.getBranchSalesTrend30Days());
+    }
 }
 

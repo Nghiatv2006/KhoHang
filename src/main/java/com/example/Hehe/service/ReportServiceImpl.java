@@ -1347,5 +1347,46 @@ public class ReportServiceImpl implements ReportService {
         cell.setCellStyle(style);
     }
 
+    @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public java.util.Map<Integer, java.util.List<java.math.BigDecimal>> getBranchSalesTrend30Days() {
+        // Trả về doanh thu xuất bán 30 ngày cho TẤT CẢ chi nhánh (Không phụ thuộc vai trò người dùng)
+        // Điều này phục vụ riêng cho Dashboard để hiện "tất cả chi nhánh" theo yêu cầu.
+        
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime thirtyDaysAgoStart = now.minusDays(29).toLocalDate().atStartOfDay();
+
+        List<Receipt> exportReceipts = receiptRepository.findByTypeAndStatus(ReceiptType.EXPORT, ReceiptStatus.COMPLETED);
+        
+        java.util.List<Branch> allBranches = branchRepository.findAll();
+        java.util.Map<Integer, java.util.List<java.math.BigDecimal>> branchSalesMap = new java.util.HashMap<>();
+        
+        for (Branch b : allBranches) {
+            java.util.List<java.math.BigDecimal> dailySales = new java.util.ArrayList<>();
+            for (int i = 0; i < 30; i++) {
+                dailySales.add(BigDecimal.ZERO);
+            }
+            branchSalesMap.put(b.getId(), dailySales);
+        }
+
+        for (Receipt r : exportReceipts) {
+            if (r.getCreatedAt() != null && !r.getCreatedAt().isBefore(thirtyDaysAgoStart)) {
+                if (r.getSourceBranch() != null && branchSalesMap.containsKey(r.getSourceBranch().getId())) {
+                    BigDecimal receiptTotal = r.getDetails().stream()
+                            .map(d -> d.getPrice().multiply(BigDecimal.valueOf(d.getQuantity())))
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                            
+                    long daysAgo = java.time.temporal.ChronoUnit.DAYS.between(r.getCreatedAt().toLocalDate(), now.toLocalDate());
+                    if (daysAgo >= 0 && daysAgo <= 29) {
+                        int index = 29 - (int)daysAgo;
+                        java.util.List<java.math.BigDecimal> currentList = branchSalesMap.get(r.getSourceBranch().getId());
+                        currentList.set(index, currentList.get(index).add(receiptTotal));
+                    }
+                }
+            }
+        }
+        
+        return branchSalesMap;
+    }
 }
 
