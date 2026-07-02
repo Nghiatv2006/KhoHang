@@ -9,6 +9,7 @@ public class ReceiptDetailResponse {
     private Integer productId;
     private String productName;
     private String productSku;
+    private String productCategory;
     private LocalDate manufacturingDate;
     private LocalDate expirationDate;
     private Integer quantity;
@@ -31,6 +32,9 @@ public class ReceiptDetailResponse {
             this.productId = d.getProduct().getId();
             this.productName = d.getProduct().getName();
             this.productSku = d.getProduct().getSku();
+            if (d.getProduct().getCategory() != null) {
+                this.productCategory = d.getProduct().getCategory().getName();
+            }
         }
     }
 
@@ -39,6 +43,7 @@ public class ReceiptDetailResponse {
     public String getBatchCode() { return batchCode; }
     public Integer getReceivedQuantity() { return receivedQuantity; }
     public String getShortfallReason() { return shortfallReason; }
+    public String getProductCategory() { return productCategory; }
     public String getProductSku() { return productSku; }
     public String getProductName() { return productName; }
     public LocalDate getManufacturingDate() { return manufacturingDate; }
