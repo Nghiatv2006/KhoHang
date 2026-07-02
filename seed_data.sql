@@ -20,12 +20,19 @@ INSERT INTO categories (name) VALUES
 ('Điện thoại di động'),
 ('Máy tính xách tay'),
 ('Phụ kiện công nghệ'),
-('Thực phẩm đóng gói');
+('Thực phẩm đóng gói'),
+('Màn hình máy tính'),
+('Bàn phím & Chuột'),
+('Thiết bị âm thanh');
 
 -- Thêm Khách hàng (Customers)
 INSERT INTO customers (name, contact_info, address, debt, email, tax_code, branch_id) VALUES
 ('Nguyễn Văn A', '0912223334', 'Ba Đình, Hà Nội', 5000000.00, 'nguyenvana@example.com', '0101234567', 1),
-('Trần Thị B', '0933445566', 'Quận 3, TP.HCM', 12500000.00, 'tranthib@example.com', '0207654321', 2);
+('Trần Thị B', '0933445566', 'Quận 3, TP.HCM', 12500000.00, 'tranthib@example.com', '0207654321', 2),
+('Công ty CP Công Nghệ Việt', '0243123456', 'Cầu Giấy, Hà Nội', 50000000.00, 'contact@congngheviet.vn', '0105678901', 1),
+('Đại lý Tuấn Cường', '0988776655', 'Hải Châu, Đà Nẵng', 0.00, 'tuancuong@gmail.com', '0309876543', 3),
+('Lê Hoàng Nam', '0911223344', 'Quận 1, TP.HCM', 2500000.00, 'namle@example.com', '0201122334', 2),
+('Phạm Thu Hương', '0966554433', 'Hoàn Kiếm, Hà Nội', 0.00, 'huongpham@example.com', '0109988776', 1);
 
 
 -- ==============================================================================
@@ -36,7 +43,7 @@ INSERT INTO customers (name, contact_info, address, debt, email, tax_code, branc
 -- Mật khẩu mặc định cho TẤT CẢ các user bên dưới là '123456' 
 -- (Hash BCrypt tương ứng: $2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu)
 INSERT INTO users (username, password, full_name, role, branch_id, status, phone, email) VALUES
-('admin', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Quản trị viên Hệ thống', 'ADMIN', NULL, 'ACTIVE', '0912345678', 'admin@example.com'),
+('admin', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Quản trị viên Hệ thống', 'ADMIN', 1, 'ACTIVE', '0912345678', 'admin@example.com'),
 ('manager_hn', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Lê Cường (QL Hà Nội)', 'MANAGER', 1, 'ACTIVE', '0923456789', 'manager_hn@example.com'),
 ('manager_dn', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Lê Cường (QL Đà Nẵng)', 'MANAGER', 3, 'ACTIVE', '0923456787', 'manager_dn@example.com'),
 ('staff_hn_1', '$2a$10$a3Jzt1usW9MnGrWgBhGb0OLr3HtHDtvHUQHG2wHdVWVVoYIMHBnEu', 'Nhân viên HN 01', 'STAFF', 1, 'ACTIVE', '0934567890', 'staff_hn_1@example.com'),
@@ -49,23 +56,37 @@ INSERT INTO users (username, password, full_name, role, branch_id, status, phone
 -- ==============================================================================
 
 -- Thêm Sản phẩm (Products)
-INSERT INTO products (code, name, unit, price, category_id, has_expiry, image_url, mfg_date, exp_date) VALUES
-('IP15', 'iPhone 15 Pro Max 256GB', 'Chiếc', 29900000, 1, FALSE, '/uploads/images/iphone_15.png', '1970-01-01', '1970-01-01'),
-('MACM2', 'MacBook Air M2 8GB/256GB', 'Chiếc', 25500000, 2, FALSE, '/uploads/images/macbook_air.png', '1970-01-01', '1970-01-01'),
-('AIRPODS', 'AirPods Pro 2', 'Hộp', 5500000, 3, FALSE, '/uploads/images/airpods_pro.png', '1970-01-01', '1970-01-01'),
-('MILK_OLD', 'Sữa tươi tiệt trùng 1L (Lô cũ)', 'Hộp', 35000, 4, TRUE, '/uploads/images/milk_old.png', '2024-01-01', '2024-07-01'),
-('MILK_NEW', 'Sữa tươi tiệt trùng 1L (Lô mới)', 'Hộp', 35000, 4, TRUE, '/uploads/images/milk_new.png', '2024-05-01', '2024-11-01');
+INSERT INTO products (code, name, unit, import_price, price, category_id, has_expiry, image_url, mfg_date, exp_date) VALUES
+('IP15', 'iPhone 15 Pro Max 256GB', 'Chiếc', 25000000, 29900000, 1, FALSE, '/uploads/images/iphone_15.png', '1970-01-01', '1970-01-01'),
+('MACM2', 'MacBook Air M2 8GB/256GB', 'Chiếc', 20000000, 25500000, 2, FALSE, '/uploads/images/macbook_air.png', '1970-01-01', '1970-01-01'),
+('AIRPODS', 'AirPods Pro 2', 'Hộp', 4000000, 5500000, 3, FALSE, '/uploads/images/airpods_pro.png', '1970-01-01', '1970-01-01'),
+('MILK_OLD', 'Sữa tươi tiệt trùng 1L (Lô cũ)', 'Hộp', 20000, 35000, 4, TRUE, '/uploads/images/milk_old.png', '2024-01-01', '2024-07-01'),
+('MILK_NEW', 'Sữa tươi tiệt trùng 1L (Lô mới)', 'Hộp', 20000, 35000, 4, TRUE, '/uploads/images/milk_new.png', '2024-05-01', '2024-11-01'),
+('DELL_U27', 'Màn hình Dell UltraSharp U2723QE', 'Chiếc', 10000000, 12500000, 5, FALSE, '/uploads/images/dell_u27.png', '1970-01-01', '1970-01-01'),
+('KEYCHRON', 'Bàn phím cơ Keychron K8 Pro', 'Chiếc', 1500000, 2100000, 6, FALSE, '/uploads/images/keychron.png', '1970-01-01', '1970-01-01'),
+('LOGI_MX', 'Chuột Logitech MX Master 3S', 'Chiếc', 1800000, 2490000, 6, FALSE, '/uploads/images/logi_mx.png', '1970-01-01', '1970-01-01'),
+('MARSHALL', 'Loa Bluetooth Marshall Stanmore III', 'Chiếc', 7000000, 9500000, 7, FALSE, '/uploads/images/marshall.png', '1970-01-01', '1970-01-01'),
+('S24_ULTRA', 'Samsung Galaxy S24 Ultra 512GB', 'Chiếc', 28000000, 33900000, 1, FALSE, '/uploads/images/s24_ultra.png', '1970-01-01', '1970-01-01');
 
 -- Thêm Tồn kho (Inventories)
 INSERT INTO inventories (branch_id, product_id, mfg_date, exp_date, batch_code, quantity) VALUES
 -- Tồn tại Chi nhánh Hà Nội
-(1, 1, '1970-01-01', '1970-01-01', 'IP15-HN-001', 50), -- 50 iPhone
-(1, 2, '1970-01-01', '1970-01-01', 'MACM2-HN-001', 20), -- 20 Macbook
-(1, 3, '1970-01-01', '1970-01-01', 'AIR-HN-001', 1),  -- 1 Airpods
-(1, 4, '2024-01-01', '2024-07-01', 'MILK-2024A', 100), -- 100 hộp sữa lô cũ
-(1, 5, '2024-05-01', '2024-11-01', 'MILK-2024B', 200), -- 200 hộp sữa lô mới
--- Tồn tại Chi nhánh HCM (iPhone sắp hết, dưới ngưỡng 15)
-(2, 1, '1970-01-01', '1970-01-01', 'IP15-HCM-001', 12); 
+(1, 1, '1970-01-01', '1970-01-01', 'IP15-HN-001', 50),
+(1, 2, '1970-01-01', '1970-01-01', 'MACM2-HN-001', 20),
+(1, 3, '1970-01-01', '1970-01-01', 'AIR-HN-001', 1),
+(1, 4, '2024-01-01', '2024-07-01', 'MILK-2024A', 100),
+(1, 5, '2024-05-01', '2024-11-01', 'MILK-2024B', 200),
+(1, 6, '1970-01-01', '1970-01-01', 'DELL-HN-001', 15),
+(1, 7, '1970-01-01', '1970-01-01', 'KEY-HN-001', 40),
+(1, 8, '1970-01-01', '1970-01-01', 'MX-HN-001', 35),
+-- Tồn tại Chi nhánh HCM
+(2, 1, '1970-01-01', '1970-01-01', 'IP15-HCM-001', 12),
+(2, 2, '1970-01-01', '1970-01-01', 'MACM2-HCM-001', 18),
+(2, 6, '1970-01-01', '1970-01-01', 'DELL-HCM-001', 22),
+(2, 9, '1970-01-01', '1970-01-01', 'MAR-HCM-001', 10),
+-- Tồn tại Chi nhánh Đà Nẵng
+(3, 10, '1970-01-01', '1970-01-01', 'S24-DN-001', 30),
+(3, 3, '1970-01-01', '1970-01-01', 'AIR-DN-001', 50);
 
 
 -- ==============================================================================
@@ -122,16 +143,16 @@ INSERT INTO audit_logs (user_id, action, entity_name, entity_id, details) VALUES
 
 -- Phiếu xuất bán (EXPORT)
 INSERT INTO receipts (code, type, status, payment_status, source_branch_id, dest_branch_id, created_by, customer_id, description, created_at) VALUES
-('EX20260601', 'EXPORT', 'COMPLETED', 'PAID', 1, NULL, 2, 1, 'Bán sỉ iPhone cho đại lý HN', '2026-06-01 10:00:00'),
-('EX20260603', 'EXPORT', 'COMPLETED', 'PAID', 2, NULL, 5, 2, 'Bán lẻ MacBook tại HCM', '2026-06-03 14:30:00'),
-('EX20260605', 'EXPORT', 'COMPLETED', 'UNPAID', 3, NULL, 3, 1, 'Bán hàng cho khách nợ Đà Nẵng', '2026-06-05 09:15:00'),
-('EX20260608', 'EXPORT', 'COMPLETED', 'PAID', 1, NULL, 2, 2, 'Khách mua AirPods và Phụ kiện HN', '2026-06-08 16:45:00'),
-('EX20260610', 'EXPORT', 'COMPLETED', 'UNPAID', 2, NULL, 5, 2, 'Bán sữa số lượng lớn HCM', '2026-06-10 11:20:00'),
-('EX20260612', 'EXPORT', 'COMPLETED', 'PAID', 3, NULL, 3, 1, 'Khách mua lẻ iPhone ĐN', '2026-06-12 15:10:00'),
-('EX20260615', 'EXPORT', 'COMPLETED', 'PAID', 1, NULL, 2, 1, 'Xuất bán MacBook HN', '2026-06-15 13:00:00'),
-('EX20260618', 'EXPORT', 'COMPLETED', 'UNPAID', 2, NULL, 5, 1, 'Hợp đồng bán sỉ iPhone HCM', '2026-06-18 10:30:00'),
-('EX20260620', 'EXPORT', 'COMPLETED', 'PAID', 3, NULL, 3, 2, 'Bán MacBook và AirPods ĐN', '2026-06-20 17:00:00'),
-('EX20260621', 'EXPORT', 'COMPLETED', 'PAID', 1, NULL, 2, 2, 'Bán sữa hộp HN', '2026-06-21 08:30:00');
+('EX20260601', 'EXPORT', 'COMPLETED', 'PAID', 1, NULL, 2, 1, 'Bán sỉ iPhone cho đại lý HN', CURRENT_TIMESTAMP - INTERVAL '28 days'),
+('EX20260603', 'EXPORT', 'COMPLETED', 'PAID', 2, NULL, 5, 2, 'Bán lẻ MacBook tại HCM', CURRENT_TIMESTAMP - INTERVAL '25 days'),
+('EX20260605', 'EXPORT', 'COMPLETED', 'UNPAID', 3, NULL, 3, 1, 'Bán hàng cho khách nợ Đà Nẵng', CURRENT_TIMESTAMP - INTERVAL '22 days'),
+('EX20260608', 'EXPORT', 'COMPLETED', 'PAID', 1, NULL, 2, 2, 'Khách mua AirPods và Phụ kiện HN', CURRENT_TIMESTAMP - INTERVAL '19 days'),
+('EX20260610', 'EXPORT', 'COMPLETED', 'UNPAID', 2, NULL, 5, 2, 'Bán sữa số lượng lớn HCM', CURRENT_TIMESTAMP - INTERVAL '16 days'),
+('EX20260612', 'EXPORT', 'COMPLETED', 'PAID', 3, NULL, 3, 1, 'Khách mua lẻ iPhone ĐN', CURRENT_TIMESTAMP - INTERVAL '14 days'),
+('EX20260615', 'EXPORT', 'COMPLETED', 'PAID', 1, NULL, 2, 1, 'Xuất bán MacBook HN', CURRENT_TIMESTAMP - INTERVAL '11 days'),
+('EX20260618', 'EXPORT', 'COMPLETED', 'UNPAID', 2, NULL, 5, 1, 'Hợp đồng bán sỉ iPhone HCM', CURRENT_TIMESTAMP - INTERVAL '8 days'),
+('EX20260620', 'EXPORT', 'COMPLETED', 'PAID', 3, NULL, 3, 2, 'Bán MacBook và AirPods ĐN', CURRENT_TIMESTAMP - INTERVAL '5 days'),
+('EX20260621', 'EXPORT', 'COMPLETED', 'PAID', 1, NULL, 2, 2, 'Bán sữa hộp HN', CURRENT_TIMESTAMP - INTERVAL '3 days');
 
 INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code) VALUES
 ((SELECT id FROM receipts WHERE code='EX20260601'), 1, 5, 29900000, 'IP15-HN-001'),
@@ -150,9 +171,9 @@ INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code
 
 -- Phiếu nhập kho (IMPORT)
 INSERT INTO receipts (code, type, status, payment_status, source_branch_id, dest_branch_id, created_by, customer_id, description, created_at) VALUES
-('IM20260602', 'IMPORT', 'COMPLETED', 'PAID', NULL, 1, 2, NULL, 'Nhập thêm iPhone và MacBook HN', '2026-06-02 09:00:00'),
-('IM20260607', 'IMPORT', 'COMPLETED', 'PAID', NULL, 2, 5, NULL, 'Nhập thêm sữa HCM', '2026-06-07 11:00:00'),
-('IM20260614', 'IMPORT', 'COMPLETED', 'PAID', NULL, 3, 3, NULL, 'Nhập AirPods Đà Nẵng', '2026-06-14 14:00:00');
+('IM20260602', 'IMPORT', 'COMPLETED', 'PAID', NULL, 1, 2, NULL, 'Nhập thêm iPhone và MacBook HN', CURRENT_TIMESTAMP - INTERVAL '27 days'),
+('IM20260607', 'IMPORT', 'COMPLETED', 'PAID', NULL, 2, 5, NULL, 'Nhập thêm sữa HCM', CURRENT_TIMESTAMP - INTERVAL '20 days'),
+('IM20260614', 'IMPORT', 'COMPLETED', 'PAID', NULL, 3, 3, NULL, 'Nhập AirPods Đà Nẵng', CURRENT_TIMESTAMP - INTERVAL '12 days');
 
 INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code) VALUES
 ((SELECT id FROM receipts WHERE code='IM20260602'), 1, 10, 29000000, 'IP15-HN-001'),
@@ -169,7 +190,8 @@ DO $$
 DECLARE
     day_offset INT;
     curr_date TIMESTAMP;
-    r_id INT;
+    r_imp_id INT;
+    r_exp_id INT;
     imp_qty INT;
     exp_qty INT;
     p_id INT;
@@ -178,46 +200,71 @@ DECLARE
     p_batch VARCHAR(100);
     target_branch INT;
     creator_id INT;
+    t INT;
+    exp_trend INT;
+    imp_trend INT;
 BEGIN
     -- Dọn dẹp dữ liệu tự động cũ nếu có
     DELETE FROM receipt_details WHERE batch_code LIKE '%-BATCH-%';
     DELETE FROM receipts WHERE code LIKE 'IM_AUTO_%' OR code LIKE 'EX_AUTO_%';
 
-    -- Sinh dữ liệu quy mô lớn xoay vòng cho 3 chi nhánh
+    -- Sinh dữ liệu quy mô lớn cho TẤT CẢ 3 chi nhánh mỗi ngày
     FOR day_offset IN 0..29 LOOP
         curr_date := NOW() - (day_offset || ' days')::INTERVAL;
-        target_branch := (day_offset % 3) + 1;
+        
+        -- t là trục thời gian đi từ 0 (quá khứ, cách đây 29 ngày) đến 29 (hôm nay)
+        t := 29 - day_offset;
+        
+        -- Đường màu xanh dương (Xuất bán): Sóng cong vòm đỉnh ở giữa tháng
+        exp_trend := 3 + (SIN((t + 3) / 35.0 * 3.14159265) * 15)::INT;
+        
+        -- Đường màu xanh lá (Nhập kho): Đường thoai thoải, ngóc đầu lên ở cuối tháng và cắt đường xanh dương
+        imp_trend := 2 + ((t * t) / 70.0)::INT;
 
-        IF target_branch = 1 THEN creator_id := 3;     -- staff_hn_1
-        ELSIF target_branch = 2 THEN creator_id := 4;  -- manager_hcm
-        ELSE creator_id := 2;                          -- manager_dn
-        END IF;
+        FOR target_branch IN 1..3 LOOP
+            IF target_branch = 1 THEN creator_id := 3;     -- staff_hn_1
+            ELSIF target_branch = 2 THEN creator_id := 4;  -- manager_hcm
+            ELSE creator_id := 2;                          -- manager_dn
+            END IF;
 
-        -- Phiếu NHẬP (IMPORT) mỗi 2 ngày
-        IF day_offset % 2 = 0 THEN
-            p_id := (day_offset % 3) + 1;
-            SELECT import_price, code INTO p_import_price, p_batch FROM products WHERE id = p_id;
-
+            -- Tạo 1 Phiếu NHẬP hằng ngày cho chi nhánh này
             INSERT INTO receipts (code, type, status, payment_status, source_branch_id, dest_branch_id, created_by, description, created_at)
-            VALUES ('IM_AUTO_' || day_offset || '_' || EXTRACT(EPOCH FROM curr_date)::BIGINT, 'IMPORT', 'COMPLETED', 'PAID', NULL, target_branch, creator_id, 'Nhập hàng mẫu quy mô lớn', curr_date)
-            RETURNING id INTO r_id;
+            VALUES ('IM_AUTO_' || day_offset || '_' || target_branch || '_' || EXTRACT(EPOCH FROM curr_date)::BIGINT, 'IMPORT', 'COMPLETED', 'PAID', NULL, target_branch, creator_id, 'Nhập hàng định kỳ', curr_date)
+            RETURNING id INTO r_imp_id;
 
-            imp_qty := 35 + (day_offset * 2) % 45;
-            INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code)
-            VALUES (r_id, p_id, imp_qty, p_import_price, p_batch || '-BATCH-' || day_offset);
-        END IF;
+            -- Chỉ Tạo Phiếu XUẤT hằng ngày cho chi nhánh nhánh (target_branch > 1), vì Hà Nội (1) là kho tổng không bán lẻ
+            IF target_branch > 1 THEN
+                INSERT INTO receipts (code, type, status, payment_status, source_branch_id, dest_branch_id, created_by, customer_id, description, created_at)
+                VALUES ('EX_AUTO_' || day_offset || '_' || target_branch || '_' || EXTRACT(EPOCH FROM curr_date)::BIGINT, 'EXPORT', 'COMPLETED', 'PAID', target_branch, NULL, creator_id, 1, 'Xuất bán sỉ hằng ngày', curr_date)
+                RETURNING id INTO r_exp_id;
+            END IF;
 
-        -- Phiếu XUẤT BÁN (EXPORT) hằng ngày
-        p_id := ((day_offset + 1) % 3) + 1;
-        SELECT price, code INTO p_price, p_batch FROM products WHERE id = p_id;
+            -- Thêm chi tiết cho cả 10 sản phẩm
+            FOR p_id IN 1..10 LOOP
+                SELECT import_price, price, code INTO p_import_price, p_price, p_batch FROM products WHERE id = p_id;
+                
+                -- Phân bổ trend cho các sản phẩm (cộng thêm 1 chút để ko bị 0)
+                -- NHÂN VỚI HỆ SỐ CỦA CHI NHÁNH ĐỂ CÁC CHI NHÁNH KHÔNG BẰNG NHAU
+                IF target_branch = 1 THEN
+                    imp_qty := (imp_trend + (p_id % 2)) * 1.0; 
+                    exp_qty := 0; -- Kho tổng không xuất bán
+                ELSIF target_branch = 2 THEN
+                    imp_qty := (imp_trend + (p_id % 2)) * 1.5; 
+                    exp_qty := (exp_trend + (p_id % 3)) * 1.6; 
+                ELSE
+                    imp_qty := (imp_trend + (p_id % 2)) * 0.7; 
+                    exp_qty := (exp_trend + (p_id % 3)) * 0.8; 
+                END IF;
 
-        INSERT INTO receipts (code, type, status, payment_status, source_branch_id, dest_branch_id, created_by, customer_id, description, created_at)
-        VALUES ('EX_AUTO_' || day_offset || '_' || EXTRACT(EPOCH FROM curr_date)::BIGINT, 'EXPORT', 'COMPLETED', 'PAID', target_branch, NULL, creator_id, 1, 'Xuất bán sỉ quy mô lớn', curr_date)
-        RETURNING id INTO r_id;
+                INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code)
+                VALUES (r_imp_id, p_id, imp_qty, p_import_price, p_batch || '-BATCH-' || day_offset || '-' || target_branch);
 
-        exp_qty := 15 + (day_offset * 2) % 30;
-        INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code)
-        VALUES (r_id, p_id, exp_qty, p_price, p_batch || '-BATCH-' || day_offset);
+                IF target_branch > 1 THEN
+                    INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code)
+                    VALUES (r_exp_id, p_id, exp_qty, p_price, p_batch || '-BATCH-' || day_offset || '-' || target_branch);
+                END IF;
+            END LOOP;
+        END LOOP;
     END LOOP;
 END $$;
 

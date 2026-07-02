@@ -4,14 +4,14 @@
 -- ==============================================================================
 
 -- DROP TABLE & TYPE (Dùng để reset nhanh database)
-DROP TABLE IF EXISTS audit_logs, stocktake_details, stocktakes, receipt_details, receipts, inventories, products, users, customers, categories, branches, password_reset_otps CASCADE;
+DROP TABLE IF EXISTS backups, audit_logs, stocktake_details, stocktakes, receipt_details, receipts, inventories, products, users, customers, categories, branches, password_reset_otps CASCADE;
 DROP TYPE IF EXISTS user_role, user_status, receipt_type, receipt_status, stocktake_status CASCADE;
 
 -- 1. ENUM TYPES
 CREATE TYPE user_role AS ENUM ('ADMIN', 'MANAGER', 'STAFF');
 CREATE TYPE user_status AS ENUM ('ACTIVE', 'LOCKED');
 CREATE TYPE receipt_type AS ENUM ('IMPORT', 'EXPORT', 'TRANSFER', 'ADJUST_IN', 'ADJUST_OUT');
-CREATE TYPE receipt_status AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED', 'PENDING_ADMIN', 'PENDING_STOCKTAKE');
+CREATE TYPE receipt_status AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED', 'PENDING_ADMIN', 'PENDING_STOCKTAKE', 'PENDING_SHORTFALL_MANAGER', 'PENDING_SHORTFALL_ADMIN', 'RETURN');
 CREATE TYPE stocktake_status AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED');
 
 -- Bảng Chi nhánh (Branches)
@@ -231,4 +231,7 @@ CREATE TABLE backups (
 );
 
 CREATE INDEX idx_backups_branch_id ON backups (branch_id);
+
+-- Migration command to apply update on existing database
+-- ALTER TYPE receipt_status ADD VALUE 'RETURN';
 

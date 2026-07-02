@@ -9,7 +9,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/login',
     name: 'Login',
-    component: () => import('../views/LoginView.vue'),
+    component: () => import('../views/AuthView.vue'),
     meta: { requiresAuth: false },
   },
   {
@@ -75,8 +75,31 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: '/receipts',
-        name: 'Receipts',
+        redirect: '/imports',
+      },
+      {
+        path: '/imports',
+        name: 'Imports',
         component: () => import('../views/ReceiptsView.vue'),
+        props: { receiptType: 'IMPORT' },
+      },
+      {
+        path: '/invoices',
+        name: 'Invoices',
+        component: () => import('../views/ReceiptsView.vue'),
+        props: { receiptType: 'EXPORT' },
+      },
+      {
+        path: '/transfers',
+        name: 'Transfers',
+        component: () => import('../views/ReceiptsView.vue'),
+        props: { receiptType: 'TRANSFER' },
+      },
+      {
+        path: '/disposals',
+        name: 'disposals',
+        component: () => import('../views/ReceiptsView.vue'),
+        props: { receiptType: 'ADJUST_OUT' },
       },
       {
         path: '/audit-logs',
@@ -91,6 +114,12 @@ const routes: RouteRecordRaw[] = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
+})
+
+router.onError((error, to) => {
+  if (error.message.includes('Failed to fetch dynamically imported module') || error.message.includes('Importing a module script failed')) {
+    window.location.href = to.fullPath
+  }
 })
 
 // Navigation guard
