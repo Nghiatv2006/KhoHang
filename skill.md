@@ -31,3 +31,9 @@ git diff <đường-dẫn-file>
 * **Không tự ý truy cập cơ sở dữ liệu (Database)**: Không tự ý truy cập database để kiểm tra trạng thái dữ liệu khi chưa giải thích và xin phép người dùng. Hãy ưu tiên đọc và phân tích mã nguồn trước để tìm câu trả lời.
 * **Không tự mở trình duyệt (Browser)**: Tuyệt đối không sử dụng công cụ mở/điều khiển trình duyệt ngầm với bất kỳ mục đích nào. Nếu cần kiểm tra giao diện, kiểm thử tính năng hoặc xem log lỗi trình duyệt, hãy giải thích rõ và hướng dẫn, yêu cầu người dùng tự thực hiện trên máy của họ.
 * **Không tự ý đọc code hoặc chạy công cụ vô tội vạ**: Khi người dùng chưa đưa ra yêu cầu tiếp theo hoặc đang trong quá trình trao đổi thảo luận, AI không được tự ý gọi các công cụ đọc file (`view_file`), tìm kiếm (`grep_search`), hay bất kỳ công cụ nào khác để quét code ngoài phạm vi câu hỏi hiện tại. Chỉ hành động khi nhận được yêu cầu rõ ràng từ người dùng.
+
+## 5. Quy tắc cấu hình Bảo mật JWT (JSON Web Token)
+Để đảm bảo trải nghiệm phát triển mượt mà ở môi trường cục bộ (Localhost) và tính an toàn bảo mật cao khi triển khai (Production AWS):
+* **Localhost (Dev):** Khóa bí mật `jwt.secret` (đọc từ biến môi trường `JWT_SECRET`) phải là **khóa cố định** để khi nhà phát triển sửa code Java/restart server không bị văng đăng xuất (logout).
+* **AWS (Production):** Khóa `jwt.secret` phải được cấu hình là `"generate-on-startup"`. Khi đó, backend sẽ tự động sinh khóa ngẫu nhiên mỗi lần khởi động lại ứng dụng, ép toàn bộ thiết bị đang đăng nhập phải đăng xuất để bảo mật.
+
