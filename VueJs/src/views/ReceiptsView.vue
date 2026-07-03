@@ -19,6 +19,13 @@ function canApproveReceipt(r: any) {
   if (r.status === 'DRAFT') {
       if (r.type === 'EXPORT' && isAdmin.value && r.sourceBranchId !== 1) return false;
       if (r.type === 'TRANSFER' && isAdmin.value) return false;
+      // DISPOSAL: Manager/Admin can approve, Staff can submit to Manager
+      if (r.type === 'DISPOSAL') {
+          if (isAdmin.value) return true;
+          if (isManager.value && r.sourceBranchId === user.value?.branchId) return true;
+          if (user.value?.role === 'STAFF' && r.sourceBranchId === user.value?.branchId) return true;
+          return false;
+      }
       if (isAdmin.value) return true;
       if (isManager.value) {
           if (r.type === 'TRANSFER') {
@@ -33,12 +40,24 @@ function canApproveReceipt(r: any) {
       return false;
   }
   if (r.status === 'PENDING_ADMIN') {
+      // DISPOSAL: Manager/Admin can approve
+      if (r.type === 'DISPOSAL') {
+          if (isAdmin.value) return true;
+          if (isManager.value && r.sourceBranchId === user.value?.branchId) return true;
+          return false;
+      }
       if (r.type === 'IMPORT') {
           if (isAdmin.value) return true;
           return false;
       }
       if (r.type === 'TRANSFER') {
           if (isManager.value && r.sourceBranchId === user.value?.branchId) return true;
+          return false;
+      }
+  }
+  if (r.status === 'PENDING_STOCKTAKE') {
+      if (r.type === 'DISPOSAL') {
+          if (isAdmin.value) return true;
           return false;
       }
   }
@@ -60,6 +79,12 @@ function approveReceiptText(r: any) {
     }
     if (r.type === 'EXPORT') {
         return "Hoàn tất xuất hóa đơn";
+    }
+    if (r.type === 'DISPOSAL') {
+        if (r.status === 'DRAFT') return 'Duyệt tiêu hủy (Gửi Quản lý)';
+        if (r.status === 'PENDING_ADMIN') return 'Phê duyệt tiêu hủy (Gửi Admin)';
+        if (r.status === 'PENDING_STOCKTAKE') return 'Phê duyệt tiêu hủy (Hoàn tất)';
+        return 'Phê duyệt tiêu hủy';
     }
     return "Phê duyệt";
 }
@@ -127,7 +152,7 @@ const defaultFilterType = computed(() => {
   if (p.includes('imports')) return 'IMPORT'
   if (p.includes('invoices')) return 'EXPORT'
   if (p.includes('transfers')) return 'TRANSFER'
-  if (p.includes('disposals')) return 'ADJUST_OUT'
+  if (p.includes('disposals')) return 'DISPOSAL'
   return ''
 })
 
@@ -443,6 +468,9 @@ const createForm = ref<{
   customerPhone: string
   paymentStatus: string
   description: string
+  disposalReason: string
+  disposalMethod: string
+  attachmentUrl: string
   details: DetailRow[]
 }>({
   type: 'IMPORT',
@@ -453,6 +481,9 @@ const createForm = ref<{
   customerPhone: '',
   paymentStatus: 'UNPAID',
   description: '',
+  disposalReason: '',
+  disposalMethod: '',
+  attachmentUrl: '',
   details: []
 })
 
@@ -500,6 +531,7 @@ function openCreateModal() {
     if (route.path === '/imports') defaultType = 'IMPORT';
     else if (route.path === '/invoices') defaultType = 'EXPORT';
     else if (route.path === '/transfers') defaultType = 'TRANSFER';
+    else if (route.path === '/disposals') defaultType = 'DISPOSAL';
   }
   createForm.value = {
     type: defaultType,
@@ -510,6 +542,9 @@ function openCreateModal() {
     customerPhone: '',
     paymentStatus: 'UNPAID',
     description: '',
+    disposalReason: '',
+    disposalMethod: '',
+    attachmentUrl: '',
     details: [{ productId: '', batchCode: '', isNewBatch: false, manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 }]
   }
   onTypeChange()
@@ -536,11 +571,24 @@ function onTypeChange() {
   } else if (t === 'TRANSFER') {
     createForm.value.sourceBranchId = ''
     createForm.value.destBranchId = user.value?.branchId || headBranch.value?.id || ''
+  } else if (t === 'DISPOSAL') {
+    createForm.value.sourceBranchId = user.value?.branchId || headBranch.value?.id || ''
+    createForm.value.destBranchId = ''
   } else {
     createForm.value.sourceBranchId = user.value?.branchId || headBranch.value?.id || ''
     createForm.value.destBranchId = ''
   }
+  // Reset disposal fields when changing type
+  if (t !== 'DISPOSAL') {
+    createForm.value.disposalReason = ''
+    createForm.value.disposalMethod = ''
+    createForm.value.attachmentUrl = ''
+  }
   // Reset products when changing type to avoid stale/out-of-stock products
+  createForm.value.details = [{ productId: '', batchCode: '', manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 }]
+}
+
+function onDisposalReasonChange() {
   createForm.value.details = [{ productId: '', batchCode: '', manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 }]
 }
 
@@ -671,10 +719,15 @@ const availableProducts = computed(() => {
     return products.value
   }
   if (createForm.value.sourceBranchId) {
+    let validInventories = sourceInventories.value.filter(inv => inv.quantity > 0)
+    
+    if (t === 'DISPOSAL' && createForm.value.disposalReason === 'Hàng hết hạn sử dụng') {
+      const todayStr = new Date().toISOString().substring(0, 10)
+      validInventories = validInventories.filter(inv => inv.hasExpiry && inv.expirationDate && inv.expirationDate.substring(0, 10) < todayStr)
+    }
+
     const inStockIds = new Set(
-      sourceInventories.value
-        .filter(inv => inv.quantity > 0)
-        .map(inv => inv.productId)
+      validInventories.map(inv => inv.productId)
     )
     return products.value.filter(p => inStockIds.has(p.id))
   }
@@ -726,7 +779,14 @@ function getBatchesForProduct(productId: number | string | null) {
     return Array.from(uniqueBatches.values())
   }
   return sourceInventories.value
-    .filter(inv => inv.productId === Number(productId) && inv.quantity > 0)
+    .filter(inv => {
+      if (inv.productId !== Number(productId) || inv.quantity <= 0) return false;
+      if (createForm.value.type === 'DISPOSAL' && createForm.value.disposalReason === 'Hàng hết hạn sử dụng') {
+        const todayStr = new Date().toISOString().substring(0, 10);
+        if (!inv.hasExpiry || !inv.expirationDate || inv.expirationDate.substring(0, 10) >= todayStr) return false;
+      }
+      return true;
+    })
     .map(inv => {
       const pendingQty = receipts.value
         .filter(r => r.status === 'DRAFT' && r.sourceBranchId === createForm.value.sourceBranchId && 
@@ -776,7 +836,7 @@ function getMaxQuantity(row: DetailRow) {
   // Trừ đi số lượng đang nằm trong các phiếu nháp chờ xuất/điều chuyển
   const pendingQty = receipts.value
     .filter(r => r.status === 'DRAFT' && r.sourceBranchId === createForm.value.sourceBranchId && 
-            (['EXPORT', 'TRANSFER', 'ADJUST_OUT'].includes(r.type) || 
+            (['EXPORT', 'TRANSFER', 'ADJUST_OUT', 'DISPOSAL'].includes(r.type) || 
              (r.type === 'IMPORT' && r.sourceBranchId !== r.destBranchId)))
     .flatMap(r => r.details || [])
     .filter(d => Number(d.productId) === Number(row.productId) && (!row.batchCode || d.batchCode === row.batchCode))
@@ -830,6 +890,12 @@ async function submitCreateDraft() {
     toast.error('Vui lòng điền đầy đủ sản phẩm, lô sản xuất và số lượng hợp lệ.')
     return
   }
+  if (f.type === 'DISPOSAL') {
+    if (!f.disposalReason?.trim()) {
+      toast.error('Vui lòng chọn lý do tiêu hủy.')
+      return
+    }
+  }
   if (f.type === 'EXPORT') {
     if (!f.customerName?.trim()) {
       toast.error('Vui lòng nhập tên khách hàng khi xuất bán.')
@@ -859,6 +925,9 @@ async function submitCreateDraft() {
     customerPhone: f.customerPhone || null,
     paymentStatus: f.paymentStatus,
     description: f.description,
+    disposalReason: f.type === 'DISPOSAL' ? f.disposalReason : null,
+    disposalMethod: f.type === 'DISPOSAL' ? f.disposalMethod : null,
+    attachmentUrl: f.type === 'DISPOSAL' ? f.attachmentUrl : null,
     details: f.details.map(d => ({
       productId: Number(d.productId),
       batchCode: d.batchCode,
@@ -1156,7 +1225,7 @@ function typeLabel(r: any) {
   const t = r?.type;
   const map: Record<string, string> = {
     IMPORT: 'Nhập kho', EXPORT: 'Xuất bán', TRANSFER: 'Điều chuyển',
-    ADJUST_IN: 'Tăng tồn kho', ADJUST_OUT: 'Giảm tồn kho'
+    ADJUST_IN: 'Tăng tồn kho', ADJUST_OUT: 'Giảm tồn kho', DISPOSAL: 'Tiêu hủy'
   }
   return map[t] || t
 }
@@ -1167,7 +1236,8 @@ function typeClass(r: any) {
     EXPORT: 'bg-purple-100 text-purple-700',
     TRANSFER: 'bg-orange-100 text-orange-700',
     ADJUST_IN: 'bg-emerald-100 text-emerald-700',
-    ADJUST_OUT: 'bg-rose-100 text-rose-700'
+    ADJUST_OUT: 'bg-rose-100 text-rose-700',
+    DISPOSAL: 'bg-red-100 text-red-800'
   }
   return map[r?.type] || 'bg-gray-100 text-gray-600'
 }
@@ -1213,12 +1283,16 @@ function statusLabel(r: any) {
     if (r?.type === 'TRANSFER') {
       return '⏳ Chờ Manager Nguồn';
     }
+    if (r?.type === 'DISPOSAL') {
+      return '🔥 Chờ Quản lý duyệt';
+    }
     return '🛡️ Chờ Admin';
   }
   if (s === 'PENDING_STOCKTAKE') {
     if (r?.type === 'TRANSFER' && r.sourceBranchId === user.value?.branchId) {
       return '📦 Đang chuyển (Chờ đích KK)';
     }
+    if (r?.type === 'DISPOSAL') return '🛡️ Chờ Admin duyệt cuối';
     return '📦 Chờ kiểm kê';
   }
   if (s === 'PENDING_SHORTFALL_MANAGER') return '⚠️ Thiếu hụt (Chờ Manager)';
@@ -1621,7 +1695,7 @@ const pageIcon = computed(() => {
       <Transition name="slide-panel">
         <div v-if="showDetail && selectedReceipt" class="fixed inset-y-0 right-0 z-[101] w-full max-w-[700px] bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] flex flex-col border-l border-[#e2e8f0]">
           <!-- Header -->
-          <div class="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-[#4361ee] to-[#4cc9f0] text-white">
+          <div class="flex items-center justify-between px-6 py-4 bg-[#1e293b] text-white border-b border-slate-600">
             <div>
               <div class="text-xs font-bold opacity-70 uppercase">{{ selectedReceipt?.type === 'EXPORT' ? 'Chi tiết hóa đơn' : 'Chi tiết phiếu kho' }}</div>
               <div class="font-mono font-bold text-lg">{{ selectedReceipt.code }}</div>
@@ -1685,7 +1759,30 @@ const pageIcon = computed(() => {
               </div>
             </div>
 
-            <!-- Detail lines -->
+            <!-- DISPOSAL info -->
+            <div v-if="selectedReceipt.type === 'DISPOSAL' && (selectedReceipt.disposalReason || selectedReceipt.disposalMethod || selectedReceipt.attachmentUrl)" class="bg-red-50 border border-red-200 rounded-xl p-4">
+              <div class="flex items-center gap-2 mb-3">
+                <i class="fas fa-fire-alt text-red-500"></i>
+                <span class="text-xs font-bold text-red-700 uppercase">Thông tin tiêu hủy</span>
+              </div>
+              <div class="grid grid-cols-2 gap-3 text-sm">
+                <div v-if="selectedReceipt.disposalReason">
+                  <div class="text-xs font-bold text-red-600 uppercase mb-1">Lý do</div>
+                  <div class="text-[#364a63] font-semibold">{{ selectedReceipt.disposalReason }}</div>
+                </div>
+                <div v-if="selectedReceipt.disposalMethod">
+                  <div class="text-xs font-bold text-red-600 uppercase mb-1">Phương pháp</div>
+                  <div class="text-[#364a63] font-semibold">{{ selectedReceipt.disposalMethod }}</div>
+                </div>
+              </div>
+              <div v-if="selectedReceipt.attachmentUrl" class="mt-3">
+                <div class="text-xs font-bold text-red-600 uppercase mb-1">Biên bản đính kèm</div>
+                <a :href="selectedReceipt.attachmentUrl" target="_blank" 
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-red-200 rounded-lg text-xs font-bold text-red-600 hover:bg-red-100 transition-all">
+                  <i class="fas fa-file-pdf"></i> Xem biên bản
+                </a>
+              </div>
+            </div>
             <div>
               <div class="text-xs font-bold text-[#8094ae] uppercase mb-3">Danh sách hàng hóa</div>
               <div class="rounded-xl border border-[#f1f5f9] overflow-hidden">
@@ -1699,8 +1796,8 @@ const pageIcon = computed(() => {
                       <th class="px-4 py-2.5 text-right font-bold text-teal-600" v-if="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)">SL Nhận</th>
                       <th class="px-4 py-2.5 text-right font-bold text-amber-500" v-if="selectedReceipt.hasDeviation">Thiếu</th>
                       <th class="px-4 py-2.5 text-right font-bold" v-else>SL</th>
-                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Đơn giá</th>
-                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Thành tiền</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type === 'EXPORT'">Đơn giá</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type === 'EXPORT'">Thành tiền</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-[#f1f5f9]">
@@ -1718,11 +1815,11 @@ const pageIcon = computed(() => {
                         {{ d.quantity > d.receivedQuantity ? (d.quantity - d.receivedQuantity) : '-' }}
                       </td>
                       <td class="px-4 py-3 text-right font-bold" v-else>{{ d.quantity }}</td>
-                      <td class="px-4 py-3 text-right" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">{{ formatVND(d.price) }}</td>
-<td class="px-4 py-3 text-right font-bold text-[#4361ee]" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">{{ formatVND(d.quantity * d.price) }}</td>
+                      <td class="px-4 py-3 text-right" v-if="selectedReceipt.type === 'EXPORT'">{{ formatVND(d.price) }}</td>
+                      <td class="px-4 py-3 text-right font-bold text-[#4361ee]" v-if="selectedReceipt.type === 'EXPORT'">{{ formatVND(d.quantity * d.price) }}</td>
                     </tr>
                   </tbody>
-                  <tfoot v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">
+                  <tfoot v-if="selectedReceipt.type === 'EXPORT'">
                     <tr class="bg-[#f8f9fa]">
                       <td :colspan="(selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)) ? (selectedReceipt.hasDeviation ? 7 : 6) : 5" class="px-4 py-2.5 text-right font-bold text-[#8094ae] text-xs uppercase">Tổng cộng</td>
                       <td class="px-4 py-2.5 text-right font-extrabold text-[#4361ee]">
@@ -1904,6 +2001,45 @@ const pageIcon = computed(() => {
                 </div>
               </div>
 
+              <!-- DISPOSAL-specific fields -->
+              <div v-if="createForm.type === 'DISPOSAL'" class="bg-red-50 border border-red-200 rounded-2xl p-5 space-y-4">
+                <div class="flex items-center gap-2 mb-1">
+                  <i class="fas fa-fire-alt text-red-500"></i>
+                  <span class="text-sm font-bold text-red-700 uppercase">Thông tin tiêu hủy</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-xs font-bold text-red-600 uppercase mb-1.5">Lý do tiêu hủy <span class="text-red-500">*</span></label>
+                    <select v-model="createForm.disposalReason" @change="onDisposalReasonChange"
+                      class="w-full h-10 px-3 border border-red-200 rounded-xl text-sm focus:ring-2 focus:ring-red-300 focus:border-red-400 outline-none bg-white">
+                      <option value="">-- Chọn lý do --</option>
+                      <option value="Hàng hết hạn sử dụng">Hàng hết hạn sử dụng</option>
+                      <option value="Hư hỏng / Lỗi kỹ thuật">Hư hỏng / Lỗi kỹ thuật</option>
+                      <option value="Khác">Khác</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-red-600 uppercase mb-1.5">Phương pháp tiêu hủy</label>
+                    <select v-model="createForm.disposalMethod"
+                      class="w-full h-10 px-3 border border-red-200 rounded-xl text-sm focus:ring-2 focus:ring-red-300 focus:border-red-400 outline-none bg-white">
+                      <option value="">-- Chọn phương pháp --</option>
+                      <option value="Đốt tiêu hủy">Đốt tiêu hủy</option>
+                      <option value="Nghiền / Đập bỏ">Nghiền / Đập bỏ</option>
+                      <option value="Xử lý hóa chất">Xử lý hóa chất</option>
+                      <option value="Thuê công ty môi trường">Thuê công ty môi trường</option>
+                      <option value="Chôn lấp">Chôn lấp</option>
+                      <option value="Khác">Khác</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-red-600 uppercase mb-1.5">Đính kèm biên bản (URL)</label>
+                  <input v-model="createForm.attachmentUrl" type="text" placeholder="Dán đường dẫn file PDF/Hình ảnh biên bản tiêu hủy..."
+                    class="w-full h-10 px-3 border border-red-200 rounded-xl text-sm focus:ring-2 focus:ring-red-300 focus:border-red-400 outline-none bg-white" />
+                  <p class="text-[10px] text-red-400 mt-1">Có thể bổ sung sau khi phiếu được duyệt</p>
+                </div>
+              </div>
+
               <!-- Detail rows -->
               <div>
                 <div class="flex items-center justify-between mb-3">
@@ -1959,7 +2095,7 @@ const pageIcon = computed(() => {
                       <!-- Thông tin Số lượng, Tiền & NSX/HSD (Nhóm trong khung nền xám nhạt để dễ nhìn) -->
                       <div v-if="d.productId" class="p-4 bg-[#f8f9fa] rounded-xl border border-[#e2e8f0] space-y-4">
                         <!-- Row 1: Số lượng, Đơn giá, Thành tiền -->
-                        <div :class="(createForm.type === 'IMPORT' || createForm.type === 'TRANSFER') ? 'grid grid-cols-1' : 'grid grid-cols-3 gap-5'">
+                        <div :class="createForm.type !== 'EXPORT' ? 'grid grid-cols-1' : 'grid grid-cols-3 gap-5'">
                           <div>
                             <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Số lượng <span class="text-red-500">*</span></label>
                             <div class="flex items-center h-10 bg-white border border-[#e2e8f0] rounded-xl overflow-hidden focus-within:border-[#4361ee] focus-within:ring-2 focus-within:ring-[#4361ee]/20">
@@ -1977,13 +2113,13 @@ const pageIcon = computed(() => {
                             </div>
                           </div>
                           
-                          <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
+                          <div v-if="createForm.type === 'EXPORT'">
                             <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Đơn giá</label>
                             <input v-model.number="d.price" type="number" min="0" readonly
                               class="w-full h-10 px-3 border border-[#e2e8f0] bg-gray-100 rounded-xl text-sm font-bold outline-none cursor-not-allowed text-[#8094ae]" />
                           </div>
                           
-                          <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
+                          <div v-if="createForm.type === 'EXPORT'">
                             <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Thành tiền</label>
                             <div class="w-full h-10 px-3 border border-transparent flex items-center text-sm font-bold text-[#4361ee] bg-[#eef2ff] rounded-xl overflow-x-auto whitespace-nowrap hide-scrollbar">
                               {{ formatVND(d.quantity * (d.price || 0)) }}
@@ -2036,7 +2172,7 @@ const pageIcon = computed(() => {
       <div v-if="showStocktakeModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden">
           <!-- Header -->
-          <div class="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-purple-500 to-fuchsia-400 text-white">
+          <div class="flex items-center justify-between px-6 py-4 bg-[#1e293b] text-white border-b border-slate-600">
             <div>
               <div class="text-xs font-bold opacity-70 uppercase">Kiểm kê & Nhập kho</div>
               <div class="font-bold text-lg">Phiếu: {{ stocktakeReceipt?.code }}</div>
@@ -2104,7 +2240,7 @@ const pageIcon = computed(() => {
         class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden">
           <!-- Header -->
-          <div class="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-sky-500 to-teal-400 text-white">
+          <div class="flex items-center justify-between px-6 py-4 bg-[#1e293b] text-white border-b border-slate-600">
             <div>
               <div class="text-xs font-bold opacity-70 uppercase">Xác nhận nhận hàng</div>
               <div class="font-bold text-lg">Phiếu: {{ confirmingReceipt.code }}</div>

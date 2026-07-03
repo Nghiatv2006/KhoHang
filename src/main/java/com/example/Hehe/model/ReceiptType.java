@@ -5,5 +5,6 @@ public enum ReceiptType {
     EXPORT,
     TRANSFER,
     ADJUST_IN,
-    ADJUST_OUT
+    ADJUST_OUT,
+    DISPOSAL
 }

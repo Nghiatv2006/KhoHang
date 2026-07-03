@@ -30,6 +30,9 @@ public class ReceiptResponse {
     private List<ReceiptDetailResponse> details;
     private Boolean hasDeviation;
     private String deviationSummary;
+    private String disposalReason;
+    private String disposalMethod;
+    private String attachmentUrl;
 
     public ReceiptResponse(Receipt r) {
         this.id = r.getId();
@@ -68,6 +71,9 @@ public class ReceiptResponse {
         this.customerName = r.getCustomerName();
         this.customerPhone = r.getCustomerPhone();
         this.description = r.getDescription();
+        this.disposalReason = r.getDisposalReason();
+        this.disposalMethod = r.getDisposalMethod();
+        this.attachmentUrl = r.getAttachmentUrl();
         this.createdAt = r.getCreatedAt();
         
         this.hasDeviation = false;
@@ -113,4 +119,7 @@ public class ReceiptResponse {
     public List<ReceiptDetailResponse> getDetails() { return details; }
     public Boolean getHasDeviation() { return hasDeviation; }
     public String getDeviationSummary() { return deviationSummary; }
+    public String getDisposalReason() { return disposalReason; }
+    public String getDisposalMethod() { return disposalMethod; }
+    public String getAttachmentUrl() { return attachmentUrl; }
 }

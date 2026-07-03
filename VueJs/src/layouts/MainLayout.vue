@@ -120,10 +120,11 @@ async function loadBadgeCounts() {
 
     // Tiêu hủy
     badgeDisposal.value = receipts.filter(r => {
-      if (r.type !== 'ADJUST_OUT') return false;
+      if (r.type !== 'DISPOSAL') return false;
       const isSource = myBranchId && Number(r.sourceBranchId) === Number(myBranchId);
       if (r.status === 'DRAFT') return (isManager && isSource) || isAdmin;
       if (r.status === 'PENDING_ADMIN') return (isManager && isSource) || isAdmin;
+      if (r.status === 'PENDING_STOCKTAKE') return isAdmin;
       return false;
     }).length
 
@@ -147,10 +148,7 @@ const mainNavItems = computed(() => {
     { label: 'Hóa đơn', to: '/invoices', icon: 'fas fa-file-invoice-dollar', badge: badgeInvoice.value },
     { label: 'Điều chuyển', to: '/transfers', icon: 'fas fa-exchange-alt', badge: badgeTransfer.value }
   ]
-  // @ts-ignore
-  if (!user.value || user.value.role !== 'ADMIN') {
-    items.push({ label: 'Tiêu hủy', to: '/disposals', icon: 'fas fa-trash-alt', badge: badgeDisposal.value })
-  }
+  items.push({ label: 'Tiêu hủy', to: '/disposals', icon: 'fas fa-trash-alt', badge: badgeDisposal.value })
   if (hasCrudPermission.value) {
     items.push({ label: 'Sản phẩm', to: '/products', icon: 'fas fa-box-open' })
   }
