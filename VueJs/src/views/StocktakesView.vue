@@ -525,7 +525,7 @@ watch([loading, rsLoading], ([newL, newRL]) => {
   if (!newL && !newRL) {
     setTimeout(() => {
       isInitialLoad.value = false
-    }, 1700)
+    }, 1300)
   }
 })
 

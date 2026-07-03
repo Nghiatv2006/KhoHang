@@ -166,7 +166,7 @@ function getBranchTheme(idx: number) {
         v-for="(b, index) in filteredBranches"
         :key="b.id"
         :class="['rounded-[16px] p-6 transition-all duration-300 group relative overflow-hidden flex flex-col cursor-pointer select-none branch-card branch-card-enter shadow-[0_8px_30px_rgba(0,0,0,0.06)] border-2', getBranchTheme(index).cardBg, `theme-${index % 4}`]"
-        :style="{ animationDelay: `${index * 150}ms` }"
+        :style="{ animationDelay: `${index * 75}ms` }"
         @dblclick="isAdmin ? openEdit(b) : null"
       >
         <!-- Decorative top bar -->
@@ -285,7 +285,7 @@ function getBranchTheme(idx: number) {
 }
 
 .branch-card-enter {
-  animation: slideUpBranch 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: slideUpBranch 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes slideUpBranch {
