@@ -1386,7 +1386,7 @@ const pageIcon = computed(() => {
     <div class="bg-white rounded-2xl border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-sm overflow-hidden">
       <!-- Toolbar -->
       <div class="p-5 border-b border-[#f1f5f9]">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" :class="isSpecificRoute ? 'lg:grid-cols-4' : 'lg:grid-cols-5'">
           <!-- Tìm kiếm đa năng -->
           <div class="lg:col-span-2 relative">
             <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae] text-sm"></i>
@@ -1424,7 +1424,7 @@ const pageIcon = computed(() => {
             </select>
           </div>
           <!-- Thời gian và Ngày -->
-          <div class="lg:col-span-4 grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div class="lg:col-span-full grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div>
               <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-1.5">Thời gian</label>
               <select v-model="filterTimeRange" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]">
@@ -1490,7 +1490,7 @@ const pageIcon = computed(() => {
             </tr>
           </thead>
           <tbody class="divide-y divide-[#f1f5f9]">
-            <tr v-for="r in paginatedReceipts" :key="r.id"
+            <tr v-for="r in paginatedReceipts" :key="r.id" v-reveal
               @dblclick="openDetail(r)"
               :class="[
                 'hover:bg-[#f8f9fa]/80 cursor-pointer transition-colors group even:bg-slate-50/60',
@@ -1588,9 +1588,9 @@ const pageIcon = computed(() => {
       </div>
 
       <!-- Pagination -->
-      <div v-if="totalPages > 1" class="px-6 py-4 border-t border-[#e2e8f0] flex flex-col sm:flex-row items-center justify-between bg-white rounded-b-2xl gap-4">
+      <div v-if="filteredReceipts.length > 0" class="px-6 py-4 border-t border-[#e2e8f0] flex flex-col sm:flex-row items-center justify-between bg-white rounded-b-2xl gap-4">
         <div class="text-sm text-[#8094ae]">
-          Hiển thị <span class="font-bold text-[#364a63]">{{ (currentPage - 1) * itemsPerPage + 1 }}</span> - <span class="font-bold text-[#364a63]">{{ Math.min(currentPage * itemsPerPage, filteredReceipts.length) }}</span> trong số <span class="font-bold text-[#364a63]">{{ filteredReceipts.length }}</span> phiếu
+          Trang <span class="font-bold text-[#364a63]">{{ currentPage }}/{{ totalPages }}</span> - Hiển thị <span class="font-bold text-[#364a63]">{{ paginatedReceipts.length }}/{{ filteredReceipts.length }}</span> phiếu
         </div>
         <div class="flex items-center gap-2">
           <button @click="currentPage--" :disabled="currentPage === 1"
@@ -1697,7 +1697,7 @@ const pageIcon = computed(() => {
                       <th class="px-4 py-2.5 text-center font-bold">HSD</th>
                       <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)">SL Gửi</th>
                       <th class="px-4 py-2.5 text-right font-bold text-teal-600" v-if="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)">SL Nhận</th>
-                      <th class="px-4 py-2.5 text-right font-bold text-amber-500" v-if="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)">Thiếu</th>
+                      <th class="px-4 py-2.5 text-right font-bold text-amber-500" v-if="selectedReceipt.hasDeviation">Thiếu</th>
                       <th class="px-4 py-2.5 text-right font-bold" v-else>SL</th>
                       <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Đơn giá</th>
                       <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Thành tiền</th>
@@ -1714,7 +1714,7 @@ const pageIcon = computed(() => {
                       <td class="px-4 py-3 text-right font-bold text-teal-600" v-if="d.receivedQuantity !== null">
                         {{ d.receivedQuantity }}
                       </td>
-                      <td class="px-4 py-3 text-right font-bold text-amber-500" v-if="d.receivedQuantity !== null">
+                      <td class="px-4 py-3 text-right font-bold text-amber-500" v-if="selectedReceipt.hasDeviation">
                         {{ d.quantity > d.receivedQuantity ? (d.quantity - d.receivedQuantity) : '-' }}
                       </td>
                       <td class="px-4 py-3 text-right font-bold" v-else>{{ d.quantity }}</td>
@@ -1724,7 +1724,7 @@ const pageIcon = computed(() => {
                   </tbody>
                   <tfoot v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">
                     <tr class="bg-[#f8f9fa]">
-                      <td :colspan="(selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)) ? 7 : 5" class="px-4 py-2.5 text-right font-bold text-[#8094ae] text-xs uppercase">Tổng cộng</td>
+                      <td :colspan="(selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)) ? (selectedReceipt.hasDeviation ? 7 : 6) : 5" class="px-4 py-2.5 text-right font-bold text-[#8094ae] text-xs uppercase">Tổng cộng</td>
                       <td class="px-4 py-2.5 text-right font-extrabold text-[#4361ee]">
                         {{ formatVND((selectedReceipt.details || []).reduce((s: number, d: any) => s + d.quantity * d.price, 0)) }}
                       </td>

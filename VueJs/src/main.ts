@@ -18,4 +18,21 @@ window.addEventListener('unhandledrejection', (e) => {
   setTimeout(() => div.remove(), 5000);
 });
 
-createApp(App).use(router).mount('#app')
+const app = createApp(App)
+
+app.directive('reveal', {
+  mounted(el) {
+    el.classList.add('reveal-item')
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          el.classList.add('reveal-visible')
+          observer.unobserve(el)
+        }
+      })
+    }, { threshold: 0.05 })
+    observer.observe(el)
+  }
+})
+
+app.use(router).mount('#app')
