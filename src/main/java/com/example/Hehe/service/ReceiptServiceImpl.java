@@ -605,6 +605,10 @@ public class ReceiptServiceImpl implements ReceiptService {
             }
         }
 
+        if (r.getApprovedBy() == null || currentUser.getRole() != UserRole.ADMIN) {
+            r.setApprovedBy(currentUser);
+        }
+
         if (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.TRANSFER || r.getType() == ReceiptType.ADJUST_OUT) {
             if (r.getStatus() == ReceiptStatus.DRAFT) {
                 // Mới DRAFT -> PENDING_ADMIN (Hoặc COMPLETED luôn với ADJUST_OUT)

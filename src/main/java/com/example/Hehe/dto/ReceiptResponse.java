@@ -20,6 +20,8 @@ public class ReceiptResponse {
     private String createdByRole;
     private Integer stocktakeById;
     private String stocktakeByName;
+    private Integer approvedById;
+    private String approvedByName;
     private Integer customerId;
     private String customerName;
     private String customerPhone;
@@ -55,6 +57,11 @@ public class ReceiptResponse {
         if (r.getStocktakeBy() != null) {
             this.stocktakeById = r.getStocktakeBy().getId();
             this.stocktakeByName = r.getStocktakeBy().getFullName();
+        }
+
+        if (r.getApprovedBy() != null) {
+            this.approvedById = r.getApprovedBy().getId();
+            this.approvedByName = r.getApprovedBy().getFullName();
         }
 
         this.customerId = r.getCustomerId();
@@ -96,6 +103,8 @@ public class ReceiptResponse {
     public String getCreatedByRole() { return createdByRole; }
     public Integer getStocktakeById() { return stocktakeById; }
     public String getStocktakeByName() { return stocktakeByName; }
+    public Integer getApprovedById() { return approvedById; }
+    public String getApprovedByName() { return approvedByName; }
     public Integer getCustomerId() { return customerId; }
     public String getCustomerName() { return customerName; }
     public String getCustomerPhone() { return customerPhone; }
