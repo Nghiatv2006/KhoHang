@@ -254,7 +254,7 @@ function startInitialLoadTimer() {
   if (initialLoadTimeout) clearTimeout(initialLoadTimeout)
   initialLoadTimeout = setTimeout(() => {
     isInitialLoad.value = false
-  }, 4000)
+  }, 1300)
 }
 
 watch(loading, (newVal) => {
@@ -564,7 +564,7 @@ function exportExcel() {
       <div 
         @click="clearFilters"
         :class="['bg-white rounded-2xl p-6 border border-[#f1f5f9] hover:border-blue-300 hover:shadow-md cursor-pointer transition-all flex items-center justify-between gap-4 group relative', isInitialLoad ? 'stat-card-3d' : '']"
-        :style="isInitialLoad ? { '--card-delay': '100ms' } : {}"
+        :style="isInitialLoad ? { '--card-delay': '30ms' } : {}"
       >
         <!-- Custom Tooltip Bubble -->
         <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-blue-200 text-[#4361ee] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(67,97,238,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
@@ -584,7 +584,7 @@ function exportExcel() {
       <!-- Total value -->
       <div 
         :class="['bg-white rounded-2xl p-6 border border-[#f1f5f9] shadow-sm flex items-center justify-between gap-4 group relative', isInitialLoad ? 'stat-card-3d' : '']"
-        :style="isInitialLoad ? { '--card-delay': '250ms' } : {}"
+        :style="isInitialLoad ? { '--card-delay': '80ms' } : {}"
       >
         <!-- Custom Tooltip Bubble -->
         <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-emerald-200 text-[#05b171] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(5,177,113,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
@@ -611,7 +611,7 @@ function exportExcel() {
             : 'border-[#f1f5f9] hover:border-yellow-300 hover:shadow-md',
           isInitialLoad ? 'stat-card-3d' : ''
         ]"
-        :style="isInitialLoad ? { '--card-delay': '400ms' } : {}"
+        :style="isInitialLoad ? { '--card-delay': '130ms' } : {}"
       >
         <!-- Custom Tooltip Bubble -->
         <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-yellow-200 text-[#d9a80c] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(217,168,12,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
@@ -643,7 +643,7 @@ function exportExcel() {
             : 'border-[#f1f5f9] hover:border-red-300 hover:shadow-md',
           isInitialLoad ? 'stat-card-3d' : ''
         ]"
-        :style="isInitialLoad ? { '--card-delay': '550ms' } : {}"
+        :style="isInitialLoad ? { '--card-delay': '180ms' } : {}"
       >
         <!-- Custom Tooltip Bubble -->
         <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-red-200 text-[#ea4f52] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(234,79,82,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
@@ -745,7 +745,7 @@ function exportExcel() {
                 v-for="(inv, index) in filteredInventories" 
                 :key="inv.id" 
                 :class="['border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer select-none group hover:-translate-y-[1px]', isInitialLoad ? 'inventory-row-anim' : '']"
-                :style="isInitialLoad ? { '--row-delay': `${800 + index * 60}ms` } : {}"
+                :style="isInitialLoad ? { '--row-delay': `${260 + index * 20}ms` } : {}"
                 @dblclick="openDetails(inv)"
               >
               <!-- Name -->
@@ -1049,7 +1049,7 @@ function exportExcel() {
   100% { transform: translateY(0); opacity: 1; }
 }
 .header-slide-down {
-  animation: slideDownHeader 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: slideDownHeader 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes boxStack3D {
@@ -1063,7 +1063,7 @@ function exportExcel() {
   }
 }
 .stat-card-3d {
-  animation: boxStack3D 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: boxStack3D 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
   animation-delay: var(--card-delay, 0ms);
   will-change: transform, opacity;
 }
@@ -1079,8 +1079,8 @@ function exportExcel() {
   }
 }
 .table-card-conveyor {
-  animation: conveyorSlide 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: 500ms;
+  animation: conveyorSlide 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 160ms;
   will-change: transform, opacity;
 }
 
@@ -1095,7 +1095,7 @@ function exportExcel() {
   }
 }
 .inventory-row-anim {
-  animation: rowSlideUp 1.0s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: rowSlideUp 0.33s cubic-bezier(0.16, 1, 0.3, 1) both;
   animation-delay: var(--row-delay, 0ms);
   will-change: transform, opacity;
 }

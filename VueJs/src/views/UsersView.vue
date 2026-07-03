@@ -37,7 +37,7 @@ watch(uLoading, (newVal) => {
     currentPage.value = 1
     setTimeout(() => {
       isInitialLoad.value = false
-    }, 3000)
+    }, 1000)
   }
 })
 
@@ -568,14 +568,14 @@ onUnmounted(() => {
 }
 
 .fly-in-left-anim td > * {
-  animation: flyInLeft 1.8s cubic-bezier(0.15, 0.85, 0.3, 1.05) both;
+  animation: flyInLeft 0.6s cubic-bezier(0.15, 0.85, 0.3, 1.05) both;
   animation-delay: var(--delay, 0ms);
   will-change: transform, opacity;
   backface-visibility: hidden;
 }
 
 .fly-in-right-anim td > * {
-  animation: flyInRight 1.8s cubic-bezier(0.15, 0.85, 0.3, 1.05) both;
+  animation: flyInRight 0.6s cubic-bezier(0.15, 0.85, 0.3, 1.05) both;
   animation-delay: var(--delay, 0ms);
   will-change: transform, opacity;
   backface-visibility: hidden;
