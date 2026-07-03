@@ -995,14 +995,6 @@ function exportExcel() {
           <!-- Footer -->
           <div class="p-6 border-t border-[#f1f5f9] bg-[#f8fafc] flex gap-3">
             <button 
-              v-if="user?.role !== 'STAFF'"
-              class="h-11 px-4 bg-white border border-[#ea4f52] hover:bg-[#ea4f52] text-[#ea4f52] hover:text-white rounded-xl text-sm font-bold transition-all shadow-sm group" 
-              title="Xoá dòng tồn kho này"
-              @click="deleteInventory"
-            >
-              <i class="fas fa-trash"></i>
-            </button>
-            <button 
               class="flex-1 h-11 bg-white border border-[#e2e8f0] hover:bg-[#f8f9fa] text-[#364a63] rounded-xl text-sm font-bold transition-colors shadow-sm" 
               @click="showDetailPanel = false"
             >

@@ -268,6 +268,35 @@ const filteredStocktakes = computed(() => {
   })
 })
 
+// ──────────────────────────────────────────────────────────────
+// PAGINATION
+// ──────────────────────────────────────────────────────────────
+const currentPagePeriodic = ref(1)
+const currentPageReceipt = ref(1)
+const itemsPerPage = 50
+
+watch([activeTab, searchKeyword, selectedStatus, filterDeviation, filterTimeRange, filterFrom, filterTo], () => {
+  currentPagePeriodic.value = 1
+})
+
+watch([activeTab, rsFilterType, rsSearch], () => {
+  currentPageReceipt.value = 1
+})
+
+const paginatedStocktakes = computed(() => {
+  const start = (currentPagePeriodic.value - 1) * itemsPerPage
+  return filteredStocktakes.value.slice(start, start + itemsPerPage)
+})
+
+const totalPagesPeriodic = computed(() => Math.ceil(filteredStocktakes.value.length / itemsPerPage) || 1)
+
+const paginatedReceiptStocktakes = computed(() => {
+  const start = (currentPageReceipt.value - 1) * itemsPerPage
+  return filteredReceiptStocktakes.value.slice(start, start + itemsPerPage)
+})
+
+const totalPagesReceipt = computed(() => Math.ceil(filteredReceiptStocktakes.value.length / itemsPerPage) || 1)
+
 const adjustmentReceipts = computed(() => {
   if (!selectedStocktake.value || !selectedStocktake.value.details) return []
   const map = new Map()
@@ -625,7 +654,7 @@ onMounted(async () => {
           </thead>
           <tbody>
             <tr
-              v-for="st in filteredStocktakes"
+              v-for="st in paginatedStocktakes"
               :key="st.id"
               :class="[
                 'border-b border-[#f1f5f9] hover:border-transparent hover:bg-[#f8f9fa] transition-all duration-300 cursor-pointer group hover:-translate-y-[1px]',
@@ -671,6 +700,26 @@ onMounted(async () => {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Pagination -->
+      <div v-if="filteredStocktakes.length > 0" class="px-6 py-4 border-t border-[#e2e8f0] flex flex-col sm:flex-row items-center justify-between bg-white rounded-b-2xl gap-4">
+        <div class="text-sm text-[#8094ae]">
+          Trang <span class="font-bold text-[#364a63]">{{ currentPagePeriodic }}/{{ totalPagesPeriodic }}</span> - Hiển thị <span class="font-bold text-[#364a63]">{{ paginatedStocktakes.length }}/{{ filteredStocktakes.length }}</span> phiên kiểm kê
+        </div>
+        <div class="flex items-center gap-2">
+          <button @click="currentPagePeriodic--" :disabled="currentPagePeriodic === 1"
+            class="px-3 py-1.5 flex items-center justify-center rounded-lg border border-[#e2e8f0] bg-white text-[#364a63] font-medium text-sm hover:bg-[#f8f9fa] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            <i class="fas fa-chevron-left mr-1.5 text-[10px]"></i> Trước
+          </button>
+          <div class="px-4 py-1.5 flex items-center justify-center rounded-lg bg-[#f8f9fa] text-[#364a63] font-bold text-sm border border-[#e2e8f0]">
+            {{ currentPagePeriodic }} / {{ totalPagesPeriodic }}
+          </div>
+          <button @click="currentPagePeriodic++" :disabled="currentPagePeriodic === totalPagesPeriodic"
+            class="px-3 py-1.5 flex items-center justify-center rounded-lg border border-[#e2e8f0] bg-white text-[#364a63] font-medium text-sm hover:bg-[#f8f9fa] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            Sau <i class="fas fa-chevron-right ml-1.5 text-[10px]"></i>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -918,7 +967,7 @@ onMounted(async () => {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="r in filteredReceiptStocktakes" :key="r.id"
+            <tr v-for="r in paginatedReceiptStocktakes" :key="r.id"
               :class="[
                 'border-b border-[#f1f5f9] hover:bg-purple-50/60 transition-all duration-200 cursor-pointer',
                 r.status !== 'PENDING_STOCKTAKE' ? 'bg-slate-50/40' : 'bg-white'
@@ -954,6 +1003,26 @@ onMounted(async () => {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Pagination -->
+      <div v-if="filteredReceiptStocktakes.length > 0" class="px-6 py-4 border-t border-[#e2e8f0] flex flex-col sm:flex-row items-center justify-between bg-white rounded-b-2xl gap-4">
+        <div class="text-sm text-[#8094ae]">
+          Trang <span class="font-bold text-[#364a63]">{{ currentPageReceipt }}/{{ totalPagesReceipt }}</span> - Hiển thị <span class="font-bold text-[#364a63]">{{ paginatedReceiptStocktakes.length }}/{{ filteredReceiptStocktakes.length }}</span> phiếu
+        </div>
+        <div class="flex items-center gap-2">
+          <button @click="currentPageReceipt--" :disabled="currentPageReceipt === 1"
+            class="px-3 py-1.5 flex items-center justify-center rounded-lg border border-[#e2e8f0] bg-white text-[#364a63] font-medium text-sm hover:bg-[#f8f9fa] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            <i class="fas fa-chevron-left mr-1.5 text-[10px]"></i> Trước
+          </button>
+          <div class="px-4 py-1.5 flex items-center justify-center rounded-lg bg-[#f8f9fa] text-[#364a63] font-bold text-sm border border-[#e2e8f0]">
+            {{ currentPageReceipt }} / {{ totalPagesReceipt }}
+          </div>
+          <button @click="currentPageReceipt++" :disabled="currentPageReceipt === totalPagesReceipt"
+            class="px-3 py-1.5 flex items-center justify-center rounded-lg border border-[#e2e8f0] bg-white text-[#364a63] font-medium text-sm hover:bg-[#f8f9fa] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            Sau <i class="fas fa-chevron-right ml-1.5 text-[10px]"></i>
+          </button>
+        </div>
       </div>
     </div>
 
