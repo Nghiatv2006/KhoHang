@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { api } from '../api'
 import { useToast } from '../utils/toast'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
@@ -20,6 +20,26 @@ const uRoleFilter = ref('')
 const uStatusFilter = ref('')
 
 const lastActiveUserId = ref<number | null>(null)
+const isInitialLoad = ref(true)
+
+const currentPage = ref(1)
+const pageSize = ref(10)
+
+// Reset to page 1 when search or filters change
+watch([uSearch, uRoleFilter, uStatusFilter], () => {
+  currentPage.value = 1
+})
+
+
+
+watch(uLoading, (newVal) => {
+  if (!newVal) {
+    currentPage.value = 1
+    setTimeout(() => {
+      isInitialLoad.value = false
+    }, 3000)
+  }
+})
 
 const filteredUsers = computed(() => {
   let list = [...users.value]
@@ -50,6 +70,14 @@ const filteredUsers = computed(() => {
   })
 
   return list
+})
+
+const totalPages = computed(() => Math.ceil(filteredUsers.value.length / pageSize.value))
+
+const paginatedUsers = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return filteredUsers.value.slice(start, end)
 })
 
 const showUserModal = ref(false)
@@ -231,9 +259,19 @@ async function loadUsers() {
   catch {} finally { uLoading.value = false }
 }
 
+function triggerUsersAnimation() {
+  isInitialLoad.value = true
+  loadUsers()
+}
+
 onMounted(async () => {
+  window.addEventListener('trigger-users-animation', triggerUsersAnimation)
   await loadUsers()
   try { const res = await api.get('/api/branches'); if (res.ok) branches.value = await res.json() } catch {}
+})
+
+onUnmounted(() => {
+  window.removeEventListener('trigger-users-animation', triggerUsersAnimation)
 })
 
 
@@ -242,19 +280,25 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-6 max-w-[1400px] mx-auto">
-    <!-- Header & Tabs -->
     <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
-      <div>
-        <h2 class="text-2xl font-bold text-[#364a63] m-0">Quản lý Nhân viên</h2>
+      <div class="header-animate">
+        <h2 class="text-2xl font-bold text-[#364a63] m-0 flex flex-wrap">
+          <span v-for="(char, idx) in 'Quản lý Nhân viên'.split('')" :key="idx" 
+            :style="{ animationDelay: `${idx * 30}ms` }"
+            class="char-pop inline-block whitespace-pre"
+          >{{ char }}</span>
+        </h2>
         <p class="text-[#8094ae] text-sm mt-1">Quản lý tài khoản, vai trò và phân công chi nhánh</p>
       </div>
       
     </div>
 
     <!-- USERS TAB -->
-    <div class="bg-indigo-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden">
+    <div :class="['bg-indigo-50 rounded-[16px] border border-[#f1f5f9] shadow-[0_2px_10px_rgba(0,0,0,0.02)] container-animate overflow-hidden', isInitialLoad ? 'overflow-visible' : 'overflow-hidden']">
+      <!-- Neon Liquid Gradient Top Line -->
+      <div class="h-[4px] w-full bg-gradient-to-r from-[#4361ee] via-[#f72585] to-[#4cc9f0] bg-[length:200%_auto] animate-neon-sweep rounded-t-[16px]"></div>
       <!-- Toolbar -->
-      <div class="p-5 border-b border-[#f1f5f9] flex items-center justify-between flex-wrap gap-4 bg-[#f8f9fa]/50">
+      <div class="p-5 border-b border-[#f1f5f9] flex items-center justify-between flex-wrap gap-4 bg-[#f8f9fa]/50 toolbar-animate">
         <div class="flex items-center gap-3 flex-1 min-w-[300px]">
           <div class="relative w-[250px]">
             <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae]"></i>
@@ -272,19 +316,20 @@ onMounted(async () => {
             <option value="INACTIVE">Ngừng HĐ</option>
           </select>
         </div>
-        <button v-if="isAdmin || isManager" class="bg-[#4361ee] text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-sm flex items-center gap-2" @click="openAddUser">
+        <button v-if="isAdmin || isManager" class="bg-[#4361ee] text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-sm flex items-center gap-2 btn-shimmer" @click="openAddUser">
           <i class="fas fa-user-plus"></i> Thêm nhân viên
         </button>
       </div>
 
-      <!-- Table -->
-      <div class="overflow-x-auto">
-        <div v-if="uLoading" class="p-8 space-y-4"><div v-for="i in 5" :key="i" class="h-12 bg-[#f8f9fa] rounded-xl animate-pulse" /></div>
-        <div v-else-if="filteredUsers.length === 0" class="py-20 text-center text-[#8094ae]">
-          <i class="fas fa-users-slash text-5xl mb-4 opacity-40"></i>
-          <div class="font-bold text-[#364a63]">Không tìm thấy nhân viên nào</div>
-        </div>
-        <table v-else class="w-full text-left border-collapse">
+      <div :class="[isInitialLoad ? 'overflow-visible' : 'overflow-x-auto']">
+        <Transition name="fade-layout" mode="out-in">
+          <div v-if="uLoading" key="loading" class="p-8 space-y-4"><div v-for="i in 5" :key="i" class="h-12 bg-[#f8f9fa] rounded-xl animate-pulse" /></div>
+          <div v-else-if="filteredUsers.length === 0" key="empty" class="py-20 text-center text-[#8094ae]">
+            <i class="fas fa-users-slash text-5xl mb-4 opacity-40"></i>
+            <div class="font-bold text-[#364a63]">Không tìm thấy nhân viên nào</div>
+          </div>
+          <div v-else key="content">
+            <table class="w-full text-left border-collapse">
           <thead class="bg-white">
             <tr>
               <th class="p-4 text-[0.75rem] uppercase font-bold text-[#8094ae] tracking-wider border-b border-[#f1f5f9]">Nhân viên</th>
@@ -295,10 +340,10 @@ onMounted(async () => {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="u in filteredUsers" :key="u.id" :class="['border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer group hover:-translate-y-[1px]', u.id === lastActiveUserId ? 'bg-[#4361ee]/5 font-semibold border-l-4 border-l-[#4361ee]' : '']" @dblclick="isAdmin || isManager ? openEditUser(u) : null">
+            <tr v-for="(u, index) in paginatedUsers" :key="u.id" :class="['border-b border-[#f1f5f9] hover:border-transparent hover:shadow-sm transition-all duration-300 cursor-pointer group', u.id === lastActiveUserId ? 'bg-[#4361ee]/5 font-semibold' : '', isInitialLoad ? (index % 2 === 0 ? 'fly-in-left-anim' : 'fly-in-right-anim') : '', `role-row-${u.role}`]" :style="isInitialLoad ? { '--delay': `${Math.min(index * 60, 600)}ms` } : {}" @dblclick="isAdmin || isManager ? openEditUser(u) : null">
               <td class="p-4 first:rounded-l-xl last:rounded-r-xl">
                 <div class="flex items-center gap-3">
-                  <div class="w-10 h-10 rounded-full bg-[#eef2ff] border border-[#dbeafe] flex items-center justify-center text-[#4361ee] font-bold text-sm flex-shrink-0 group-hover:bg-white group-hover:border-[#4361ee]/30 transition-colors">
+                  <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 user-avatar group-hover:rotate-[360deg] group-hover:scale-110 group-hover:shadow-md transition-all duration-700 ease-out">
                     {{ u.fullName?.charAt(0) || '?' }}
                   </div>
                   <div>
@@ -315,8 +360,10 @@ onMounted(async () => {
               </td>
               <td class="p-4 first:rounded-l-xl last:rounded-r-xl"><StatusBadge :value="u.role" type="role" /></td>
               <td class="p-4 first:rounded-l-xl last:rounded-r-xl">
-                <span v-if="u.branchName" class="font-medium text-[#364a63]"><i class="fas fa-store text-[#8094ae] mr-1"></i> {{ u.branchName }}</span>
-                <span v-else class="text-[#8094ae] text-sm italic">Chưa phân công</span>
+                <div>
+                  <span v-if="u.branchName" class="font-medium text-[#364a63]"><i class="fas fa-store text-[#8094ae] mr-1"></i> {{ u.branchName }}</span>
+                  <span v-else class="text-[#8094ae] text-sm italic">Chưa phân công</span>
+                </div>
               </td>
               <td class="p-4 text-center first:rounded-l-xl last:rounded-r-xl"><StatusBadge :value="u.status" type="status" /></td>
               <td v-if="isAdmin || isManager" class="p-4 first:rounded-l-xl last:rounded-r-xl">
@@ -334,10 +381,49 @@ onMounted(async () => {
               </td>
             </tr>
           </tbody>
-        </table>
-        <div v-if="!uLoading && filteredUsers.length > 0" class="px-6 py-4 bg-[#f8f9fa] border-t border-[#f1f5f9] text-xs font-bold text-[#8094ae]">
-          Tổng cộng: {{ filteredUsers.length }} nhân viên
-        </div>
+            </table>
+            <div class="px-6 py-4 bg-[#f8f9fa] border-t border-[#f1f5f9] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-bold text-[#8094ae]">
+              <div>
+                Hiển thị {{ Math.min((currentPage - 1) * pageSize + 1, filteredUsers.length) }} - {{ Math.min(currentPage * pageSize, filteredUsers.length) }} của {{ filteredUsers.length }} nhân viên
+              </div>
+              
+              <div v-if="totalPages > 1" class="flex items-center gap-1.5">
+                <!-- Prev Button -->
+                <button 
+                  :disabled="currentPage === 1" 
+                  @click="currentPage--"
+                  class="w-8 h-8 rounded-lg border border-[#e2e8f0] bg-white hover:bg-[#e2e8f0]/40 flex items-center justify-center text-[#8094ae] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                >
+                  <i class="fas fa-chevron-left text-[10px]"></i>
+                </button>
+                
+                <!-- Page Buttons -->
+                <button 
+                  v-for="p in totalPages" 
+                  :key="p" 
+                  @click="currentPage = p"
+                  :class="[
+                    'w-8 h-8 rounded-lg border flex items-center justify-center transition-all cursor-pointer font-bold',
+                    currentPage === p 
+                      ? 'bg-[#4361ee] border-[#4361ee] text-white shadow-sm shadow-[#4361ee]/20' 
+                      : 'bg-white border-[#e2e8f0] hover:bg-[#e2e8f0]/40 text-[#364a63]'
+                  ]"
+                >
+                  {{ p }}
+                </button>
+                
+                <!-- Next Button -->
+                <button 
+                  :disabled="currentPage === totalPages" 
+                  @click="currentPage++"
+                  class="w-8 h-8 rounded-lg border border-[#e2e8f0] bg-white hover:bg-[#e2e8f0]/40 flex items-center justify-center text-[#8094ae] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                >
+                  <i class="fas fa-chevron-right text-[10px]"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </Transition>
       </div>
     </div>
 
@@ -437,6 +523,64 @@ onMounted(async () => {
 @keyframes spin { to { transform: rotate(360deg); } }
 .animate-spin { animation: spin 0.8s linear infinite; }
 
+@keyframes flyInLeft {
+  0% {
+    transform: translate3d(-100vw, -100vh, -600px) rotateX(75deg) rotateY(-75deg) rotateZ(-45deg) scale(0.5);
+    opacity: 0;
+  }
+  60% {
+    transform: translate3d(20px, 15px, 50px) rotateX(-10deg) rotateY(10deg) rotateZ(3deg) scale(1.02);
+    opacity: 0.9;
+  }
+  85% {
+    transform: translate3d(-5px, -5px, -10px) rotateX(3deg) rotateY(-3deg) rotateZ(-1deg) scale(0.99);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg) rotateZ(0deg) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes flyInRight {
+  0% {
+    transform: translate3d(100vw, -100vh, -600px) rotateX(75deg) rotateY(75deg) rotateZ(45deg) scale(0.5);
+    opacity: 0;
+  }
+  60% {
+    transform: translate3d(-20px, 15px, 50px) rotateX(-10deg) rotateY(-10deg) rotateZ(-3deg) scale(1.02);
+    opacity: 0.9;
+  }
+  85% {
+    transform: translate3d(5px, -5px, -10px) rotateX(3deg) rotateY(3deg) rotateZ(1deg) scale(0.99);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg) rotateZ(0deg) scale(1);
+    opacity: 1;
+  }
+}
+
+.fly-in-left-anim td,
+.fly-in-right-anim td {
+  perspective: 1000px;
+  transform-style: preserve-3d;
+}
+
+.fly-in-left-anim td > * {
+  animation: flyInLeft 1.8s cubic-bezier(0.15, 0.85, 0.3, 1.05) both;
+  animation-delay: var(--delay, 0ms);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}
+
+.fly-in-right-anim td > * {
+  animation: flyInRight 1.8s cubic-bezier(0.15, 0.85, 0.3, 1.05) both;
+  animation-delay: var(--delay, 0ms);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}
+
 .slide-panel-enter-active, .slide-panel-leave-active {
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -453,4 +597,210 @@ onMounted(async () => {
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Additional premium effects */
+@keyframes slideDownHeader {
+  0% {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.header-animate {
+  animation: slideDownHeader 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes charPopIn {
+  0% {
+    transform: translateY(15px) scale(0.6);
+    opacity: 0;
+    filter: blur(4px);
+  }
+  60% {
+    transform: translateY(-4px) scale(1.08);
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.char-pop {
+  animation: charPopIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+@keyframes toolbarPop {
+  0% {
+    transform: translateY(-10px) scale(0.99);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.toolbar-animate {
+  animation: toolbarPop 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 150ms;
+}
+
+@keyframes containerSlideUp {
+  0% {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.container-animate {
+  animation: containerSlideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 220ms;
+}
+
+.btn-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.btn-shimmer::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -60%;
+  width: 30%;
+  height: 200%;
+  background: rgba(255, 255, 255, 0.25);
+  transform: rotate(30deg);
+  transition: none;
+  animation: shimmer 3s infinite;
+}
+@keyframes shimmer {
+  0% { left: -60%; }
+  30% { left: 140%; }
+  100% { left: 140%; }
+}
+
+.fade-layout-enter-active, .fade-layout-leave-active {
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.fade-layout-enter-from, .fade-layout-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+/* Table row left glowing border on hover */
+tbody tr td:first-child {
+  box-shadow: inset 0 0 0 transparent;
+  transition: box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Role Row styles (Light mode defaults) ── */
+.role-row-ADMIN .user-avatar {
+  background-color: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #b45309;
+}
+.role-row-ADMIN:hover {
+  background: linear-gradient(to right, rgba(245, 158, 11, 0.08), rgba(225, 29, 72, 0.08)) !important;
+}
+.role-row-ADMIN:hover td:first-child {
+  box-shadow: inset 4px 0 0 0 #f59e0b !important;
+}
+
+.role-row-MANAGER .user-avatar {
+  background-color: #f0f2ff;
+  border: 1px solid #c7d2fe;
+  color: #4361ee;
+}
+.role-row-MANAGER:hover {
+  background: linear-gradient(to right, rgba(67, 97, 238, 0.08), rgba(114, 9, 183, 0.08)) !important;
+}
+.role-row-MANAGER:hover td:first-child {
+  box-shadow: inset 4px 0 0 0 #4361ee !important;
+}
+
+.role-row-STAFF .user-avatar {
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #16a34a;
+}
+.role-row-STAFF:hover {
+  background: linear-gradient(to right, rgba(16, 185, 129, 0.08), rgba(6, 182, 212, 0.08)) !important;
+}
+.role-row-STAFF:hover td:first-child {
+  box-shadow: inset 4px 0 0 0 #10b981 !important;
+}
+
+/* ── Dark Mode Overrides for Role Rows ── */
+html.dark-mode .role-row-ADMIN .user-avatar {
+  background-color: rgba(120, 53, 15, 0.3) !important;
+  border-color: rgba(180, 83, 9, 0.5) !important;
+  color: #fcd34d !important;
+}
+html.dark-mode .role-row-ADMIN:hover {
+  background: linear-gradient(to right, rgba(120, 53, 15, 0.2), rgba(30, 41, 59, 0.8)) !important;
+}
+
+html.dark-mode .role-row-MANAGER .user-avatar {
+  background-color: rgba(30, 27, 75, 0.4) !important;
+  border-color: rgba(67, 97, 238, 0.5) !important;
+  color: #818cf8 !important;
+}
+html.dark-mode .role-row-MANAGER:hover {
+  background: linear-gradient(to right, rgba(30, 27, 75, 0.3), rgba(30, 41, 59, 0.8)) !important;
+}
+
+html.dark-mode .role-row-STAFF .user-avatar {
+  background-color: rgba(6, 78, 59, 0.3) !important;
+  border-color: rgba(16, 185, 129, 0.5) !important;
+  color: #34d399 !important;
+}
+html.dark-mode .role-row-STAFF:hover {
+  background: linear-gradient(to right, rgba(6, 78, 59, 0.2), rgba(30, 41, 59, 0.8)) !important;
+}
+
+@keyframes neonSweep {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.animate-neon-sweep {
+  animation: neonSweep 4s ease infinite;
+}
+
+/* ── Role Avatar Pulsing Halos ── */
+@keyframes rolePulseAdmin {
+  0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+@keyframes rolePulseManager {
+  0% { box-shadow: 0 0 0 0 rgba(67, 97, 238, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(67, 97, 238, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(67, 97, 238, 0); }
+}
+@keyframes rolePulseStaff {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.role-row-ADMIN .user-avatar {
+  animation: rolePulseAdmin 2s infinite ease-in-out;
+}
+.role-row-MANAGER .user-avatar {
+  animation: rolePulseManager 2s infinite ease-in-out;
+}
+.role-row-STAFF .user-avatar {
+  animation: rolePulseStaff 2s infinite ease-in-out;
+}
+
 </style>

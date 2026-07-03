@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { api } from '../api'
 import { useToast } from '../utils/toast'
 import AppModal from '../components/AppModal.vue'
@@ -247,7 +247,40 @@ const totalExpiredCount = computed(() => {
   return activeTabInventories.value.filter(inv => inv.isExpired).length
 })
 
-onMounted(loadData)
+const isInitialLoad = ref(true)
+let initialLoadTimeout: ReturnType<typeof setTimeout> | null = null
+
+function startInitialLoadTimer() {
+  if (initialLoadTimeout) clearTimeout(initialLoadTimeout)
+  initialLoadTimeout = setTimeout(() => {
+    isInitialLoad.value = false
+  }, 4000)
+}
+
+watch(loading, (newVal) => {
+  if (!newVal) {
+    startInitialLoadTimer()
+  }
+})
+
+watch([activeTab, selectedSubBranchId], () => {
+  isInitialLoad.value = true
+  startInitialLoadTimer()
+})
+
+function triggerInventoryAnimation() {
+  isInitialLoad.value = true
+  loadData()
+}
+
+onMounted(() => {
+  window.addEventListener('trigger-inventory-animation', triggerInventoryAnimation)
+  loadData()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('trigger-inventory-animation', triggerInventoryAnimation)
+})
 
 // Open Configure Threshold
 function openConfigModal() {
@@ -415,7 +448,7 @@ function exportExcel() {
   <div class="space-y-6 max-w-[1400px] mx-auto font-['Inter',sans-serif]">
     
     <!-- Title & Controls -->
-    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
+    <div :class="['flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6', isInitialLoad ? 'header-slide-down' : '']">
       <div>
         <h2 class="text-2xl font-bold text-[#364a63] m-0 flex items-center gap-3">
           Quản lý Tồn kho
@@ -526,11 +559,12 @@ function exportExcel() {
     </div>
 
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+    <div :key="`stats-${activeTab}-${selectedSubBranchId}`" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
       <!-- Distinct products -->
       <div 
         @click="clearFilters"
-        class="bg-white rounded-2xl p-6 border border-[#f1f5f9] hover:border-blue-300 hover:shadow-md cursor-pointer transition-all flex items-center justify-between gap-4 group relative"
+        :class="['bg-white rounded-2xl p-6 border border-[#f1f5f9] hover:border-blue-300 hover:shadow-md cursor-pointer transition-all flex items-center justify-between gap-4 group relative', isInitialLoad ? 'stat-card-3d' : '']"
+        :style="isInitialLoad ? { '--card-delay': '100ms' } : {}"
       >
         <!-- Custom Tooltip Bubble -->
         <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-blue-200 text-[#4361ee] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(67,97,238,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
@@ -548,7 +582,10 @@ function exportExcel() {
       </div>
 
       <!-- Total value -->
-      <div class="bg-white rounded-2xl p-6 border border-[#f1f5f9] shadow-sm flex items-center justify-between gap-4 group relative">
+      <div 
+        :class="['bg-white rounded-2xl p-6 border border-[#f1f5f9] shadow-sm flex items-center justify-between gap-4 group relative', isInitialLoad ? 'stat-card-3d' : '']"
+        :style="isInitialLoad ? { '--card-delay': '250ms' } : {}"
+      >
         <!-- Custom Tooltip Bubble -->
         <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-emerald-200 text-[#05b171] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(5,177,113,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
           <span class="font-mono text-sm">{{ formatVND(totalInventoryValue) }}</span>
@@ -571,8 +608,10 @@ function exportExcel() {
           'bg-white rounded-2xl p-6 border transition-all flex items-center justify-between gap-4 cursor-pointer select-none group relative', 
           onlyWarning 
             ? 'border-yellow-400 ring-2 ring-yellow-400/20 shadow-md' 
-            : 'border-[#f1f5f9] hover:border-yellow-300 hover:shadow-md'
+            : 'border-[#f1f5f9] hover:border-yellow-300 hover:shadow-md',
+          isInitialLoad ? 'stat-card-3d' : ''
         ]"
+        :style="isInitialLoad ? { '--card-delay': '400ms' } : {}"
       >
         <!-- Custom Tooltip Bubble -->
         <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-yellow-200 text-[#d9a80c] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(217,168,12,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
@@ -601,8 +640,10 @@ function exportExcel() {
           'bg-white rounded-2xl p-6 border transition-all flex items-center justify-between gap-4 cursor-pointer select-none group relative', 
           onlyExpired 
             ? 'border-[#ea4f52] ring-2 ring-[#ea4f52]/20 shadow-md' 
-            : 'border-[#f1f5f9] hover:border-red-300 hover:shadow-md'
+            : 'border-[#f1f5f9] hover:border-red-300 hover:shadow-md',
+          isInitialLoad ? 'stat-card-3d' : ''
         ]"
+        :style="isInitialLoad ? { '--card-delay': '550ms' } : {}"
       >
         <!-- Custom Tooltip Bubble -->
         <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-red-200 text-[#ea4f52] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(234,79,82,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
@@ -626,7 +667,7 @@ function exportExcel() {
     </div>
 
     <!-- INVENTORY TAB (Combined Toolbar & Table) -->
-    <div class="bg-indigo-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden">
+    <div :key="`table-${activeTab}-${selectedSubBranchId}`" :class="['bg-indigo-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden', isInitialLoad ? 'table-card-conveyor' : '']">
       
       <!-- Search & Filters Toolbar -->
       <div class="p-5 border-b border-[#f1f5f9] flex flex-col lg:flex-row items-center justify-between gap-4 bg-[#f8f9fa]/50">
@@ -701,9 +742,10 @@ function exportExcel() {
             </thead>
             <tbody>
               <tr 
-                v-for="inv in filteredInventories" 
+                v-for="(inv, index) in filteredInventories" 
                 :key="inv.id" 
-                class="border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer select-none group hover:-translate-y-[1px]"
+                :class="['border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer select-none group hover:-translate-y-[1px]', isInitialLoad ? 'inventory-row-anim' : '']"
+                :style="isInitialLoad ? { '--row-delay': `${800 + index * 60}ms` } : {}"
                 @dblclick="openDetails(inv)"
               >
               <!-- Name -->
@@ -729,7 +771,7 @@ function exportExcel() {
               </td>
 
               <!-- Lot Code -->
-              <td class="p-4 font-bold text-[#364a63] text-xs font-mono first:rounded-l-xl last:rounded-r-xl">{{ inv.batchCode }}</td>
+              <td class="p-4 font-bold text-[#364a63] text-xs font-mono first:rounded-l-xl last:rounded-r-xl"><div>{{ inv.batchCode }}</div></td>
 
               <!-- Branch / Category -->
               <td class="p-4 text-[#364a63] font-medium first:rounded-l-xl last:rounded-r-xl">
@@ -739,12 +781,12 @@ function exportExcel() {
                   </span>
                 </template>
                 <template v-else>
-                  {{ inv.branchName }}
+                  <div>{{ inv.branchName }}</div>
                 </template>
               </td>
 
               <!-- Unit -->
-              <td class="p-4 text-[#364a63] font-medium first:rounded-l-xl last:rounded-r-xl">{{ inv.unit }}</td>
+              <td class="p-4 text-[#364a63] font-medium first:rounded-l-xl last:rounded-r-xl"><div>{{ inv.unit }}</div></td>
 
               <!-- Quantity -->
               <td class="p-4 text-center first:rounded-l-xl last:rounded-r-xl">
@@ -756,7 +798,7 @@ function exportExcel() {
               </td>
 
               <!-- Total value -->
-              <td class="p-4 text-right font-extrabold text-[#364a63] first:rounded-l-xl last:rounded-r-xl">{{ formatVND(inv.totalValue) }}</td>
+              <td class="p-4 text-right font-extrabold text-[#364a63] first:rounded-l-xl last:rounded-r-xl"><div>{{ formatVND(inv.totalValue) }}</div></td>
             </tr>
           </tbody>
         </table>
@@ -1000,4 +1042,61 @@ function exportExcel() {
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ── 3D Isometric Box Stack Animations ── */
+@keyframes slideDownHeader {
+  0% { transform: translateY(-30px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.header-slide-down {
+  animation: slideDownHeader 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes boxStack3D {
+  0% {
+    transform: perspective(1000px) rotateX(20deg) rotateY(-15deg) translate3d(0, -60px, -150px);
+    opacity: 0;
+  }
+  100% {
+    transform: perspective(1000px) rotateX(0deg) rotateY(0deg) translate3d(0, 0, 0);
+    opacity: 1;
+  }
+}
+.stat-card-3d {
+  animation: boxStack3D 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: var(--card-delay, 0ms);
+  will-change: transform, opacity;
+}
+
+@keyframes conveyorSlide {
+  0% {
+    transform: perspective(1000px) translate3d(0, 40px, -200px) scale(0.92);
+    opacity: 0;
+  }
+  100% {
+    transform: perspective(1000px) translate3d(0, 0, 0) scale(1);
+    opacity: 1;
+  }
+}
+.table-card-conveyor {
+  animation: conveyorSlide 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 500ms;
+  will-change: transform, opacity;
+}
+
+@keyframes rowSlideUp {
+  0% {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.inventory-row-anim {
+  animation: rowSlideUp 1.0s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--row-delay, 0ms);
+  will-change: transform, opacity;
+}
 </style>

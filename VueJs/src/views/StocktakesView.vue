@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { api } from '../api'
 import { useToast } from '../utils/toast'
 import { draftStocktakeCount, refreshStocktakeBadge } from '../utils/stocktakeStore'
@@ -519,8 +519,33 @@ function rsStatusLabel(s: string) {
   return map[s] || s
 }
 
+const isInitialLoad = ref(true)
+
+watch([loading, rsLoading], ([newL, newRL]) => {
+  if (!newL && !newRL) {
+    setTimeout(() => {
+      isInitialLoad.value = false
+    }, 5000)
+  }
+})
+
+watch(activeTab, () => {
+  isInitialLoad.value = true
+})
+
+function triggerStocktakesAnimation() {
+  isInitialLoad.value = true
+  loadStocktakes()
+  loadReceiptStocktakes()
+}
+
 onMounted(async () => {
+  window.addEventListener('trigger-stocktakes-animation', triggerStocktakesAnimation)
   await Promise.all([loadStocktakes(), loadReceiptStocktakes()])
+})
+
+onUnmounted(() => {
+  window.removeEventListener('trigger-stocktakes-animation', triggerStocktakesAnimation)
 })
 </script>
 
@@ -528,7 +553,7 @@ onMounted(async () => {
   <div class="space-y-6 max-w-[1400px] mx-auto font-['Inter',sans-serif]">
 
     <!-- PAGE HEADER + TABS -->
-    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
+    <div :class="['flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2', isInitialLoad ? 'header-slide-down' : '']">
       <div>
         <h2 class="text-2xl font-bold text-[#364a63] m-0">Kiểm kê kho</h2>
         <p class="text-[#8094ae] text-sm mt-1">Quản lý kiểm kê định kỳ và xác nhận hàng nhận về</p>
@@ -567,7 +592,7 @@ onMounted(async () => {
     <template v-if="activeTab === 'periodic'">
 
     <!-- Toolbar: Filter + Khởi tạo -->
-    <div class="bg-indigo-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden">
+    <div :class="['bg-indigo-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden', isInitialLoad ? 'accordion-filter-expand' : '']">
       <div class="p-5 border-b border-[#f1f5f9] bg-white/60 space-y-4">
         <div class="flex flex-col md:flex-row gap-3">
           <div class="relative flex-1">
@@ -624,7 +649,7 @@ onMounted(async () => {
     </div><!-- end bg-indigo-50 filter card -->
 
     <!-- STOCKTAKE TABLE -->
-    <div class="bg-white rounded-[16px] shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-[#f1f5f9] overflow-hidden">
+    <div :class="['bg-white rounded-[16px] shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-[#f1f5f9] overflow-hidden', isInitialLoad ? 'accordion-table-expand' : '']">
       <div v-if="loading" class="flex flex-col items-center justify-center py-16">
         <i class="fas fa-spinner fa-spin text-3xl text-[#4361ee] mb-4"></i>
         <span class="text-sm text-[#8094ae]">Đang tải danh sách...</span>
@@ -654,19 +679,21 @@ onMounted(async () => {
           </thead>
           <tbody>
             <tr
-              v-for="st in paginatedStocktakes"
+              v-for="(st, index) in paginatedStocktakes"
               :key="st.id"
               :class="[
                 'border-b border-[#f1f5f9] hover:border-transparent hover:bg-[#f8f9fa] transition-all duration-300 cursor-pointer group hover:-translate-y-[1px]',
-                st.hasDeviation && st.status === 'COMPLETED' ? 'bg-rose-50/50 hover:bg-rose-100/50' : ''
+                st.hasDeviation && st.status === 'COMPLETED' ? 'bg-rose-50/50 hover:bg-rose-100/50' : '',
+                isInitialLoad ? 'accordion-row-anim' : ''
               ]"
+              :style="isInitialLoad ? { '--row-delay': `${350 + index * 100}ms` } : {}"
               @dblclick="openDetail(st)"
             >
-              <td class="p-4 pl-8 font-mono font-bold text-[#4361ee]">{{ st.code }}</td>
-              <td class="p-4 text-sm font-semibold text-[#364a63]">{{ st.branchName }}</td>
-              <td class="p-4 text-sm text-[#364a63]">{{ st.createdByName }}</td>
-              <td class="p-4 text-sm text-[#8094ae] font-mono">{{ formatDateTime(st.createdAt) }}</td>
-              <td class="p-4 text-sm text-slate-500 max-w-[200px] truncate" :title="st.notes">{{ st.notes || '-' }}</td>
+              <td class="p-4 pl-8 font-mono font-bold text-[#4361ee]"><div>{{ st.code }}</div></td>
+              <td class="p-4 text-sm font-semibold text-[#364a63]"><div>{{ st.branchName }}</div></td>
+              <td class="p-4 text-sm text-[#364a63]"><div>{{ st.createdByName }}</div></td>
+              <td class="p-4 text-sm text-[#8094ae] font-mono"><div>{{ formatDateTime(st.createdAt) }}</div></td>
+              <td class="p-4 text-sm text-slate-500 max-w-[200px] truncate" :title="st.notes"><div>{{ st.notes || '-' }}</div></td>
               <td class="p-4">
                 <span :class="['inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border', getStatusBadgeClass(st.status)]">
                   {{ getStatusLabel(st.status) }}
@@ -686,7 +713,7 @@ onMounted(async () => {
                     ✓ Khớp
                   </span>
                 </div>
-                <div v-else class="text-xs text-slate-400">—</div>
+                <div v-else class="text-xs text-slate-400"><div>—</div></div>
               </td>
               <td class="p-4 pr-8 text-right">
                 <button
@@ -922,7 +949,7 @@ onMounted(async () => {
          TAB 2: KIỂM KÊ NHẬN HÀNG (PENDING_STOCKTAKE)
     ════════════════════════════════════════════════════ -->
     <template v-if="activeTab === 'receipt'">
-    <div class="bg-purple-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-purple-500 shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden">
+    <div :class="['bg-purple-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-purple-500 shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden', isInitialLoad ? 'accordion-filter-expand' : '']">
       <!-- Toolbar -->
       <div class="p-5 border-b border-[#f1f5f9] bg-white/60 flex flex-col md:flex-row gap-3 items-center">
         <div class="relative flex-1">
@@ -967,22 +994,24 @@ onMounted(async () => {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="r in paginatedReceiptStocktakes" :key="r.id"
+            <tr v-for="(r, index) in paginatedReceiptStocktakes" :key="r.id"
               :class="[
-                'border-b border-[#f1f5f9] hover:bg-purple-50/60 transition-all duration-200 cursor-pointer',
-                r.status !== 'PENDING_STOCKTAKE' ? 'bg-slate-50/40' : 'bg-white'
+                'border-b border-[#f1f5f9] hover:bg-purple-50/60 transition-all duration-[350ms] cursor-pointer',
+                r.status !== 'PENDING_STOCKTAKE' ? 'bg-slate-50/40' : 'bg-white',
+                isInitialLoad ? 'accordion-row-anim' : ''
               ]"
+              :style="isInitialLoad ? { '--row-delay': `${350 + index * 100}ms` } : {}"
               @dblclick="openRsDetail(r)">
-              <td :class="['p-4 pl-8 font-mono font-bold', r.status === 'PENDING_STOCKTAKE' ? 'text-purple-600' : 'text-slate-500']">{{ r.code }}</td>
+              <td :class="['p-4 pl-8 font-mono font-bold', r.status === 'PENDING_STOCKTAKE' ? 'text-purple-600' : 'text-slate-500']"><div>{{ r.code }}</div></td>
               <td class="p-4">
                 <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold', rsTypeClass(r.type)]">
                   {{ rsTypeLabel(r.type) }}
                 </span>
               </td>
-              <td class="p-4 text-sm text-[#364a63]">{{ r.sourceBranchName || '—' }}</td>
-              <td class="p-4 text-sm font-semibold text-[#364a63]">{{ r.destBranchName || '—' }}</td>
-              <td class="p-4 text-sm text-[#364a63]">{{ r.createdByName }}</td>
-              <td class="p-4 text-sm text-[#8094ae] font-mono">{{ formatDateTime(r.createdAt) }}</td>
+              <td class="p-4 text-sm text-[#364a63]"><div>{{ r.sourceBranchName || '—' }}</div></td>
+              <td class="p-4 text-sm font-semibold text-[#364a63]"><div>{{ r.destBranchName || '—' }}</div></td>
+              <td class="p-4 text-sm text-[#364a63]"><div>{{ r.createdByName }}</div></td>
+              <td class="p-4 text-sm text-[#8094ae] font-mono"><div>{{ formatDateTime(r.createdAt) }}</div></td>
               <td class="p-4 text-sm">
                 <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border', rsStatusClass(r.status)]">
                   {{ rsStatusLabel(r.status) }}
@@ -1242,5 +1271,51 @@ onMounted(async () => {
 }
 .animate-slide-in {
   animation: slide-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── Accordion Entrance Animations ── */
+@keyframes slideDownHeader {
+  0% { transform: translateY(-30px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.header-slide-down {
+  animation: slideDownHeader 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes accordionExpand {
+  0% { transform: scaleY(0); opacity: 0; }
+  100% { transform: scaleY(1); opacity: 1; }
+}
+.accordion-filter-expand {
+  transform-origin: top;
+  animation: accordionExpand 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+.accordion-table-expand {
+  transform-origin: top;
+  animation: accordionExpand 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 260ms;
+  will-change: transform, opacity;
+}
+
+/* ── Horizontal Meet-in-the-Middle Cell Slide ── */
+@keyframes slideFromLeft {
+  0% { transform: translate3d(-50px, 0, 0); opacity: 0; }
+  100% { transform: translate3d(0, 0, 0); opacity: 1; }
+}
+@keyframes slideFromRight {
+  0% { transform: translate3d(50px, 0, 0); opacity: 0; }
+  100% { transform: translate3d(0, 0, 0); opacity: 1; }
+}
+
+.accordion-row-anim td:nth-child(-n+4) > * {
+  animation: slideFromLeft 2.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--row-delay, 0ms);
+  will-change: transform, opacity;
+}
+.accordion-row-anim td:nth-child(n+5) > * {
+  animation: slideFromRight 2.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--row-delay, 0ms);
+  will-change: transform, opacity;
 }
 </style>

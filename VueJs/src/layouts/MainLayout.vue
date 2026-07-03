@@ -234,6 +234,16 @@ onMounted(() => {
   badgeTimer = setInterval(loadBadgeCounts, 3000) // Refresh mỗi 3 giây
 })
 
+function handleNavClick(to: string) {
+  if (to === '/users' && route.path === '/users') {
+    window.dispatchEvent(new CustomEvent('trigger-users-animation'))
+  } else if (to === '/stocktakes' && route.path === '/stocktakes') {
+    window.dispatchEvent(new CustomEvent('trigger-stocktakes-animation'))
+  } else if (to === '/inventory' && route.path === '/inventory') {
+    window.dispatchEvent(new CustomEvent('trigger-inventory-animation'))
+  }
+}
+
 onUnmounted(() => {
   if (timer) clearInterval(timer)
   if (stocktakeTimer) clearInterval(stocktakeTimer)
@@ -266,6 +276,7 @@ onUnmounted(() => {
             v-for="item in mainNavItems"
             :key="item.to"
             :to="item.to"
+            @click="handleNavClick(item.to)"
             class="relative flex items-center font-semibold px-6 py-[0.9rem] mx-4 my-1 rounded-xl transition-all duration-300 group"
             :class="route.path.startsWith(item.to) && item.to !== '/' ? 'nav-active' : 'nav-idle'"
           >
@@ -284,6 +295,7 @@ onUnmounted(() => {
           <RouterLink
             v-if="showStocktakeNav"
             to="/stocktakes"
+            @click="handleNavClick('/stocktakes')"
             class="flex items-center font-semibold px-6 py-[0.9rem] mx-4 my-1 rounded-xl transition-all duration-300 group relative"
             :class="route.path.startsWith('/stocktakes') ? 'nav-active' : 'nav-idle'"
           >
@@ -303,6 +315,7 @@ onUnmounted(() => {
             v-for="item in adminNavItems"
             :key="item.to"
             :to="item.to"
+            @click="handleNavClick(item.to)"
             class="flex items-center font-semibold px-6 py-[0.9rem] mx-4 my-1 rounded-xl transition-all duration-300 group"
             :class="route.path.startsWith(item.to) ? 'nav-active' : 'nav-idle'"
           >
