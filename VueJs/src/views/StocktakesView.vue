@@ -525,7 +525,7 @@ watch([loading, rsLoading], ([newL, newRL]) => {
   if (!newL && !newRL) {
     setTimeout(() => {
       isInitialLoad.value = false
-    }, 1300)
+    }, 1000)
   }
 })
 
@@ -686,7 +686,7 @@ onUnmounted(() => {
                 st.hasDeviation && st.status === 'COMPLETED' ? 'bg-rose-50/50 hover:bg-rose-100/50' : '',
                 isInitialLoad ? 'accordion-row-anim' : ''
               ]"
-              :style="isInitialLoad ? { '--row-delay': `${120 + index * 30}ms` } : {}"
+              :style="isInitialLoad ? { '--row-delay': `${90 + index * 20}ms` } : {}"
               @dblclick="openDetail(st)"
             >
               <td class="p-4 pl-8 font-mono font-bold text-[#4361ee]"><div>{{ st.code }}</div></td>
@@ -1000,7 +1000,7 @@ onUnmounted(() => {
                 r.status !== 'PENDING_STOCKTAKE' ? 'bg-slate-50/40' : 'bg-white',
                 isInitialLoad ? 'accordion-row-anim' : ''
               ]"
-              :style="isInitialLoad ? { '--row-delay': `${120 + index * 30}ms` } : {}"
+              :style="isInitialLoad ? { '--row-delay': `${90 + index * 20}ms` } : {}"
               @dblclick="openRsDetail(r)">
               <td :class="['p-4 pl-8 font-mono font-bold', r.status === 'PENDING_STOCKTAKE' ? 'text-purple-600' : 'text-slate-500']"><div>{{ r.code }}</div></td>
               <td class="p-4">
@@ -1279,7 +1279,7 @@ onUnmounted(() => {
   100% { transform: translateY(0); opacity: 1; }
 }
 .header-slide-down {
-  animation: slideDownHeader 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: slideDownHeader 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes accordionExpand {
@@ -1288,13 +1288,13 @@ onUnmounted(() => {
 }
 .accordion-filter-expand {
   transform-origin: top;
-  animation: accordionExpand 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: accordionExpand 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
   will-change: transform, opacity;
 }
 .accordion-table-expand {
   transform-origin: top;
-  animation: accordionExpand 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: 80ms;
+  animation: accordionExpand 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 60ms;
   will-change: transform, opacity;
 }
 
@@ -1309,12 +1309,12 @@ onUnmounted(() => {
 }
 
 .accordion-row-anim td:nth-child(-n+4) > * {
-  animation: slideFromLeft 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: slideFromLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
   animation-delay: var(--row-delay, 0ms);
   will-change: transform, opacity;
 }
 .accordion-row-anim td:nth-child(n+5) > * {
-  animation: slideFromRight 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: slideFromRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
   animation-delay: var(--row-delay, 0ms);
   will-change: transform, opacity;
 }

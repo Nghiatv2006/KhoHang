@@ -37,7 +37,7 @@ watch(uLoading, (newVal) => {
     currentPage.value = 1
     setTimeout(() => {
       isInitialLoad.value = false
-    }, 650)
+    }, 800)
   }
 })
 
@@ -340,7 +340,7 @@ onUnmounted(() => {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(u, index) in paginatedUsers" :key="u.id" :class="['border-b border-[#f1f5f9] hover:border-transparent hover:shadow-sm transition-all duration-300 cursor-pointer group', u.id === lastActiveUserId ? 'bg-[#4361ee]/5 font-semibold' : '', isInitialLoad ? (index % 2 === 0 ? 'fly-in-left-anim' : 'fly-in-right-anim') : '', `role-row-${u.role}`]" :style="isInitialLoad ? { '--delay': `${Math.min(index * 60, 600)}ms` } : {}" @dblclick="isAdmin || isManager ? openEditUser(u) : null">
+            <tr v-for="(u, index) in paginatedUsers" :key="u.id" :class="['border-b border-[#f1f5f9] hover:border-transparent hover:shadow-sm transition-all duration-300 cursor-pointer group', u.id === lastActiveUserId ? 'bg-[#4361ee]/5 font-semibold' : '', isInitialLoad ? (index % 2 === 0 ? 'fly-in-left-anim' : 'fly-in-right-anim') : '', `role-row-${u.role}`]" :style="isInitialLoad ? { '--delay': `${index * 30}ms` } : {}" @dblclick="isAdmin || isManager ? openEditUser(u) : null">
               <td class="p-4 first:rounded-l-xl last:rounded-r-xl">
                 <div class="flex items-center gap-3">
                   <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 user-avatar group-hover:rotate-[360deg] group-hover:scale-110 group-hover:shadow-md transition-all duration-700 ease-out">
@@ -561,24 +561,16 @@ onUnmounted(() => {
   }
 }
 
-.fly-in-left-anim td,
-.fly-in-right-anim td {
-  perspective: 1000px;
-  transform-style: preserve-3d;
-}
-
-.fly-in-left-anim td > * {
-  animation: flyInLeft 0.3s cubic-bezier(0.15, 0.85, 0.3, 1.05) both;
+.fly-in-left-anim {
+  animation: flyInLeft 0.23s cubic-bezier(0.15, 0.85, 0.3, 1.05) both;
   animation-delay: var(--delay, 0ms);
   will-change: transform, opacity;
-  backface-visibility: hidden;
 }
 
-.fly-in-right-anim td > * {
-  animation: flyInRight 0.3s cubic-bezier(0.15, 0.85, 0.3, 1.05) both;
+.fly-in-right-anim {
+  animation: flyInRight 0.23s cubic-bezier(0.15, 0.85, 0.3, 1.05) both;
   animation-delay: var(--delay, 0ms);
   will-change: transform, opacity;
-  backface-visibility: hidden;
 }
 
 .slide-panel-enter-active, .slide-panel-leave-active {
