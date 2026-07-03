@@ -14,8 +14,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./full_schema.sql:/docker-entrypoint-initdb.d/1_full_schema.sql
-      - ./migration_add_backup_and_branch_lock.sql:/docker-entrypoint-initdb.d/2_migration_add_backup_and_branch_lock.sql
-      - ./seed_data.sql:/docker-entrypoint-initdb.d/3_seed_data.sql
+      - ./seed_data.sql:/docker-entrypoint-initdb.d/2_seed_data.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d warehouse_db"]
       interval: 10s
