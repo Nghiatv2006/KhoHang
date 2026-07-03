@@ -8,10 +8,6 @@ import AppModal from '../components/AppModal.vue'
 const props = defineProps<{ receiptType?: string }>()
 const route = useRoute()
 
-const props = defineProps<{
-  receiptType?: string
-}>()
-
 const toast = useToast()
 const user = ref<any>(JSON.parse(localStorage.getItem('wh_user') || '{}'))
 const isAdmin = computed(() => user.value?.role === 'ADMIN')
