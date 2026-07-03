@@ -279,10 +279,6 @@ watch([activeTab, searchKeyword, selectedStatus, filterDeviation, filterTimeRang
   currentPagePeriodic.value = 1
 })
 
-watch([activeTab, rsFilterType, rsSearch], () => {
-  currentPageReceipt.value = 1
-})
-
 const paginatedStocktakes = computed(() => {
   const start = (currentPagePeriodic.value - 1) * itemsPerPage
   return filteredStocktakes.value.slice(start, start + itemsPerPage)
@@ -366,6 +362,10 @@ const pendingReceiptStocktakesCount = computed(() => {
 const rsLoading = ref(false)
 const rsSearch = ref('')
 const rsFilterType = ref('') // 'IMPORT' | 'TRANSFER' | ''
+
+watch([activeTab, rsFilterType, rsSearch], () => {
+  currentPageReceipt.value = 1
+})
 
 async function loadReceiptStocktakes() {
   rsLoading.value = true
