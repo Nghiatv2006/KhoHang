@@ -5,6 +5,7 @@ import { api } from '../api'
 import { useToast } from '../utils/toast'
 import AppModal from '../components/AppModal.vue'
 
+const props = defineProps<{ receiptType?: string }>()
 const route = useRoute()
 
 const toast = useToast()
@@ -1211,7 +1212,7 @@ function statusLabel(r: any) {
   }
   if (s === 'PENDING_STOCKTAKE') {
     if (r?.type === 'TRANSFER' && r.sourceBranchId === user.value?.branchId) {
-      return '✅ Đã duyệt'; // Cũng hiện đã duyệt cho bên gửi khi chờ kiểm kê
+      return '📦 Đang chuyển (Chờ đích KK)';
     }
     return '📦 Chờ kiểm kê';
   }
