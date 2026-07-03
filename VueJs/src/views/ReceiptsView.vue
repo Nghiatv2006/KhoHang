@@ -200,7 +200,7 @@ watch(filterTimeRange, (val) => {
   }
 })
 
-const filteredReceipts = computed(() => {
+const baseReceipts = computed(() => {
   let result = [...receipts.value]
 
   // Hard filter to ensure visibility rules on frontend
@@ -215,6 +215,12 @@ const filteredReceipts = computed(() => {
   })
 
   if (filterType.value) result = result.filter(r => r.type === filterType.value)
+  return result
+})
+
+const filteredReceipts = computed(() => {
+  let result = [...baseReceipts.value]
+
   if (filterStatus.value) {
     if (filterStatus.value === 'UNPAID') {
       result = result.filter(r => r.type === 'EXPORT' && r.status === 'COMPLETED' && (r.paymentStatus === 'UNPAID' || r.paymentStatus === 'Chưa thanh toán'))
@@ -307,13 +313,13 @@ const headBranch = computed(() => branches.value.find(b => b.isHead) || branches
 // ──────────────────────────────────────────────────────────────
 // STATS
 // ──────────────────────────────────────────────────────────────
-const statDraft = computed(() => receipts.value.filter(r => r.status === 'DRAFT').length)
-const statCompleted = computed(() => receipts.value.filter(r => r.status === 'COMPLETED').length)
-const statCancelled = computed(() => receipts.value.filter(r => r.status === 'CANCELLED').length)
+const statDraft = computed(() => baseReceipts.value.filter(r => r.status === 'DRAFT').length)
+const statCompleted = computed(() => baseReceipts.value.filter(r => r.status === 'COMPLETED').length)
+const statCancelled = computed(() => baseReceipts.value.filter(r => r.status === 'CANCELLED').length)
 
-const statUnpaid = computed(() => receipts.value.filter(r => r.type === 'EXPORT' && r.status === 'COMPLETED' && (r.paymentStatus === 'UNPAID' || r.paymentStatus === 'Chưa thanh toán')).length)
-const statCompensation = computed(() => receipts.value.filter(r => r.type === 'TRANSFER' && r.code?.startsWith('COMP-')).length)
-const statShortfall = computed(() => receipts.value.filter(r => r.type === 'IMPORT' && (r.status === 'PENDING_SHORTFALL_MANAGER' || r.status === 'PENDING_SHORTFALL_ADMIN')).length)
+const statUnpaid = computed(() => baseReceipts.value.filter(r => r.type === 'EXPORT' && r.status === 'COMPLETED' && (r.paymentStatus === 'UNPAID' || r.paymentStatus === 'Chưa thanh toán')).length)
+const statCompensation = computed(() => baseReceipts.value.filter(r => r.type === 'TRANSFER' && r.code?.startsWith('COMP-')).length)
+const statShortfall = computed(() => baseReceipts.value.filter(r => r.type === 'IMPORT' && (r.status === 'PENDING_SHORTFALL_MANAGER' || r.status === 'PENDING_SHORTFALL_ADMIN')).length)
 
 // ──────────────────────────────────────────────────────────────
 // DETAIL PANEL
