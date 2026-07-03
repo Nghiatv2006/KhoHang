@@ -119,3 +119,14 @@ html, body {
 
 .page-enter-active, .page-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
 .page-enter-from, .page-leave-to { opacity: 0; transform: translateY(10px); }
+
+/* Scroll Reveal Animation */
+.reveal-item {
+  opacity: 0;
+  transform: translateY(15px);
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+}
+.reveal-visible {
+  opacity: 1;
+  transform: translateY(0);
+}

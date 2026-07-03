@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { api } from '../api'
 import { useToast } from '../utils/toast'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -51,6 +51,41 @@ async function changePassword() {
   } catch { pwError.value = 'Không thể kết nối máy chủ.' }
   finally { pwSaving.value = false }
 }
+
+const pwRequirements = computed(() => {
+  const p = pwForm.newPassword
+  return {
+    length: p.length >= 8,
+    number: /\d/.test(p),
+    lowercase: /[a-z]/.test(p),
+    uppercase: /[A-Z]/.test(p),
+    symbol: /[^A-Za-z0-9]/.test(p)
+  }
+})
+
+const pwScore = computed(() => {
+  if (!pwForm.newPassword) return 0
+  return Object.values(pwRequirements.value).filter(Boolean).length
+})
+
+const pwStrengthLabel = computed(() => {
+  if (pwScore.value === 0) return ''
+  if (pwScore.value <= 2) return 'Yếu'
+  if (pwScore.value <= 4) return 'Trung bình'
+  return 'Mạnh'
+})
+
+const pwStrengthColor = computed(() => {
+  if (pwScore.value === 0) return 'bg-slate-200'
+  if (pwScore.value <= 2) return 'bg-rose-500'
+  if (pwScore.value <= 4) return 'bg-amber-500'
+  return 'bg-emerald-500'
+})
+
+const pwStrengthWidth = computed(() => {
+  if (pwScore.value === 0) return '0%'
+  return `${(pwScore.value / 5) * 100}%`
+})
 
 const roleColors: Record<string, string> = {
   ADMIN: 'from-[#4361ee] to-[#3a0ca3]',
@@ -148,6 +183,35 @@ onMounted(refreshUser)
             <button type="button" class="absolute right-4 top-1/2 -translate-y-1/2 text-[#8094ae] hover:text-[#364a63] transition-colors cursor-pointer" @click="showPwds.new = !showPwds.new">
               <i :class="['fas', showPwds.new ? 'fa-eye-slash' : 'fa-eye']"></i>
             </button>
+          </div>
+
+          <!-- Mức độ bảo mật mật khẩu -->
+          <div v-if="pwForm.newPassword" class="mt-3 bg-slate-50 rounded-xl p-4 border border-slate-100">
+            <div class="flex justify-between items-center mb-2 text-xs font-bold">
+              <span class="text-[#8094ae]">Độ mạnh mật khẩu:</span>
+              <span :class="{'text-rose-500': pwScore <= 2, 'text-amber-500': pwScore > 2 && pwScore <= 4, 'text-emerald-600': pwScore === 5}">{{ pwStrengthLabel }}</span>
+            </div>
+            <div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden mb-3">
+              <div class="h-full transition-all duration-500 ease-out" :class="pwStrengthColor" :style="{ width: pwStrengthWidth }"></div>
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-medium text-[#8094ae]">
+              <div class="flex items-center gap-1.5" :class="{'text-emerald-600 font-bold': pwRequirements.length}">
+                <i :class="['fas', pwRequirements.length ? 'fa-check-circle' : 'fa-times-circle text-slate-300']"></i> Tối thiểu 8 ký tự
+              </div>
+              <div class="flex items-center gap-1.5" :class="{'text-emerald-600 font-bold': pwRequirements.uppercase}">
+                <i :class="['fas', pwRequirements.uppercase ? 'fa-check-circle' : 'fa-times-circle text-slate-300']"></i> Chữ in hoa (A-Z)
+              </div>
+              <div class="flex items-center gap-1.5" :class="{'text-emerald-600 font-bold': pwRequirements.lowercase}">
+                <i :class="['fas', pwRequirements.lowercase ? 'fa-check-circle' : 'fa-times-circle text-slate-300']"></i> Chữ thường (a-z)
+              </div>
+              <div class="flex items-center gap-1.5" :class="{'text-emerald-600 font-bold': pwRequirements.number}">
+                <i :class="['fas', pwRequirements.number ? 'fa-check-circle' : 'fa-times-circle text-slate-300']"></i> Chữ số (0-9)
+              </div>
+              <div class="flex items-center gap-1.5 sm:col-span-2" :class="{'text-emerald-600 font-bold': pwRequirements.symbol}">
+                <i :class="['fas', pwRequirements.symbol ? 'fa-check-circle' : 'fa-times-circle text-slate-300']"></i> Ký tự đặc biệt (!@#$...)
+              </div>
+            </div>
           </div>
         </div>
 
