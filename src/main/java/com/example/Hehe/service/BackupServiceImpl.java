@@ -6,6 +6,7 @@ import com.example.Hehe.model.User;
 import com.example.Hehe.model.UserRole;
 import com.example.Hehe.repository.BackupRepository;
 import com.example.Hehe.repository.BranchRepository;
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import org.postgresql.util.PGobject;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -30,6 +32,8 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
 import javax.crypto.spec.GCMParameterSpec;
@@ -56,12 +60,16 @@ public class BackupServiceImpl implements BackupService {
     // ─── AES-256-GCM Encryption constants ────────────────────────────────────
     /** Magic header để nhận diện file đã mã hoá (4 bytes ASCII). */
     private static final byte[] MAGIC_HEADER = {0x57, 0x48, 0x42, 0x4B}; // "WHBK"
-    /** Version byte — dành cho tương thích ngược khi nâng cấp thuật toán. */
-    private static final byte  ENC_VERSION   = 0x01;
+    /** Version 1: AES-GCM thuần (không nén). */
+    private static final byte  ENC_VERSION_V1 = 0x01;
+    /** Version 2: GZIP + AES-GCM (mặc định từ bản nâng cấp). */
+    private static final byte  ENC_VERSION_V2 = 0x02;
     /** Kích thước IV cho AES-GCM (chuẩn 96-bit = 12 bytes). */
     private static final int   GCM_IV_SIZE   = 12;
     /** Kích thước authentication tag của GCM (128-bit = 16 bytes). */
     private static final int   GCM_TAG_BITS  = 128;
+    /** Kích thước buffer cho streaming (8 KB). */
+    private static final int   STREAM_BUFFER_SIZE = 8192;
 
     public BackupServiceImpl(BackupRepository backupRepository,
                              BranchRepository branchRepository,
@@ -315,49 +323,66 @@ public class BackupServiceImpl implements BackupService {
 
     // ─────────────────────────────────────────────────────────────────────────
     // PRIVATE: Tạo JSON backup với chữ ký HMAC-SHA256
+    //    Streaming API: dùng JsonGenerator ghi trực tiếp vào OutputStream
+    //    thay vì load toàn bộ dữ liệu vào Map<String,Object> → tiết kiệm RAM
     //    Không có @Transactional vì được gọi từ exportBranchData (đã có TX)
     //    và performScheduledBackup (không cần TX đọc thuần)
     // ─────────────────────────────────────────────────────────────────────────
     private byte[] generateBackupJson(Integer branchId) {
         try {
-            Map<String, Object> data = new LinkedHashMap<>();
+            ByteArrayOutputStream baos = new ByteArrayOutputStream(STREAM_BUFFER_SIZE);
 
-            // 1. Metadata
-            Map<String, Object> metadata = new LinkedHashMap<>();
-            metadata.put("branchId", branchId);
-            Branch branch = branchRepository.findById(branchId).orElse(null);
-            metadata.put("branchName", branch != null ? branch.getName() : "Không tên");
-            metadata.put("backupAt", LocalDateTime.now().toString());
-            metadata.put("systemVersion", "1.0");
-            metadata.put("signature", null); // Đặt null trước khi ký
-            data.put("metadata", metadata);
+            // ── Bước 1: Streaming JSON bằng JsonGenerator ──────────────────
+            try (JsonGenerator gen = objectMapper.getFactory().createGenerator(baos)) {
+                gen.writeStartObject();
 
-            // 2. Query 7 bảng dữ liệu theo branchId
-            data.put("users",      jdbcTemplate.queryForList("SELECT * FROM users WHERE branch_id = ?", branchId));
-            data.put("customers",  jdbcTemplate.queryForList("SELECT * FROM customers WHERE branch_id = ?", branchId));
-            data.put("inventories",jdbcTemplate.queryForList("SELECT * FROM inventories WHERE branch_id = ?", branchId));
+                // 1. Metadata (với signature=null — sẽ ký sau)
+                Branch branch = branchRepository.findById(branchId).orElse(null);
+                gen.writeObjectFieldStart("metadata");
+                gen.writeNumberField("branchId", branchId);
+                gen.writeStringField("branchName", branch != null ? branch.getName() : "Không tên");
+                gen.writeStringField("backupAt", LocalDateTime.now().toString());
+                gen.writeStringField("systemVersion", "2.0");
+                gen.writeNullField("signature");
+                gen.writeEndObject();
 
-            List<Map<String, Object>> receipts = jdbcTemplate.queryForList(
-                    "SELECT * FROM receipts WHERE source_branch_id = ? OR dest_branch_id = ?", branchId, branchId);
-            data.put("receipts", receipts);
+                // 2. Stream từng bảng — đọc từ DB và ghi thẳng vào output
+                writeTableToGenerator(gen, "users",
+                        "SELECT * FROM users WHERE branch_id = ?", branchId);
+                writeTableToGenerator(gen, "customers",
+                        "SELECT * FROM customers WHERE branch_id = ?", branchId);
+                writeTableToGenerator(gen, "inventories",
+                        "SELECT * FROM inventories WHERE branch_id = ?", branchId);
+                writeTableToGenerator(gen, "receipts",
+                        "SELECT * FROM receipts WHERE source_branch_id = ? OR dest_branch_id = ?",
+                        branchId, branchId);
+                writeTableToGenerator(gen, "receiptDetails",
+                        "SELECT rd.* FROM receipt_details rd"
+                        + " JOIN receipts r ON rd.receipt_id = r.id"
+                        + " WHERE r.source_branch_id = ? OR r.dest_branch_id = ?",
+                        branchId, branchId);
+                writeTableToGenerator(gen, "stocktakes",
+                        "SELECT * FROM stocktakes WHERE branch_id = ?", branchId);
+                writeTableToGenerator(gen, "stocktakeDetails",
+                        "SELECT sd.* FROM stocktake_details sd"
+                        + " JOIN stocktakes s ON sd.stocktake_id = s.id"
+                        + " WHERE s.branch_id = ?", branchId);
 
-            data.put("receiptDetails", jdbcTemplate.queryForList(
-                    "SELECT rd.* FROM receipt_details rd"
-                    + " JOIN receipts r ON rd.receipt_id = r.id"
-                    + " WHERE r.source_branch_id = ? OR r.dest_branch_id = ?", branchId, branchId));
+                gen.writeEndObject();
+            }
 
-            List<Map<String, Object>> stocktakes = jdbcTemplate.queryForList(
-                    "SELECT * FROM stocktakes WHERE branch_id = ?", branchId);
-            data.put("stocktakes", stocktakes);
+            // ── Bước 2: Parse JSON → ký HMAC trên cùng format mà verify sẽ dùng ──
+            byte[] jsonWithNullSig = baos.toByteArray();
 
-            data.put("stocktakeDetails", jdbcTemplate.queryForList(
-                    "SELECT sd.* FROM stocktake_details sd"
-                    + " JOIN stocktakes s ON sd.stocktake_id = s.id"
-                    + " WHERE s.branch_id = ?", branchId));
+            // Parse thành Map, serialize bằng objectMapper (cùng format với verify)
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = objectMapper.readValue(jsonWithNullSig, Map.class);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> metadata = (Map<String, Object>) data.get("metadata");
 
-            // 3. Ký HMAC-SHA256
-            String jsonWithoutSignature = objectMapper.writeValueAsString(data);
-            String signature = calculateHmac(jsonWithoutSignature, secretKey);
+            // Ký HMAC trên JSON có signature=null (serialize bằng objectMapper)
+            String jsonForHmac = objectMapper.writeValueAsString(data);
+            String signature = calculateHmac(jsonForHmac, secretKey);
             metadata.put("signature", signature);
 
             return objectMapper.writeValueAsBytes(data);
@@ -365,6 +390,20 @@ public class BackupServiceImpl implements BackupService {
         } catch (Exception e) {
             throw new RuntimeException("Lỗi tạo file sao lưu: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Streaming helper: Ghi kết quả SQL query trực tiếp vào JsonGenerator
+     * thay vì load toàn bộ vào List rồi mới serialize.
+     * Mỗi row từ ResultSet được ghi ngay vào OutputStream → RAM usage = O(1 row).
+     */
+    private void writeTableToGenerator(JsonGenerator gen, String fieldName, String sql, Object... params) throws IOException {
+        gen.writeArrayFieldStart(fieldName);
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, params);
+        for (Map<String, Object> row : rows) {
+            gen.writeObject(row);
+        }
+        gen.writeEndArray();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -629,7 +668,44 @@ public class BackupServiceImpl implements BackupService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // PRIVATE: Mã hoá AES-256-GCM
+    // PRIVATE: Nén GZIP
+    // ─────────────────────────────────────────────────────────────────────────
+    private byte[] compressGzip(byte[] data) {
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream(data.length / 4);
+            try (GZIPOutputStream gzip = new GZIPOutputStream(baos, STREAM_BUFFER_SIZE)) {
+                gzip.write(data);
+            }
+            return baos.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException("Lỗi nén GZIP: " + e.getMessage(), e);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PRIVATE: Giải nén GZIP
+    // ─────────────────────────────────────────────────────────────────────────
+    private byte[] decompressGzip(byte[] compressed) {
+        try {
+            ByteArrayInputStream bais = new ByteArrayInputStream(compressed);
+            ByteArrayOutputStream baos = new ByteArrayOutputStream(compressed.length * 4);
+            try (GZIPInputStream gzip = new GZIPInputStream(bais, STREAM_BUFFER_SIZE)) {
+                byte[] buffer = new byte[STREAM_BUFFER_SIZE];
+                int len;
+                while ((len = gzip.read(buffer)) != -1) {
+                    baos.write(buffer, 0, len);
+                }
+            }
+            return baos.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException("Lỗi giải nén GZIP: " + e.getMessage(), e);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PRIVATE: Mã hoá AES-256-GCM (v2: GZIP trước khi mã hoá)
+    //
+    // Pipeline: plaintext → GZIP compress → AES-256-GCM encrypt
     //
     // Định dạng output (binary):
     //   [MAGIC 4B] [VERSION 1B] [IV 12B] [Ciphertext + GCM AuthTag 16B]
@@ -643,6 +719,15 @@ public class BackupServiceImpl implements BackupService {
     // ─────────────────────────────────────────────────────────────────────────
     private byte[] encryptData(byte[] plaintext) {
         try {
+            // 0. Nén GZIP trước khi mã hoá (tiết kiệm 70-90% dung lượng)
+            long originalSize = plaintext.length;
+            byte[] compressed = compressGzip(plaintext);
+            long compressedSize = compressed.length;
+            double ratio = originalSize > 0 ? (1.0 - (double) compressedSize / originalSize) * 100 : 0;
+            System.out.println("[BackupService] GZIP: " + formatBytes(originalSize)
+                    + " → " + formatBytes(compressedSize)
+                    + " (giảm " + String.format("%.1f", ratio) + "%)");
+
             // 1. Derive 256-bit AES key từ BACKUP_SECRET qua SHA-256
             MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
             byte[] aesKeyBytes   = sha256.digest(secretKey.getBytes(StandardCharsets.UTF_8));
@@ -652,17 +737,17 @@ public class BackupServiceImpl implements BackupService {
             byte[] iv = new byte[GCM_IV_SIZE];
             new SecureRandom().nextBytes(iv);
 
-            // 3. Mã hoá
+            // 3. Mã hoá dữ liệu đã nén
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.ENCRYPT_MODE, aesKey, new GCMParameterSpec(GCM_TAG_BITS, iv));
-            byte[] ciphertext = cipher.doFinal(plaintext);
+            byte[] ciphertext = cipher.doFinal(compressed);
 
-            // 4. Ghép output: MAGIC(4) + VERSION(1) + IV(12) + Ciphertext
+            // 4. Ghép output: MAGIC(4) + VERSION_V2(1) + IV(12) + Ciphertext
             ByteArrayOutputStream out = new ByteArrayOutputStream();
-            out.write(MAGIC_HEADER);      // 4 bytes
-            out.write(ENC_VERSION);       // 1 byte
-            out.write(iv);                // 12 bytes
-            out.write(ciphertext);        // N + 16 bytes (data + auth tag)
+            out.write(MAGIC_HEADER);       // 4 bytes
+            out.write(ENC_VERSION_V2);     // 1 byte — v2 = GZIP + AES-GCM
+            out.write(iv);                 // 12 bytes
+            out.write(ciphertext);         // N + 16 bytes (data + auth tag)
             return out.toByteArray();
 
         } catch (Exception e) {
@@ -671,12 +756,13 @@ public class BackupServiceImpl implements BackupService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // PRIVATE: Giải mã AES-256-GCM — tương thích ngược với file JSON thuần
+    // PRIVATE: Giải mã AES-256-GCM — tương thích ngược đa phiên bản
     //
     // Logic phát hiện:
-    //   - Bắt đầu bằng MAGIC_HEADER "WHBK" → file mã hoá → giải mã AES-GCM
-    //   - Bắt đầu bằng '{' (ASCII JSON)   → file cũ chưa mã hoá → trả nguyên
-    //   - Trường hợp khác                 → báo lỗi định dạng không hợp lệ
+    //   - Bắt đầu bằng MAGIC "WHBK" + v2 → giải mã AES → giải nén GZIP
+    //   - Bắt đầu bằng MAGIC "WHBK" + v1 → giải mã AES (không nén)
+    //   - Bắt đầu bằng '{' (ASCII JSON)  → file cũ chưa mã hoá → trả nguyên
+    //   - Trường hợp khác                → báo lỗi định dạng không hợp lệ
     // ─────────────────────────────────────────────────────────────────────────
     private byte[] decryptData(byte[] rawData) {
         if (rawData == null || rawData.length == 0) {
@@ -707,8 +793,8 @@ public class BackupServiceImpl implements BackupService {
 
         try {
             int offset = MAGIC_HEADER.length; // bỏ qua MAGIC
-            // byte version = rawData[offset]; // Dùng cho tương thích ngược sau này
-            offset += 1; // bỏ qua VERSION
+            byte version = rawData[offset];   // Đọc VERSION để xác định pipeline
+            offset += 1;
 
             byte[] iv         = Arrays.copyOfRange(rawData, offset, offset + GCM_IV_SIZE);
             byte[] ciphertext = Arrays.copyOfRange(rawData, offset + GCM_IV_SIZE, rawData.length);
@@ -721,7 +807,17 @@ public class BackupServiceImpl implements BackupService {
             // Giải mã — AES-GCM tự xác thực AuthTag, ném AEADBadTagException nếu sai
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.DECRYPT_MODE, aesKey, new GCMParameterSpec(GCM_TAG_BITS, iv));
-            return cipher.doFinal(ciphertext);
+            byte[] decrypted = cipher.doFinal(ciphertext);
+
+            // v2: GZIP compressed → giải nén sau khi giải mã
+            if (version == ENC_VERSION_V2) {
+                System.out.println("[BackupService] Phát hiện file v2 (GZIP + AES-GCM), đang giải nén...");
+                decrypted = decompressGzip(decrypted);
+            } else {
+                System.out.println("[BackupService] Phát hiện file v1 (AES-GCM thuần, không nén).");
+            }
+
+            return decrypted;
 
         } catch (javax.crypto.AEADBadTagException e) {
             throw new RuntimeException("Xác thực GCM thất bại — file sao lưu đã bị giả mạo hoặc sai khoá giải mã.", e);
@@ -1065,6 +1161,79 @@ public class BackupServiceImpl implements BackupService {
         }
 
         syncSequences();
+    }
+
+    // =========================================================================
+    // DEMO/TEST: Xóa toàn bộ dữ liệu giao dịch chi nhánh (dùng để test backup)
+    //   Giữ lại: user đang thao tác, thông tin chi nhánh
+    //   Xoá sạch: tồn kho, phiếu kho, kiểm kê, khách hàng, nhân viên khác
+    // =========================================================================
+    @Override
+    public void wipeBranchData(User currentUser) {
+        if (currentUser.getRole() == UserRole.STAFF) {
+            throw new RuntimeException("Nhân viên không có quyền thực hiện thao tác này.");
+        }
+        if (currentUser.getBranch() == null) {
+            throw new RuntimeException("Tài khoản chưa được phân công vào chi nhánh nào.");
+        }
+
+        Integer branchId   = currentUser.getBranch().getId();
+        Integer currentUserId = currentUser.getId();
+
+        // Khóa chi nhánh trong quá trình xóa
+        branchLockHelper.lock(branchId);
+
+        try {
+            auditLogService.logAction(currentUser, "WIPE", "branch_data", String.valueOf(branchId),
+                    "Bắt đầu xóa toàn bộ dữ liệu chi nhánh ID=" + branchId + " (DEMO/TEST).");
+
+            transactionTemplate.execute(status -> {
+                try {
+                    // Xóa theo đúng thứ tự ràng buộc khóa ngoại
+                    int sdDel = jdbcTemplate.update("DELETE FROM stocktake_details WHERE stocktake_id IN (SELECT id FROM stocktakes WHERE branch_id = ?)", branchId);
+                    int sDel  = jdbcTemplate.update("DELETE FROM stocktakes WHERE branch_id = ?", branchId);
+                    int rdDel = jdbcTemplate.update("DELETE FROM receipt_details WHERE receipt_id IN (SELECT id FROM receipts WHERE source_branch_id = ? OR dest_branch_id = ?)", branchId, branchId);
+                    int rDel  = jdbcTemplate.update("DELETE FROM receipts WHERE source_branch_id = ? OR dest_branch_id = ?", branchId, branchId);
+                    int iDel  = jdbcTemplate.update("DELETE FROM inventories WHERE branch_id = ?", branchId);
+
+                    // Gỡ FK tham chiếu chéo chi nhánh trước khi xóa customers/users
+                    // (receipts từ chi nhánh khác có thể tham chiếu customer/user của chi nhánh này)
+                    jdbcTemplate.update(
+                        "UPDATE receipts SET customer_id = NULL WHERE customer_id IN (SELECT id FROM customers WHERE branch_id = ?)", branchId);
+                    jdbcTemplate.update(
+                        "UPDATE receipts SET created_by = (SELECT MIN(id) FROM users WHERE role = 'ADMIN') WHERE created_by IN (SELECT id FROM users WHERE branch_id = ? AND id != ?)", branchId, currentUserId);
+                    jdbcTemplate.update(
+                        "UPDATE receipts SET stocktake_by_id = NULL WHERE stocktake_by_id IN (SELECT id FROM users WHERE branch_id = ? AND id != ?)", branchId, currentUserId);
+
+                    int cDel  = jdbcTemplate.update("DELETE FROM customers WHERE branch_id = ?", branchId);
+                    int uDel  = jdbcTemplate.update("DELETE FROM users WHERE branch_id = ? AND id != ?", branchId, currentUserId);
+
+                    System.out.println("[BackupService] WIPE chi nhánh " + branchId
+                            + ": stocktake_details=" + sdDel + ", stocktakes=" + sDel
+                            + ", receipt_details=" + rdDel + ", receipts=" + rDel
+                            + ", inventories=" + iDel + ", customers=" + cDel
+                            + ", users=" + uDel);
+
+                    syncSequences();
+                } catch (Exception e) {
+                    status.setRollbackOnly();
+                    throw new RuntimeException(e.getMessage(), e);
+                }
+                return null;
+            });
+
+            auditLogService.logAction(currentUser, "WIPE", "branch_data", String.valueOf(branchId),
+                    "Xóa toàn bộ dữ liệu chi nhánh ID=" + branchId + " thành công (DEMO/TEST).");
+
+        } catch (Exception e) {
+            try {
+                auditLogService.logAction(currentUser, "WIPE", "branch_data", String.valueOf(branchId),
+                        "Xóa dữ liệu chi nhánh ID=" + branchId + " THẤT BẠI: " + e.getMessage());
+            } catch (Exception ignore) {}
+            throw new RuntimeException(e.getMessage(), e);
+        } finally {
+            branchLockHelper.unlock(branchId);
+        }
     }
 }
 
