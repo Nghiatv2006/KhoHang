@@ -1484,6 +1484,7 @@ const pageIcon = computed(() => {
               <th class="px-5 py-3 text-left font-bold">Chi nhánh nguồn</th>
               <th class="px-5 py-3 text-left font-bold">Đích / Khách hàng</th>
               <th class="px-5 py-3 text-left font-bold">Người lập</th>
+              <th class="px-5 py-3 text-left font-bold">Người duyệt</th>
               <th class="px-5 py-3 text-left font-bold">Ngày tạo</th>
               <th class="px-5 py-3 text-center font-bold">Thao tác</th>
             </tr>
@@ -1540,6 +1541,9 @@ const pageIcon = computed(() => {
                 <div class="text-[#8094ae]">{{ r.createdByName }}</div>
                 <div v-if="r.stocktakeByName" class="text-xs text-purple-600 mt-1 font-semibold" title="Người kiểm kê"><i class="fas fa-clipboard-check"></i> {{ r.stocktakeByName }}</div>
                 <div v-else-if="r.status === 'COMPLETED' && (r.type === 'IMPORT' || r.type === 'TRANSFER') && r.createdByRole === 'STAFF'" class="text-xs text-purple-600 mt-1 font-semibold opacity-60" title="Người kiểm kê (Dữ liệu cũ)"><i class="fas fa-clipboard-check"></i> {{ r.createdByName }}</div>
+              </td>
+              <td class="px-6 py-5">
+                <span class="text-[#364a63] font-medium">{{ r.approvedByName || '—' }}</span>
               </td>
               <td class="px-6 py-5">
                 <span class="text-[#8094ae] text-xs">{{ formatDateTime(r.createdAt) }}</span>

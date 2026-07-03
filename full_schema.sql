@@ -130,12 +130,14 @@ CREATE TABLE receipts (
     customer_phone VARCHAR(50),    -- SĐT khách hàng
     description VARCHAR(500),
     stocktake_by_id INT,           -- Người xác nhận kiểm kê (phiếu PENDING_STOCKTAKE)
+    approved_by_id INT,            -- Người duyệt phiếu
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_receipt_source_branch FOREIGN KEY (source_branch_id) REFERENCES branches(id) ON DELETE RESTRICT,
     CONSTRAINT fk_receipt_dest_branch FOREIGN KEY (dest_branch_id) REFERENCES branches(id) ON DELETE RESTRICT,
     CONSTRAINT fk_receipt_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
     CONSTRAINT fk_receipt_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT,
-    CONSTRAINT fk_receipt_stocktake_by FOREIGN KEY (stocktake_by_id) REFERENCES users(id)
+    CONSTRAINT fk_receipt_stocktake_by FOREIGN KEY (stocktake_by_id) REFERENCES users(id),
+    CONSTRAINT fk_receipt_approved_by FOREIGN KEY (approved_by_id) REFERENCES users(id)
 );
 
 -- Bảng Chi tiết phiếu kho (Receipt Details)
