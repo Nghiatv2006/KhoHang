@@ -1,7 +1,12 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onBeforeUnmount, onMounted } from 'vue'
+import { ref, reactive, computed, onBeforeUnmount, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api'
+import {
+  Scene, WebGLRenderer, PerspectiveCamera, Color, Group, Mesh,
+  BoxGeometry, MeshStandardMaterial,
+  AmbientLight, DirectionalLight
+} from 'three'
 
 const router = useRouter()
 const form = reactive({ username: '', password: '' })
@@ -65,13 +70,46 @@ function clearOtpTimers() {
   resendCooldown.value = 0
 }
 
+let renderer: WebGLRenderer | null = null
+let animationFrameId: number | null = null
+let handleResizeListener: (() => void) | null = null
+
 onMounted(() => {
   document.documentElement.classList.remove('dark-mode')
 })
 
 onBeforeUnmount(() => {
   clearOtpTimers()
+  if (animationFrameId) cancelAnimationFrame(animationFrameId)
+  if (handleResizeListener) {
+    window.removeEventListener('resize', handleResizeListener)
+    handleResizeListener = null
+  }
+  if (renderer) renderer.dispose()
 })
+
+function skipIntro() {
+  if (!showIntro.value) return
+  
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId)
+    animationFrameId = null
+  }
+  if (handleResizeListener) {
+    window.removeEventListener('resize', handleResizeListener)
+    handleResizeListener = null
+  }
+  if (renderer) {
+    renderer.dispose()
+    renderer = null
+  }
+  
+  fadeIntro.value = true
+  showIntro.value = false
+  startAnimations.value = true
+  animateUptime()
+  animateAes()
+}
 
 async function handleLogin() {
   if (!form.username.trim() || !form.password) {
@@ -252,10 +290,440 @@ async function handleResetPassword() {
     loading.value = false
   }
 }
+
+// --- Animation states for metrics ---
+const uptimeText = ref("0.00%")
+const aesText = ref("AES-256")
+
+function animateUptime() {
+  const start = 0
+  const end = 99.99
+  const duration = 1500 // 1.5 seconds in milliseconds
+  const startTime = performance.now()
+
+  function update(currentTime: number) {
+    const elapsed = currentTime - startTime
+    const progress = Math.min(elapsed / duration, 1)
+    
+    // Easing out quadratic
+    const easeOutQuad = (t: number) => t * (2 - t)
+    const easedProgress = easeOutQuad(progress)
+    
+    const currentValue = start + (end - start) * easedProgress
+    uptimeText.value = currentValue.toFixed(2) + "%"
+
+    if (progress < 1) {
+      requestAnimationFrame(update)
+    } else {
+      uptimeText.value = "99.99%"
+    }
+  }
+
+  requestAnimationFrame(update)
+}
+
+function animateAes() {
+  const target = "AES-256"
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-="
+  
+  const queue = target.split("").map((to) => {
+    const end = Math.floor(Math.random() * 40) + 30 // Settle between frame 30 and 70
+    return {
+      to,
+      end,
+      currentChar: chars[Math.floor(Math.random() * chars.length)]
+    }
+  })
+
+  let frame = 0
+  function update() {
+    let output = ""
+    let complete = 0
+    
+    for (let i = 0; i < queue.length; i++) {
+      const item = queue[i]
+      if (frame >= item.end) {
+        output += item.to
+        complete++
+      } else {
+        if (Math.random() < 0.3) {
+          item.currentChar = chars[Math.floor(Math.random() * chars.length)]
+        }
+        output += item.currentChar
+      }
+    }
+    
+    aesText.value = output
+    
+    if (complete < queue.length) {
+      frame++
+      requestAnimationFrame(update)
+    } else {
+      aesText.value = target
+    }
+  }
+  
+  update()
+}
+
+const isShaking = ref(false)
+watch([errorMsg, banMsg], ([newErr, newBan]) => {
+  if (newErr || newBan) {
+    isShaking.value = true
+    setTimeout(() => {
+      isShaking.value = false
+    }, 500)
+  }
+})
+
+const startAnimations = ref(false)
+const showIntro = ref(true)
+const fadeIntro = ref(false)
+const canvasRef = ref<HTMLCanvasElement | null>(null)
+
+// Easing functions
+function easeInQuad(t: number) { return t * t }
+function easeOutQuad(t: number) { return t * (2 - t) }
+function easeInOutQuad(t: number) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t }
+// Removed unused easeOutBack
+function easeOutSine(t: number) { return Math.sin(t * Math.PI / 2) }
+function easeInCubic(t: number) { return t * t * t }
+function easeOutElastic(t: number) {
+  if (t === 0 || t === 1) return t
+  return Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * (2 * Math.PI) / 3) + 1
+}
+function lerp(a: number, b: number, t: number) { return a + (b - a) * t }
+function clamp01(t: number) { return Math.max(0, Math.min(1, t)) }
+function progress(elapsed: number, start: number, end: number) {
+  return clamp01((elapsed - start) / (end - start))
+}
+
+interface TileState {
+  ox: number; oz: number; dist: number; isCenter: boolean
+  crashY: number; sinkY: number; hoverY: number
+  flyX: number; flyZ: number; flyY: number
+  rotX: number; rotY: number; rotZ: number
+  flyDelay: number
+}
+
+function init3DAnimation() {
+  if (!canvasRef.value) return
+
+  const width = window.innerWidth
+  const height = window.innerHeight
+
+  const scene = new Scene()
+  scene.background = new Color('#ffffff')
+
+  const camera = new PerspectiveCamera(35, width / height, 0.1, 200)
+  camera.position.set(0, 5.64, 20.66)
+  camera.rotation.x = -14.73 * (Math.PI / 180)
+
+  renderer = new WebGLRenderer({ canvas: canvasRef.value, antialias: true })
+  renderer.setSize(width, height)
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+  renderer.setClearColor(new Color('#ffffff'), 1)
+
+  scene.add(new AmbientLight(0xffffff, 0.6))
+  const dirLight = new DirectionalLight(0xffffff, 1.6)
+  dirLight.position.set(100, 200, 300)
+  scene.add(dirLight)
+  const rimLight = new DirectionalLight(0xaab8ff, 0.6)
+  rimLight.position.set(-200, -50, 150)
+  scene.add(rimLight)
+
+  // ─── Floor tiles ───────────────────────────────────────────────
+  const COLS = 31, ROWS = 31
+  // Removed unused EXPLODE_RADIUS
+  const centerCol = Math.floor(COLS / 2)
+  const centerRow = Math.floor(ROWS / 2)
+
+  const tileGeo = new BoxGeometry(0.94, 0.94, 0.94)
+  const tileMat = new MeshStandardMaterial({ color: new Color('#d4d4d8'), roughness: 0.7, metalness: 0.05 })
+
+  const tileGroup = new Group()
+  const tileMeshes: Mesh[] = []
+  const tileStates: TileState[] = []
+
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const mesh = new Mesh(tileGeo, tileMat)
+      const ox = c - centerCol
+      const oz = r - centerRow
+      mesh.position.set(ox, 0, oz)
+      tileGroup.add(mesh)
+      tileMeshes.push(mesh)
+
+      const dist = Math.hypot(ox, oz)
+      const crashY = Math.max(0, (1 - dist / 22)) * 0.4
+      const baseSink = lerp(2.0, 0.4, dist / 22)
+      // Scatter tiles to float at random suspended heights during the shatter phase
+      const hoverY = (Math.random() - 0.5) * 3.5 - (dist / 22) * 1.0
+      const spreadFactor = lerp(6.0, 1.2, dist / 22)
+      const angle = Math.atan2(oz, ox)
+      tileStates.push({
+        ox, oz, dist, isCenter: true,
+        crashY,
+        sinkY: -baseSink * 0.35,
+        hoverY,
+        flyX: Math.cos(angle) * spreadFactor * (2 + Math.random() * 3) + (Math.random() - 0.5) * 4,
+        flyZ: Math.sin(angle) * spreadFactor * (2 + Math.random() * 3) + (Math.random() - 0.5) * 4 + 8,
+        flyY: 8 + Math.random() * 16,
+        rotX: (Math.random() - 0.5) * Math.PI * 4,
+        rotY: (Math.random() - 0.5) * Math.PI * 4,
+        rotZ: (Math.random() - 0.5) * Math.PI * 4,
+        flyDelay: (dist / 22) * 0.4,
+      })
+    }
+  }
+  scene.add(tileGroup)
+
+  // ─── Falling box (starts as a tall thin needle) ───────────────
+  const boxGeo = new BoxGeometry(1, 1, 1)
+  const boxMat = new MeshStandardMaterial({ color: new Color('#FF4B4B'), roughness: 0.4, metalness: 0.1 })
+  const box = new Mesh(boxGeo, boxMat)
+  box.position.set(0, 24, 0)
+  box.scale.set(0.02, 5, 0.02)
+  scene.add(box)
+
+  handleResizeListener = () => {
+    if (!renderer) return
+    camera.aspect = window.innerWidth / window.innerHeight
+    camera.updateProjectionMatrix()
+    renderer.setSize(window.innerWidth, window.innerHeight)
+  }
+  window.addEventListener('resize', handleResizeListener)
+
+  // ─── Timeline constants (ms) ──────────────────────────────────
+  const T = {
+    FALL_START:     0,
+    FALL_END:    3000,
+    IMPACT:      3000,
+    RIPPLE_END:  3500,
+    SQUASH_END:  4000,
+    FLOOR_SINK:  3500,
+    FLOOR_SINK_END: 5500,
+    BOX_STRETCH: 5500,
+    BOX_LAUNCH:  6500,
+    BOX_GONE:    7200,
+    FLY_START:   6600,
+    FLY_END:    10300,
+    FADE_START:  8800,
+    TOTAL:      11000,
+  }
+
+  let cameraShakeAmp = 0
+  const startTime = performance.now()
+  let done = false
+
+  const tick = () => {
+    if (done || !renderer) return
+    const elapsed = performance.now() - startTime
+
+    // 1. ANIMATE RED BOX
+    let bottomOffset = 0
+    if (elapsed >= 4000 && elapsed < 4400) {
+      // Jump up: box lifts 1.8 units in the air as a solid body
+      const ct = progress(elapsed, 4000, 4400)
+      bottomOffset = lerp(0.0, 1.8, easeOutQuad(ct))
+    } else if (elapsed >= 4400 && elapsed < 4500) {
+      // Stomp down: box slams down to the ground rapidly
+      const st = progress(elapsed, 4400, 4500)
+      bottomOffset = lerp(1.8, 0.0, easeInQuad(st))
+    }
+
+    if (elapsed <= T.FALL_END) {
+      const ft = progress(elapsed, T.FALL_START, T.FALL_END)
+      const eased = easeInCubic(ft)
+      box.position.y = lerp(24, 1.47, eased)
+      const sxz = lerp(0.02, 1, eased)
+      box.scale.x = sxz
+      box.scale.z = sxz
+      box.scale.y = lerp(5, 1, eased)
+    } else if (elapsed >= 3000 && elapsed < 4000) {
+      const ft = progress(elapsed, 3000, 4000)
+      const elastic = easeOutElastic(ft)
+      box.scale.y = lerp(0.55, 1, elastic)
+      box.scale.x = lerp(1.45, 1, elastic)
+      box.scale.z = lerp(1.45, 1, elastic)
+    } else if (elapsed >= 4000 && elapsed < 5500) {
+      // Keep box rigid (scale 1x1x1) during jump, stomp, and initial sink
+      box.scale.set(1, 1, 1)
+    } else if (elapsed >= 5500 && elapsed < 6500) {
+      const st = progress(elapsed, 5500, 6500)
+      const eased = easeInOutQuad(st)
+      box.scale.y = lerp(1, 4, eased)
+      box.scale.x = lerp(1, 0.6, eased)
+      box.scale.z = lerp(1, 0.6, eased)
+    } else if (elapsed >= 6500 && elapsed < 7200) {
+      const lt = progress(elapsed, 6500, 7200)
+      const eased = easeOutSine(lt)
+      box.scale.y = lerp(4, 0.1, eased)
+      box.scale.x = lerp(0.6, 0.01, eased)
+      box.scale.z = lerp(0.6, 0.01, eased)
+    }
+    if (elapsed >= 7200) {
+      box.visible = false
+    }
+
+    // 2. ANIMATE TILES (Unified Loop)
+    for (let i = 0; i < tileMeshes.length; i++) {
+      const ts = tileStates[i]
+      let tx = ts.ox
+      let tz = ts.oz
+      let ty = 0
+      let rx = 0
+      let ry = 0
+      let rz = 0
+
+      if (elapsed < 3000) {
+        ty = 0
+      } else if (elapsed >= 3000 && elapsed < 4000) {
+        // Sudden drop/sag within 200ms on first impact
+        const ft = progress(elapsed, 3000, 3200)
+        const tileDelay = (ts.dist / 22) * 0.08
+        const lt = clamp01((ft - tileDelay) / (1 - tileDelay + 0.01))
+        const eased = easeOutQuad(lt)
+
+        ty = lerp(0, ts.sinkY, eased)
+        rx = lerp(0, ts.rotX * 0.05, eased)
+        ry = lerp(0, ts.rotY * 0.05, eased)
+        rz = lerp(0, ts.rotZ * 0.05, eased)
+        tx = lerp(ts.ox, ts.ox * 1.05, eased)
+        tz = lerp(ts.oz, ts.oz * 1.05, eased)
+      } else if (elapsed >= 4000 && elapsed < 4500) {
+        ty = ts.sinkY
+        rx = ts.rotX * 0.05
+        ry = ts.rotY * 0.05
+        rz = ts.rotZ * 0.05
+        tx = ts.ox * 1.05
+        tz = ts.oz * 1.05
+      } else if (elapsed >= 4500 && elapsed < 5500) {
+        // Explosive collapse/shatter within 200ms upon stomp impact
+        const ft = progress(elapsed, 4500, 4700)
+        const tileDelay = (ts.dist / 22) * 0.05
+        const lt = clamp01((ft - tileDelay) / (1 - tileDelay + 0.01))
+        const eased = easeOutQuad(lt)
+
+        ty = lerp(ts.sinkY, ts.hoverY, eased)
+        rx = lerp(ts.rotX * 0.05, ts.rotX * 0.25, eased)
+        ry = lerp(ts.rotY * 0.05, ts.rotY * 0.25, eased)
+        rz = lerp(ts.rotZ * 0.05, ts.rotZ * 0.25, eased)
+        tx = lerp(ts.ox * 1.05, ts.ox * 1.25, eased)
+        tz = lerp(ts.oz * 1.05, ts.oz * 1.25, eased)
+      } else if (elapsed >= 5500 && elapsed < 6600) {
+        ty = ts.hoverY
+        rx = ts.rotX * 0.25
+        ry = ts.rotY * 0.25
+        rz = ts.rotZ * 0.25
+        tx = ts.ox * 1.25
+        tz = ts.oz * 1.25
+      } else if (elapsed >= 6600) {
+        const ft = progress(elapsed, 6600, 10300)
+        const lt = clamp01((ft - ts.flyDelay) / (1 - ts.flyDelay + 0.01))
+        const eased = easeOutSine(lt)
+
+        ty = lerp(ts.hoverY, ts.flyY, eased)
+        tx = lerp(ts.ox * 1.25, ts.flyX, eased)
+        tz = lerp(ts.oz * 1.25, ts.flyZ, eased)
+        rx = lerp(ts.rotX * 0.25, ts.rotX * 0.75, eased)
+        ry = lerp(ts.rotY * 0.25, ts.rotY * 0.75, eased)
+        rz = lerp(ts.rotZ * 0.25, ts.rotZ * 0.75, eased)
+      }
+
+      // Continuous zero-gravity slow drifting once shattered
+      if (elapsed >= 4500) {
+        const tOffset = (elapsed - 4500) * 0.001
+        ty += Math.sin(tOffset * 2.2 + ts.dist * 0.5) * 0.25
+        tx += Math.cos(tOffset * 1.8 + ts.ox * 0.3) * 0.15
+        tz += Math.sin(tOffset * 1.6 + ts.oz * 0.3) * 0.15
+        rx += Math.sin(tOffset * 1.2 + ts.rotX) * 0.08
+        ry += Math.cos(tOffset * 1.0 + ts.rotY) * 0.08
+        rz += Math.sin(tOffset * 0.8 + ts.rotZ) * 0.08
+      }
+
+      tileMeshes[i].position.set(tx, ty, tz)
+      tileMeshes[i].rotation.set(rx, ry, rz)
+    }
+
+    // 3. ANCHOR BOX POSITION TO CENTER TILE 480
+    if (elapsed >= 3000 && elapsed < 5500) {
+      const centerTileMesh = tileMeshes[480]
+      const floorY = centerTileMesh.position.y + 0.47
+      box.position.y = floorY + box.scale.y + bottomOffset
+    } else if (elapsed >= 5500 && elapsed < 6500) {
+      const st = progress(elapsed, 5500, 6500)
+      const eased = easeInOutQuad(st)
+      const centerTileMesh = tileMeshes[480]
+      const startY = centerTileMesh.position.y + 0.47 + 1.0
+      box.position.y = lerp(startY, 4, eased)
+    } else if (elapsed >= 6500 && elapsed < 7200) {
+      const lt = progress(elapsed, 6500, 7200)
+      const eased = easeOutSine(lt)
+      box.position.y = lerp(4, 50, eased)
+    }
+
+    // Camera shake trigger & decay
+    if (elapsed >= 3000 && elapsed < 4000) {
+      cameraShakeAmp = lerp(0.25, 0, progress(elapsed, 3000, 4000))
+    }
+    if (elapsed >= 4500 && elapsed < 4530) {
+      cameraShakeAmp = 0.25
+    }
+    if (cameraShakeAmp > 0.01) {
+      camera.position.y += (Math.random() - 0.5) * cameraShakeAmp
+      cameraShakeAmp *= 0.85
+    }
+
+    // ═══ Fade canvas out ═════════════════════════════════════════
+    // Transition trigger
+    if (elapsed >= T.FADE_START && !fadeIntro.value) {
+      fadeIntro.value = true
+      startAnimations.value = true
+      animateUptime()
+      animateAes()
+    }
+
+    renderer.render(scene, camera)
+
+    if (elapsed >= T.TOTAL) {
+      done = true
+      showIntro.value = false
+      if (handleResizeListener) {
+        window.removeEventListener('resize', handleResizeListener)
+        handleResizeListener = null
+      }
+      renderer.dispose()
+      renderer = null
+      return
+    }
+
+    animationFrameId = requestAnimationFrame(tick)
+  }
+
+  animationFrameId = requestAnimationFrame(tick)
+}
+
+onMounted(async () => {
+  await nextTick()
+  if (canvasRef.value) {
+    init3DAnimation()
+  }
+})
 </script>
 
 <template>
   <div class="min-h-screen flex relative font-['Nunito',sans-serif] overflow-hidden bg-[#0a192f]">
+    
+    <!-- 3D Intro Canvas -->
+    <canvas 
+      v-if="showIntro" 
+      ref="canvasRef" 
+      @click="skipIntro"
+      class="fixed inset-0 w-full h-full z-50 transition-opacity duration-1000 cursor-pointer" 
+      style="background-color: #ffffff;"
+      :class="{ 'opacity-0 pointer-events-none': fadeIntro }"
+    ></canvas>
     
     <!-- Global Animated Background -->
     <div class="absolute inset-0 z-0">
@@ -273,15 +741,90 @@ async function handleResetPassword() {
       <div class="absolute inset-0 bg-black/30 backdrop-blur-[2px] border-r border-white/10"></div>
       
       <!-- Login Card -->
-      <div class="relative z-20 bg-white/95 backdrop-blur-xl rounded-[20px] shadow-[0_15px_40px_rgba(0,0,0,0.1)] p-8 md:p-12 w-full max-w-[480px] border border-white/60">
+      <div 
+        class="relative z-20 bg-white/95 backdrop-blur-xl rounded-[20px] shadow-[0_15px_40px_rgba(0,0,0,0.1)] p-8 md:p-12 w-full max-w-[480px] border border-white/60 transition-transform duration-300"
+        :class="{ 'animate-shake': isShaking }"
+      >
         
         <!-- Logo & Header -->
         <div class="text-center mb-8">
-          <div class="w-[80px] h-[80px] bg-[#ffeaa7] rounded-full flex items-center justify-center mx-auto mb-4 text-[#d63031] shadow-[0_5px_15px_rgba(214,48,49,0.2)]">
-            <i :class="['fas', mode === 'login' ? 'fa-boxes' : mode === 'forgot_email' ? 'fa-envelope-open-text' : mode === 'forgot_select_acc' ? 'fa-users-cog' : mode === 'forgot_otp' ? 'fa-key' : 'fa-shield-alt', 'fa-3x']"></i>
+          <div class="relative w-[84px] h-[84px] mx-auto mb-4 flex items-center justify-center group cursor-pointer">
+            <!-- Squircle Accent Background (Rotates 45deg on hover) -->
+            <div class="absolute inset-0 rounded-[24px] bg-gradient-to-tr from-[#d63031] to-[#ff7675] opacity-10 group-hover:opacity-20 group-hover:rotate-45 transition-all duration-700"></div>
+            
+            <!-- Glass Card Logo Body (Lifts on hover) -->
+            <div class="w-[64px] h-[64px] rounded-[20px] bg-gradient-to-tr from-white to-slate-50 border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.06)] flex items-center justify-center relative overflow-hidden group-hover:shadow-[0_15px_35px_rgba(214,48,49,0.15)] group-hover:-translate-y-1 transition-all duration-300">
+              <!-- Diagonal shiny reflection sweep -->
+              <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out"></div>
+              
+              <!-- Custom SVG Logo with falling cubes (Only in login mode) -->
+              <svg v-if="mode === 'login'" class="w-[58px] h-[58px] relative z-10" viewBox="20 32 60 51" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="cardboardGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#f5d6a7" />
+                    <stop offset="100%" stop-color="#d4a373" />
+                  </linearGradient>
+                  <linearGradient id="tapeGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#ff7675" />
+                    <stop offset="100%" stop-color="#d63031" />
+                  </linearGradient>
+                </defs>
+                <!-- Cube 1 (Bottom Left) -->
+                <g :class="startAnimations ? 'cube-1' : 'opacity-0'">
+                  <!-- Top Face -->
+                  <path d="M 0 -12 L 14 -5 L 0 2 L -14 -5 Z" fill="#f5d6a7" stroke="#a0784c" stroke-width="0.8" />
+                  <!-- Left Face -->
+                  <path d="M -14 -5 L 0 2 L 0 16 L -14 9 Z" fill="#d4a373" stroke="#a0784c" stroke-width="0.8" />
+                  <!-- Right Face -->
+                  <path d="M 0 2 L 14 -5 L 14 9 L 0 16 Z" fill="#bfa181" stroke="#a0784c" stroke-width="0.8" />
+                  <!-- Top Face Center Seam -->
+                  <line x1="0" y1="-12" x2="0" y2="2" stroke="#a0784c" stroke-width="0.8" />
+                  <!-- Red Packaging Tape (covering the seam) -->
+                  <path d="M -2.5 -10.75 L 2.5 -13.25 L 2.5 3.25 L -2.5 0.75 Z" fill="url(#tapeGrad)" />
+                  <path d="M -2.5 0.75 L 0 2 L 0 16 L -2.5 14.75 Z" fill="url(#tapeGrad)" />
+                  <path d="M 0 2 L 2.5 0.75 L 2.5 14.75 L 0 16 Z" fill="url(#tapeGrad)" />
+                </g>
+                <!-- Cube 2 (Bottom Right) -->
+                <g :class="startAnimations ? 'cube-2' : 'opacity-0'">
+                  <path d="M 0 -12 L 14 -5 L 0 2 L -14 -5 Z" fill="#f5d6a7" stroke="#a0784c" stroke-width="0.8" />
+                  <path d="M -14 -5 L 0 2 L 0 16 L -14 9 Z" fill="#d4a373" stroke="#a0784c" stroke-width="0.8" />
+                  <path d="M 0 2 L 14 -5 L 14 9 L 0 16 Z" fill="#bfa181" stroke="#a0784c" stroke-width="0.8" />
+                  <line x1="0" y1="-12" x2="0" y2="2" stroke="#a0784c" stroke-width="0.8" />
+                  <path d="M -2.5 -10.75 L 2.5 -13.25 L 2.5 3.25 L -2.5 0.75 Z" fill="url(#tapeGrad)" />
+                  <path d="M -2.5 0.75 L 0 2 L 0 16 L -2.5 14.75 Z" fill="url(#tapeGrad)" />
+                  <path d="M 0 2 L 2.5 0.75 L 2.5 14.75 L 0 16 Z" fill="url(#tapeGrad)" />
+                </g>
+                <!-- Cube 3 (Top Center) -->
+                <g :class="startAnimations ? 'cube-3' : 'opacity-0'">
+                  <path d="M 0 -12 L 14 -5 L 0 2 L -14 -5 Z" fill="#f5d6a7" stroke="#a0784c" stroke-width="0.8" />
+                  <path d="M -14 -5 L 0 2 L 0 16 L -14 9 Z" fill="#d4a373" stroke="#a0784c" stroke-width="0.8" />
+                  <path d="M 0 2 L 14 -5 L 14 9 L 0 16 Z" fill="#bfa181" stroke="#a0784c" stroke-width="0.8" />
+                  <line x1="0" y1="-12" x2="0" y2="2" stroke="#a0784c" stroke-width="0.8" />
+                  <path d="M -2.5 -10.75 L 2.5 -13.25 L 2.5 3.25 L -2.5 0.75 Z" fill="url(#tapeGrad)" />
+                  <path d="M -2.5 0.75 L 0 2 L 0 16 L -2.5 14.75 Z" fill="url(#tapeGrad)" />
+                  <path d="M 0 2 L 2.5 0.75 L 2.5 14.75 L 0 16 Z" fill="url(#tapeGrad)" />
+                </g>
+              </svg>
+              
+              <!-- FontAwesome Icon for other modes -->
+              <i 
+                v-else
+                :class="[
+                  'fas', 
+                  mode === 'forgot_email' ? 'fa-envelope-open-text' : mode === 'forgot_select_acc' ? 'fa-users-cog' : mode === 'forgot_otp' ? 'fa-key' : 'fa-shield-alt', 
+                  'fa-2x', 
+                  'bg-gradient-to-tr from-[#d63031] to-[#ff7675] bg-clip-text text-transparent transform group-hover:scale-110 transition-transform duration-300'
+                ]"
+              ></i>
+            </div>
           </div>
           <h2 class="text-[32px] font-extrabold text-gray-900 mb-2">
-            {{ mode === 'login' ? 'Warehouse Pro' : mode === 'forgot_email' ? 'Quên mật khẩu' : mode === 'forgot_select_acc' ? 'Chọn tài khoản' : mode === 'forgot_otp' ? 'Xác minh OTP' : 'Đặt mật khẩu mới' }}
+            <template v-if="mode === 'login'">
+              <span class="pro-gradient-text">Warehouse Pro</span>
+            </template>
+            <template v-else>
+              {{ mode === 'forgot_email' ? 'Quên mật khẩu' : mode === 'forgot_select_acc' ? 'Chọn tài khoản' : mode === 'forgot_otp' ? 'Xác minh OTP' : 'Đặt mật khẩu mới' }}
+            </template>
           </h2>
           <p class="text-gray-500 font-medium">
             {{ mode === 'login' ? 'Đăng nhập hệ thống quản trị' : mode === 'forgot_email' ? 'Nhập email để khôi phục tài khoản' : mode === 'forgot_select_acc' ? 'Chọn tài khoản muốn khôi phục' : mode === 'forgot_otp' ? 'Nhập mã xác thực gửi qua email' : 'Thiết lập mật khẩu bảo mật mới' }}
@@ -537,33 +1080,33 @@ async function handleResetPassword() {
     </div>
 
     <!-- Right Panel Overlay & Content -->
-    <div class="hidden lg:flex flex-1 relative items-center justify-center z-10">
+    <div class="hidden lg:flex flex-1 relative items-center justify-center z-10 overflow-hidden">
       
       <!-- Dark Blue Enterprise Overlay -->
-      <div class="absolute inset-0 bg-gradient-to-tr from-[#0a192f]/95 via-[#112240]/85 to-[#0047b3]/40 mix-blend-multiply"></div>
+      <div class="absolute inset-0 bg-gradient-to-tr from-[#0a192f]/95 via-[#112240]/85 to-[#0047b3]/40 mix-blend-multiply z-0"></div>
 
       <!-- Professional Content -->
       <div class="relative z-20 px-16 max-w-2xl text-left border-l-4 border-[#00a8ff] pl-8 ml-8">
-        <div class="text-[#00a8ff] mb-4 uppercase tracking-[0.2em] text-sm font-extrabold flex items-center gap-2">
+        <div class="text-[#00a8ff] mb-4 uppercase tracking-[0.2em] text-sm font-extrabold flex items-center gap-2 animate-fade-in-up">
           <i class="fas fa-server"></i> Phiên bản Doanh nghiệp
         </div>
 
-        <h2 class="text-[3.5rem] font-extrabold mb-6 tracking-tight text-white leading-[1.15]">
+        <h2 class="text-[3.5rem] font-extrabold mb-6 tracking-tight text-white leading-[1.15] animate-fade-in-up delay-150">
           Kiểm soát toàn diện <br/>
           <span class="pro-gradient-text">chuỗi cung ứng</span>
         </h2>
         
-        <p class="text-[1.15rem] text-slate-300 font-light leading-relaxed mb-10">
+        <p class="text-[1.15rem] text-slate-300 font-light leading-relaxed mb-10 animate-fade-in-up delay-300">
           Hệ thống lõi cung cấp khả năng hiển thị thời gian thực, quản lý tồn kho đa chi nhánh và tối ưu hóa luồng hàng hóa với độ trễ bằng 0.
         </p>
 
-        <div class="grid grid-cols-2 gap-8 pt-8 border-t border-white/10">
-          <div>
-            <div class="text-3xl font-bold mb-1 font-mono tracking-tight text-white">99.99%</div>
+        <div class="grid grid-cols-2 gap-8 pt-8 border-t border-white/10 animate-fade-in-up delay-450">
+          <div class="p-4 rounded-xl bg-transparent border border-transparent hover:bg-white/5 hover:border-white/10 hover:-translate-y-1 transition-all duration-300 cursor-default group">
+            <div class="text-3xl font-bold mb-1 font-mono tracking-tight text-white group-hover:text-[#00a8ff] transition-colors duration-300">{{ uptimeText }}</div>
             <div class="text-sm font-semibold text-slate-400 uppercase tracking-wide">Uptime Hệ thống</div>
           </div>
-          <div>
-            <div class="text-3xl font-bold mb-1 font-mono tracking-tight text-white">AES-256</div>
+          <div class="p-4 rounded-xl bg-transparent border border-transparent hover:bg-white/5 hover:border-white/10 hover:-translate-y-1 transition-all duration-300 cursor-default group">
+            <div class="text-3xl font-bold mb-1 font-mono tracking-tight text-white group-hover:text-[#00a8ff] transition-colors duration-300">{{ aesText }}</div>
             <div class="text-sm font-semibold text-slate-400 uppercase tracking-wide">Mã hóa Dữ liệu</div>
           </div>
         </div>
@@ -667,6 +1210,100 @@ input:-webkit-autofill:active{
 @keyframes shine {
   to {
     background-position: 300% center;
+  }
+}
+
+/* --- NEW PREMIUM ANIMATIONS & EFFECTS --- */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  opacity: 0;
+  animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.delay-150 {
+  animation-delay: 150ms;
+}
+
+.delay-300 {
+  animation-delay: 300ms;
+}
+
+.delay-450 {
+  animation-delay: 450ms;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* --- CUBE FALLING ANIMATION --- */
+.cube-1 {
+  opacity: 0;
+  transform: translate(35px, 65px);
+  animation: dropCube1 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  animation-delay: 0.2s;
+}
+
+.cube-2 {
+  opacity: 0;
+  transform: translate(65px, 65px);
+  animation: dropCube2 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  animation-delay: 0.5s;
+}
+
+.cube-3 {
+  opacity: 0;
+  transform: translate(50px, 46px);
+  animation: dropCube3 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  animation-delay: 0.8s;
+}
+
+@keyframes dropCube1 {
+  0% {
+    opacity: 0;
+    transform: translate(35px, -60px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(35px, 65px);
+  }
+}
+
+@keyframes dropCube2 {
+  0% {
+    opacity: 0;
+    transform: translate(65px, -60px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(65px, 65px);
+  }
+}
+
+@keyframes dropCube3 {
+  0% {
+    opacity: 0;
+    transform: translate(50px, -60px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(50px, 46px);
   }
 }
 </style>

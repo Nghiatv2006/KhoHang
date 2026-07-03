@@ -38,6 +38,7 @@ const user = ref<{
   roles: string[]
   role?: string
   branchId?: number
+  branch?: any
 } | null>(null)
 
 onMounted(() => {
