@@ -6,6 +6,7 @@ import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import jakarta.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
@@ -21,9 +22,22 @@ public class JwtTokenProvider {
     @Value("${jwt.expiration}")
     private long jwtExpirationInMs;
 
+    private Key signingKey;
+
+    @PostConstruct
+    public void init() {
+        if (jwtSecret == null || jwtSecret.trim().isEmpty() || "generate-on-startup".equalsIgnoreCase(jwtSecret.trim())) {
+            this.signingKey = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+            System.out.println("JWT: Generated a random signing key for startup security.");
+        } else {
+            byte[] keyBytes = this.jwtSecret.getBytes(StandardCharsets.UTF_8);
+            this.signingKey = Keys.hmacShaKeyFor(keyBytes);
+            System.out.println("JWT: Using statically configured signing key.");
+        }
+    }
+
     private Key getSigningKey() {
-        byte[] keyBytes = this.jwtSecret.getBytes(StandardCharsets.UTF_8);
-        return Keys.hmacShaKeyFor(keyBytes);
+        return this.signingKey;
     }
 
     public String generateToken(String username, String role) {
