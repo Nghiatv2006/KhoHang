@@ -309,35 +309,6 @@ function openDetails(inv: any) {
   showDetailPanel.value = true
 }
 
-async function deleteInventory() {
-  if (!selectedInv.value) return;
-  if (!confirm('Bạn có chắc chắn muốn xoá dòng tồn kho này không? Dữ liệu bị xoá sẽ không thể khôi phục.')) return;
-  
-  if (selectedInv.value.quantity > 0) {
-    if (!confirm(`Cảnh báo: Dòng tồn kho này vẫn còn số lượng tồn là ${selectedInv.value.quantity} ${selectedInv.value.unit}. Bạn có thực sự chắc chắn muốn xoá không?`)) return;
-  }
-  
-  try {
-    const res = await api.delete(`/api/inventories/${selectedInv.value.id}`);
-    if (res.ok) {
-      toast.success('Xoá tồn kho thành công!');
-      showDetailPanel.value = false;
-      await loadData();
-    } else {
-      const text = await res.text();
-      let errMessage = 'Lỗi khi xoá tồn kho';
-      if (text) {
-        try {
-          const err = JSON.parse(text);
-          errMessage = err.message || errMessage;
-        } catch(e) {}
-      }
-      toast.error(errMessage);
-    }
-  } catch (err: any) {
-    toast.error('Lỗi kết nối: ' + err.message);
-  }
-}
 
 // Get lot status
 function getLotStatus(inv: any) {
