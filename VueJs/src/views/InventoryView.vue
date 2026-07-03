@@ -856,7 +856,7 @@ function exportExcel() {
           class="fixed inset-y-0 right-0 z-[101] w-[450px] bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] flex flex-col border-l border-[#e2e8f0]"
         >
           <!-- Header -->
-          <div class="px-6 py-5 border-b border-[#f1f5f9] flex justify-between items-center bg-gradient-to-r from-[#f8fafc] to-white">
+          <div class="px-6 py-5 border-b border-[#f1f5f9] flex justify-between items-center bg-white">
             <h3 class="font-bold text-[#364a63] text-lg flex items-center gap-2">
               <i class="fas fa-info-circle text-[#4361ee]"></i>
               Chi tiết lô tồn kho
@@ -886,13 +886,13 @@ function exportExcel() {
 
             <!-- Basic lot metrics -->
             <div class="grid grid-cols-2 gap-4">
-              <div class="bg-slate-50/60 rounded-xl p-4 border border-slate-100">
+              <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
                 <div class="text-[10px] text-[#8094ae] font-bold uppercase tracking-wider mb-1">Số lượng</div>
                 <div class="text-xl font-extrabold text-[#364a63]">
                   {{ selectedInv.quantity }} <span class="text-xs text-slate-500 font-normal">{{ selectedInv.unit }}</span>
                 </div>
               </div>
-              <div class="bg-slate-50/60 rounded-xl p-4 border border-slate-100">
+              <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
                 <div class="text-[10px] text-[#8094ae] font-bold uppercase tracking-wider mb-1">Giá trị tồn</div>
                 <div class="text-xl font-extrabold text-emerald-600">{{ formatVND(selectedInv.totalValue) }}</div>
               </div>

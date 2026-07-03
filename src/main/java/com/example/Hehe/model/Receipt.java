@@ -56,6 +56,15 @@ public class Receipt {
     @Column(name = "description", length = 500)
     private String description;
 
+    @Column(name = "disposal_reason", length = 255)
+    private String disposalReason;
+
+    @Column(name = "disposal_method", length = 255)
+    private String disposalMethod;
+
+    @Column(name = "attachment_url", length = 500)
+    private String attachmentUrl;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -100,6 +109,15 @@ public class Receipt {
 
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+
+    public String getDisposalReason() { return disposalReason; }
+    public void setDisposalReason(String disposalReason) { this.disposalReason = disposalReason; }
+
+    public String getDisposalMethod() { return disposalMethod; }
+    public void setDisposalMethod(String disposalMethod) { this.disposalMethod = disposalMethod; }
+
+    public String getAttachmentUrl() { return attachmentUrl; }
+    public void setAttachmentUrl(String attachmentUrl) { this.attachmentUrl = attachmentUrl; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

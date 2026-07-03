@@ -99,7 +99,7 @@ const routes: RouteRecordRaw[] = [
         path: '/disposals',
         name: 'disposals',
         component: () => import('../views/ReceiptsView.vue'),
-        props: { receiptType: 'ADJUST_OUT' },
+        props: { receiptType: 'DISPOSAL' },
       },
       {
         path: '/audit-logs',
