@@ -72,9 +72,25 @@ public class ReportController {
         return ResponseEntity.ok(reportService.getDebtAgingAnalysis(currentUser));
     }
 
+    @GetMapping("/revenue/excel")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<byte[]> exportRevenueExcel(
+            @AuthenticationPrincipal User currentUser) {
+
+        byte[] excelBytes = reportService.exportRevenueReport(currentUser);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentDispositionFormData("attachment", "Bao_Cao_Doanh_Thu.xlsx");
+        headers.setCacheControl("must-revalidate, post-check=0, pre-check=0");
+
+        return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
+    }
+
     @GetMapping("/dashboard/branch-sales")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF')")
     public ResponseEntity<java.util.Map<Integer, java.util.List<java.math.BigDecimal>>> getBranchSalesTrend30Days() {
         return ResponseEntity.ok(reportService.getBranchSalesTrend30Days());
     }
 }
+

@@ -33,11 +33,7 @@ const routes: RouteRecordRaw[] = [
         name: 'Products',
         component: () => import('../views/ProductsView.vue'),
       },
-      {
-        path: '/global-inventory',
-        name: 'GlobalInventory',
-        component: () => import('../views/GlobalInventoryView.vue'),
-      },
+
       {
         path: '/partners',
         name: 'Partners',
@@ -136,7 +132,7 @@ router.beforeEach((to, _from, next) => {
     // Chỉ ADMIN mới được vào Products
     const hasCrud = user && user.role === 'ADMIN'
     if (!hasCrud) {
-      next('/global-inventory')
+      next('/dashboard')
     } else {
       next()
     }

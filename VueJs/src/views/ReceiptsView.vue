@@ -1369,6 +1369,72 @@ const pageIcon = computed(() => {
   return 'fas fa-file-invoice text-[#4361ee]'
 })
 
+const exportingPdfId = ref<number | null>(null)
+const exportingExcel = ref(false)
+
+async function exportPdf(receiptId: number) {
+  exportingPdfId.value = receiptId
+  try {
+    const res = await api.get(`/api/invoices/${receiptId}/export-pdf`)
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Lỗi xuất PDF' }))
+      toast.error(err.message || 'Lỗi xuất PDF')
+      return
+    }
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Hoa_Don_${receiptId}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('Xuất hóa đơn PDF thành công!')
+  } catch (e: any) {
+    toast.error('Lỗi kết nối: ' + e.message)
+  } finally {
+    exportingPdfId.value = null
+  }
+}
+
+async function exportExcel() {
+  if (!isAdmin.value && !isManager.value) {
+    toast.error('Bạn không có quyền xuất danh sách hóa đơn.')
+    return
+  }
+  exportingExcel.value = true
+  try {
+    let url = '/api/invoices/export-excel'
+    const params: string[] = []
+    if (filterStartDate.value) params.push(`startDate=${filterStartDate.value}`)
+    if (filterEndDate.value)   params.push(`endDate=${filterEndDate.value}`)
+    if (params.length > 0) url += '?' + params.join('&')
+
+    const res = await api.get(url)
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Lỗi xuất Excel' }))
+      toast.error(err.message || 'Lỗi xuất Excel')
+      return
+    }
+    const blob = await res.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    if (!filterStartDate.value && !filterEndDate.value) {
+      a.download = 'Danh_Sach_Hoa_Don_Ban_Hang.xlsx'
+    } else {
+      const from = filterStartDate.value?.replace(/-/g, '') || 'TuDau'
+      const to   = filterEndDate.value?.replace(/-/g, '')   || 'DenNay'
+      a.download = `Danh_Sach_Hoa_Don_${from}_${to}.xlsx`
+    }
+    a.click()
+    URL.revokeObjectURL(blobUrl)
+    toast.success('Xuất file Excel thành công!')
+  } catch (e: any) {
+    toast.error('Lỗi kết nối: ' + e.message)
+  } finally {
+    exportingExcel.value = false
+  }
+}
 </script>
 
 <template>
@@ -1384,6 +1450,15 @@ const pageIcon = computed(() => {
         <p class="text-[#8094ae] text-sm mt-1">Theo dõi, lập và phê duyệt các phiếu nhập/xuất/điều chuyển kho</p>
       </div>
       <div class="flex items-center gap-3">
+        <button
+          v-if="isAdmin || isManager"
+          @click="exportExcel"
+          :disabled="exportingExcel"
+          class="h-[42px] bg-emerald-600 hover:bg-emerald-700 text-white px-5 rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
+        >
+          <i class="fas fa-file-excel"></i>
+          <span>{{ exportingExcel ? 'Đang xuất...' : 'Xuất Excel' }}</span>
+        </button>
         <button
           v-if="isAdmin"
           @click="openDirectImportModal"
@@ -1634,6 +1709,16 @@ const pageIcon = computed(() => {
                     class="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-600 hover:bg-[#4361ee] text-white transition-all shadow-sm"
                     title="Xem chi tiết">
                     <i class="fas fa-eye text-sm"></i>
+                  </button>
+                  <button
+                    v-if="r.type === 'EXPORT' && r.status === 'COMPLETED'"
+                    @click.stop="exportPdf(r.id)"
+                    :disabled="exportingPdfId === r.id"
+                    class="w-8 h-8 flex items-center justify-center rounded-lg bg-orange-50 hover:bg-orange-500 hover:text-white text-orange-500 transition-all disabled:opacity-50"
+                    title="Xuất hóa đơn PDF"
+                  >
+                    <i v-if="exportingPdfId === r.id" class="fas fa-spinner fa-spin text-xs"></i>
+                    <i v-else class="fas fa-file-pdf text-xs"></i>
                   </button>
                   <button v-if="canApproveReceipt(r)"
                     @click.stop="approveReceipt(r)"
