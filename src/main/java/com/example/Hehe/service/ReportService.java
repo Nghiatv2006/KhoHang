@@ -7,6 +7,8 @@ public interface ReportService {
     
     byte[] exportCustomersToExcel(User currentUser);
     
+    java.util.Map<String, Object> getInventoryAgeAnalysis(User currentUser);
+    java.util.List<java.util.Map<String, Object>> getStocktakeDiscrepancyHistory(User currentUser);
     java.util.Map<String, Object> getDebtAgingAnalysis(User currentUser);
     byte[] exportRevenueReport(User currentUser);
     
