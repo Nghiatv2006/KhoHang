@@ -310,8 +310,10 @@ const statPendingAdmin = computed(() => typeFilteredReceipts.value.filter(r => r
 const selectedReceipt = ref<any>(null)
 const showDetail = ref(false)
 
+const isSpaceEasterEgg = ref(false)
 
 async function openDetail(receipt: any) {
+  isSpaceEasterEgg.value = Math.random() < 0.004;
   try {
     const res = await api.get(`/api/receipts/${receipt.id}`)
     if (res.ok) {
@@ -510,6 +512,7 @@ interface DetailRow {
 }
 
 function openCreateModal() {
+  isSpaceEasterEgg.value = Math.random() < 0.004;
   // Nếu có receiptType prop → luôn dùng type đó, không cho chọn
   const defaultType = props.receiptType || ((user.value?.branchId !== headBranch.value?.id && !isManager.value) ? 'IMPORT' : 'EXPORT');
   createForm.value = {
@@ -1632,7 +1635,7 @@ async function exportExcel() {
       </div>
 
       <!-- Table -->
-      <div v-else class="overflow-x-auto">
+      <div v-else class="w-full">
         <table class="w-full text-sm">
           <thead>
             <tr class="bg-[#f8f9fa] text-[#8094ae] text-xs uppercase tracking-wider">
@@ -1651,7 +1654,7 @@ async function exportExcel() {
             <tr v-for="r in paginatedReceipts" :key="r.id"
               @dblclick="openDetail(r)"
               :class="[
-                'hover:bg-[#f8f9fa]/80 cursor-pointer transition-colors group',
+                'receipt-row hover:bg-[#f8f9fa]/80 cursor-pointer transition-colors group',
                 r.hasDeviation && (r.status === 'PENDING_SHORTFALL_MANAGER' || r.status === 'PENDING_SHORTFALL_ADMIN') ? 'bg-rose-50/40 hover:bg-rose-100/40' : ''
               ]">
               <td class="px-5 py-4">
@@ -1787,12 +1790,47 @@ async function exportExcel() {
       <Transition name="slide-panel">
         <div v-if="showDetail && selectedReceipt" class="fixed inset-y-0 right-0 z-[101] w-full max-w-[700px] bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] flex flex-col border-l border-[#e2e8f0]">
           <!-- Header -->
-          <div class="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-[#4361ee] to-[#4cc9f0] text-white">
-            <div>
-              <div class="text-xs font-bold opacity-70 uppercase">Chi tiết phiếu kho</div>
-              <div class="font-mono font-bold text-lg">{{ selectedReceipt.code }}</div>
+          <div class="theme-modal-header relative overflow-hidden flex items-center justify-between px-8 py-6 transition-colors duration-500" :class="{ 'easter-egg-space': isSpaceEasterEgg }">
+            <template v-if="isSpaceEasterEgg">
+              <!-- Space Easter Egg Decor -->
+              <div class="absolute inset-0 pointer-events-none">
+                <i class="fas fa-rocket absolute top-4 right-32 text-white/80 text-4xl animate-[bounce_3s_infinite] -rotate-45"></i>
+                <i class="fas fa-meteor absolute -top-4 right-16 text-orange-400/60 text-6xl rotate-[120deg] drop-shadow-[0_0_15px_rgba(251,146,60,0.8)]"></i>
+                <i class="fas fa-user-astronaut absolute bottom-2 right-64 text-white/60 text-3xl animate-[bounce_4s_infinite]"></i>
+                <i class="fas fa-star absolute top-2 right-48 text-white/90 text-[8px] animate-pulse"></i>
+                <i class="fas fa-star absolute bottom-4 right-20 text-white/70 text-[6px] animate-pulse" style="animation-delay: 1s"></i>
+                <i class="fas fa-satellite absolute top-8 right-80 text-white/50 text-2xl animate-[spin_20s_linear_infinite]"></i>
+              </div>
+            </template>
+            <template v-else>
+              <!-- Light Mode Decor: Sun & Clouds -->
+              <div :key="'light-detail-' + selectedReceipt?.id" class="theme-light-decor absolute inset-0 pointer-events-none transition-all duration-500">
+                <i class="fas fa-sun absolute -top-12 right-8 text-yellow-300 text-[140px] opacity-10 animate-[spin_40s_linear_infinite]"></i>
+                <i class="fas fa-sun absolute top-3 right-24 text-yellow-300 text-5xl drop-shadow-[0_0_20px_rgba(253,224,71,0.8)] animate-[spin_20s_linear_infinite]"></i>
+                <i class="fas fa-cloud absolute top-8 right-44 text-white/50 text-5xl drop-shadow-sm"></i>
+                <i class="fas fa-cloud absolute top-2 right-64 text-white/40 text-3xl"></i>
+                <i class="fas fa-cloud absolute -bottom-2 right-28 text-white/30 text-7xl"></i>
+              </div>
+
+              <!-- Dark Mode Decor: Moon & Stars -->
+              <div :key="'dark-detail-' + selectedReceipt?.id" class="theme-dark-decor absolute inset-0 pointer-events-none transition-all duration-500">
+                <i class="fas fa-moon absolute -top-8 right-12 text-blue-100 text-[120px] opacity-[0.03] -rotate-12"></i>
+                <i class="fas fa-moon absolute top-3 right-24 text-yellow-200 text-4xl drop-shadow-[0_0_15px_rgba(254,240,138,0.5)] -rotate-12"></i>
+                <i class="fas fa-star absolute top-4 right-48 text-white/80 text-[8px] animate-pulse"></i>
+                <i class="fas fa-star absolute top-8 right-60 text-white/60 text-[10px] animate-pulse" style="animation-delay: 1s"></i>
+                <i class="fas fa-star absolute top-3 right-72 text-white/90 text-[6px] animate-pulse" style="animation-delay: 0.5s"></i>
+                <i class="fas fa-star absolute bottom-4 right-36 text-white/50 text-[12px] animate-pulse" style="animation-delay: 1.5s"></i>
+                <i class="fas fa-star absolute bottom-2 right-56 text-white/70 text-[8px] animate-pulse"></i>
+              </div>
+            </template>
+
+            <div class="relative z-10 text-white drop-shadow-md">
+              <div class="text-xs font-bold opacity-90 uppercase tracking-wider mb-1">
+                {{ selectedReceipt?.type === 'EXPORT' ? 'Chi tiết hóa đơn' : selectedReceipt?.type === 'TRANSFER' ? 'Chi tiết phiếu điều chuyển' : selectedReceipt?.type === 'ADJUST_OUT' ? 'Chi tiết phiếu tiêu hủy' : 'Chi tiết phiếu kho' }}
+              </div>
+              <div class="font-mono font-bold text-xl">{{ selectedReceipt?.code }}</div>
             </div>
-            <button @click="showDetail = false" class="w-9 h-9 flex items-center justify-center rounded-xl bg-white/20 hover:bg-white/30 transition-all">
+            <button @click="showDetail = false" class="relative z-10 w-9 h-9 flex items-center justify-center rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-sm transition-all shadow-sm border border-white/10">
               <i class="fas fa-times"></i>
             </button>
           </div>
@@ -1834,6 +1872,10 @@ async function exportExcel() {
                 <div class="font-semibold text-[#364a63]">{{ selectedReceipt.createdByName }}</div>
                 <div v-if="selectedReceipt.stocktakeByName" class="text-xs text-purple-600 font-bold mt-1 flex items-center gap-1.5" title="Người kiểm kê"><i class="fas fa-clipboard-check"></i> Kiểm kê: {{ selectedReceipt.stocktakeByName }}</div>
                 <div v-else-if="selectedReceipt.status === 'COMPLETED' && (selectedReceipt.type === 'IMPORT' || selectedReceipt.type === 'TRANSFER') && selectedReceipt.createdByRole === 'STAFF'" class="text-xs text-purple-600 font-bold mt-1 flex items-center gap-1.5 opacity-60" title="Người kiểm kê (Dữ liệu cũ)"><i class="fas fa-clipboard-check"></i> Kiểm kê: {{ selectedReceipt.createdByName }}</div>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Người duyệt</div>
+                <div class="font-semibold text-[#364a63]">{{ selectedReceipt.approvedByName || '—' }}</div>
               </div>
               <div>
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Ngày tạo</div>
@@ -2000,14 +2042,47 @@ async function exportExcel() {
       <Transition name="slide-panel">
         <div v-if="showCreateModal" class="fixed inset-y-0 right-0 z-[101] w-full max-w-[800px] bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] flex flex-col border-l border-[#e2e8f0]">
           <!-- Header -->
-          <div class="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-[#4361ee] to-[#4cc9f0] text-white">
-            <div>
-              <div class="text-xs font-bold opacity-70 uppercase">
+          <div class="theme-modal-header relative overflow-hidden flex items-center justify-between px-8 py-6 transition-colors duration-500" :class="{ 'easter-egg-space': isSpaceEasterEgg }">
+            <template v-if="isSpaceEasterEgg">
+              <!-- Space Easter Egg Decor -->
+              <div class="absolute inset-0 pointer-events-none">
+                <i class="fas fa-rocket absolute top-4 right-32 text-white/80 text-4xl animate-[bounce_3s_infinite] -rotate-45"></i>
+                <i class="fas fa-meteor absolute -top-4 right-16 text-orange-400/60 text-6xl rotate-[120deg] drop-shadow-[0_0_15px_rgba(251,146,60,0.8)]"></i>
+                <i class="fas fa-user-astronaut absolute bottom-2 right-64 text-white/60 text-3xl animate-[bounce_4s_infinite]"></i>
+                <i class="fas fa-star absolute top-2 right-48 text-white/90 text-[8px] animate-pulse"></i>
+                <i class="fas fa-star absolute bottom-4 right-20 text-white/70 text-[6px] animate-pulse" style="animation-delay: 1s"></i>
+                <i class="fas fa-satellite absolute top-8 right-80 text-white/50 text-2xl animate-[spin_20s_linear_infinite]"></i>
+              </div>
+            </template>
+            <template v-else>
+              <!-- Light Mode Decor: Sun & Clouds -->
+              <div :key="'light-' + createForm.type" class="theme-light-decor absolute inset-0 pointer-events-none transition-all duration-500">
+                <i class="fas fa-sun absolute -top-12 right-8 text-yellow-300 text-[140px] opacity-10 animate-[spin_40s_linear_infinite]"></i>
+                <i class="fas fa-sun absolute top-3 right-24 text-yellow-300 text-5xl drop-shadow-[0_0_20px_rgba(253,224,71,0.8)] animate-[spin_20s_linear_infinite]"></i>
+                <i class="fas fa-cloud absolute top-8 right-44 text-white/50 text-5xl drop-shadow-sm"></i>
+                <i class="fas fa-cloud absolute top-2 right-64 text-white/40 text-3xl"></i>
+                <i class="fas fa-cloud absolute -bottom-2 right-28 text-white/30 text-7xl"></i>
+              </div>
+
+              <!-- Dark Mode Decor: Moon & Stars -->
+              <div :key="'dark-' + createForm.type" class="theme-dark-decor absolute inset-0 pointer-events-none transition-all duration-500">
+                <i class="fas fa-moon absolute -top-8 right-12 text-blue-100 text-[120px] opacity-[0.03] -rotate-12"></i>
+                <i class="fas fa-moon absolute top-3 right-24 text-yellow-200 text-4xl drop-shadow-[0_0_15px_rgba(254,240,138,0.5)] -rotate-12"></i>
+                <i class="fas fa-star absolute top-4 right-48 text-white/80 text-[8px] animate-pulse"></i>
+                <i class="fas fa-star absolute top-8 right-60 text-white/60 text-[10px] animate-pulse" style="animation-delay: 1s"></i>
+                <i class="fas fa-star absolute top-3 right-72 text-white/90 text-[6px] animate-pulse" style="animation-delay: 0.5s"></i>
+                <i class="fas fa-star absolute bottom-4 right-36 text-white/50 text-[12px] animate-pulse" style="animation-delay: 1.5s"></i>
+                <i class="fas fa-star absolute bottom-2 right-56 text-white/70 text-[8px] animate-pulse"></i>
+              </div>
+            </template>
+
+            <div class="relative z-10 text-white drop-shadow-md">
+              <div class="text-xs font-bold opacity-90 uppercase tracking-wider mb-1">
                 {{ createForm.type === 'EXPORT' ? 'Lập hóa đơn' : createForm.type === 'TRANSFER' ? 'Lập phiếu điều chuyển' : createForm.type === 'ADJUST_OUT' ? 'Lập phiếu tiêu hủy' : 'Lập phiếu kho' }}
               </div>
-              <div class="font-bold text-lg">Tạo phiếu nháp (DRAFT)</div>
+              <div class="font-bold text-xl">Tạo phiếu nháp (DRAFT)</div>
             </div>
-            <button @click="showCreateModal = false" class="w-9 h-9 flex items-center justify-center rounded-xl bg-white/20 hover:bg-white/30 transition-all">
+            <button @click="showCreateModal = false" class="relative z-10 w-9 h-9 flex items-center justify-center rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-sm transition-all shadow-sm border border-white/10">
               <i class="fas fa-times"></i>
             </button>
           </div>
@@ -2552,4 +2627,81 @@ async function exportExcel() {
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Dynamic Modal Header Styles */
+.theme-modal-header {
+  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+}
+.theme-light-decor {
+  opacity: 1;
+  transform: translateY(0);
+}
+.theme-dark-decor {
+  opacity: 0;
+  transform: translateY(20px);
+}
+</style>
+
+<style>
+/* Dark Mode Overrides for Receipt Modal Header */
+html.dark-mode .theme-modal-header {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+}
+html.dark-mode .theme-modal-header.easter-egg-space {
+  background: linear-gradient(135deg, #090a0f 0%, #1b1130 50%, #0c0817 100%) !important;
+}
+html.dark-mode .theme-light-decor {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+html.dark-mode .theme-dark-decor {
+  opacity: 1;
+  transform: translateY(0);
+}
+.theme-modal-header.easter-egg-space {
+  background: linear-gradient(135deg, #090a0f 0%, #1b1130 50%, #0c0817 100%) !important;
+}
+
+@keyframes soft-running-light {
+  0% {
+    box-shadow: 
+      inset 2px 0 10px rgba(56, 189, 248, 0.1), 
+      0 4px 12px rgba(0, 0, 0, 0.05);
+    outline: 1px solid rgba(56, 189, 248, 0.1);
+  }
+  33% {
+    box-shadow: 
+      inset 0 2px 10px rgba(56, 189, 248, 0.15), 
+      0 4px 12px rgba(0, 0, 0, 0.05);
+    outline: 1px solid rgba(56, 189, 248, 0.3);
+  }
+  66% {
+    box-shadow: 
+      inset -2px 0 10px rgba(56, 189, 248, 0.1), 
+      0 4px 12px rgba(0, 0, 0, 0.05);
+    outline: 1px solid rgba(56, 189, 248, 0.1);
+  }
+  100% {
+    box-shadow: 
+      inset 2px 0 10px rgba(56, 189, 248, 0.1), 
+      0 4px 12px rgba(0, 0, 0, 0.05);
+    outline: 1px solid rgba(56, 189, 248, 0.1);
+  }
+}
+
+.receipt-row {
+  transition: transform 0.3s ease, background-color 0.3s ease;
+}
+
+.receipt-row:hover {
+  transform: translateY(-2px);
+  z-index: 50;
+  position: relative;
+  background-color: #ffffff !important;
+  animation: soft-running-light 2s linear infinite;
+  border-radius: 8px;
+}
+html.dark-mode .receipt-row:hover {
+  background-color: #1e293b !important;
+}
 </style>
