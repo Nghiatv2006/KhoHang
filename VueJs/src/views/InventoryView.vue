@@ -65,6 +65,7 @@ const configuringBranchId = ref<number | null>(null)
 // Right Panel Details
 const showDetailPanel = ref(false)
 const selectedInv = ref<any>(null)
+const isSpaceEasterEgg = ref(false)
 
 // Add Stock Modal state
 
@@ -338,6 +339,7 @@ async function saveThreshold() {
 
 // Open Right Panel Details
 function openDetails(inv: any) {
+  isSpaceEasterEgg.value = Math.random() < 0.004
   selectedInv.value = inv
   showDetailPanel.value = true
 }
@@ -869,15 +871,45 @@ function exportExcel() {
           class="fixed inset-y-0 right-0 z-[101] w-[450px] bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] flex flex-col border-l border-[#e2e8f0]"
         >
           <!-- Header -->
-          <div class="px-6 py-5 border-b border-[#f1f5f9] flex justify-between items-center bg-white">
-            <h3 class="font-bold text-[#364a63] text-lg flex items-center gap-2">
-              <i class="fas fa-info-circle text-[#4361ee]"></i>
+          <div class="theme-modal-header relative overflow-hidden flex items-center justify-between px-8 py-6 transition-colors duration-500" :class="{ 'easter-egg-space': isSpaceEasterEgg }">
+            <template v-if="isSpaceEasterEgg">
+              <!-- Space Easter Egg Decor -->
+              <div class="absolute inset-0 pointer-events-none">
+                <i class="fas fa-rocket absolute top-4 right-32 text-white/80 text-4xl animate-[bounce_3s_infinite] -rotate-45"></i>
+                <i class="fas fa-meteor absolute -top-4 right-16 text-orange-400/60 text-6xl rotate-[120deg] drop-shadow-[0_0_15px_rgba(251,146,60,0.8)]"></i>
+                <i class="fas fa-user-astronaut absolute bottom-2 right-64 text-white/60 text-3xl animate-[bounce_4s_infinite]"></i>
+                <i class="fas fa-star absolute top-2 right-48 text-white/90 text-[8px] animate-pulse"></i>
+                <i class="fas fa-star absolute bottom-4 right-20 text-white/70 text-[6px] animate-pulse" style="animation-delay: 1s"></i>
+                <i class="fas fa-satellite absolute top-8 right-80 text-white/50 text-2xl animate-[spin_20s_linear_infinite]"></i>
+              </div>
+            </template>
+            <template v-else>
+              <!-- Light Mode Decor: Sun & Clouds -->
+              <div :key="'light-inv-modal'" class="theme-light-decor absolute inset-0 pointer-events-none transition-all duration-500">
+                <i class="fas fa-sun absolute -top-12 right-8 text-yellow-300 text-[140px] opacity-10 animate-[spin_40s_linear_infinite]"></i>
+                <i class="fas fa-sun absolute top-3 right-24 text-yellow-300 text-5xl drop-shadow-[0_0_20px_rgba(253,224,71,0.8)] animate-[spin_20s_linear_infinite]"></i>
+                <i class="fas fa-cloud absolute top-8 right-44 text-white/50 text-5xl drop-shadow-sm"></i>
+                <i class="fas fa-cloud absolute top-2 right-64 text-white/40 text-3xl"></i>
+                <i class="fas fa-cloud absolute -bottom-2 right-28 text-white/30 text-7xl"></i>
+              </div>
+
+              <!-- Dark Mode Decor: Moon & Stars -->
+              <div :key="'dark-inv-modal'" class="theme-dark-decor absolute inset-0 pointer-events-none transition-all duration-500">
+                <i class="fas fa-moon absolute -top-8 right-12 text-blue-100 text-[120px] opacity-[0.03] -rotate-12"></i>
+                <i class="fas fa-moon absolute top-3 right-24 text-yellow-200 text-4xl drop-shadow-[0_0_15px_rgba(254,240,138,0.5)] -rotate-12"></i>
+                <i class="fas fa-star absolute top-4 right-48 text-white/80 text-[8px] animate-pulse"></i>
+                <i class="fas fa-star absolute top-8 right-60 text-white/60 text-[10px] animate-pulse" style="animation-delay: 1s"></i>
+                <i class="fas fa-star absolute top-3 right-72 text-white/90 text-[6px] animate-pulse" style="animation-delay: 0.5s"></i>
+                <i class="fas fa-star absolute bottom-4 right-36 text-white/50 text-[12px] animate-pulse" style="animation-delay: 1.5s"></i>
+                <i class="fas fa-star absolute bottom-2 right-56 text-white/70 text-[8px] animate-pulse"></i>
+              </div>
+            </template>
+
+            <h3 class="font-bold text-white text-lg flex items-center gap-2 relative z-10 drop-shadow-md">
+              <i class="fas fa-info-circle text-white"></i>
               Chi tiết lô tồn kho
             </h3>
-            <button 
-              @click="showDetailPanel = false" 
-              class="text-[#8094ae] hover:text-[#ea4f52] transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50"
-            >
+            <button @click="showDetailPanel = false" class="relative z-10 w-9 h-9 flex items-center justify-center rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-sm transition-all shadow-sm border border-white/10">
               <i class="fas fa-times"></i>
             </button>
           </div>
@@ -1098,5 +1130,39 @@ function exportExcel() {
   animation: rowSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
   animation-delay: var(--row-delay, 0ms);
   will-change: transform, opacity;
+}
+
+/* Dynamic Modal Header Styles */
+.theme-modal-header {
+  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+}
+.theme-light-decor {
+  opacity: 1;
+  transform: translateY(0);
+}
+.theme-dark-decor {
+  opacity: 0;
+  transform: translateY(20px);
+}
+</style>
+
+<style>
+/* Dark Mode Overrides for Inventory Modal Header */
+html.dark-mode .theme-modal-header {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+}
+html.dark-mode .theme-modal-header.easter-egg-space {
+  background: linear-gradient(135deg, #090a0f 0%, #1b1130 50%, #0c0817 100%) !important;
+}
+html.dark-mode .theme-light-decor {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+html.dark-mode .theme-dark-decor {
+  opacity: 1;
+  transform: translateY(0);
+}
+.theme-modal-header.easter-egg-space {
+  background: linear-gradient(135deg, #090a0f 0%, #1b1130 50%, #0c0817 100%) !important;
 }
 </style>

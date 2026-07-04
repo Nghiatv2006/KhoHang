@@ -37,3 +37,20 @@ git diff <đường-dẫn-file>
 * **Localhost (Dev):** Khóa bí mật `jwt.secret` (đọc từ biến môi trường `JWT_SECRET`) phải là **khóa cố định** để khi nhà phát triển sửa code Java/restart server không bị văng đăng xuất (logout).
 * **AWS (Production):** Khóa `jwt.secret` phải được cấu hình là `"generate-on-startup"`. Khi đó, backend sẽ tự động sinh khóa ngẫu nhiên mỗi lần khởi động lại ứng dụng, ép toàn bộ thiết bị đang đăng nhập phải đăng xuất để bảo mật.
 
+# Quy tắc thiết kế Giao diện (UI/UX Premium Standards)
+
+Để đảm bảo giao diện luôn đạt tiêu chuẩn thẩm mỹ cao cấp (Premium) của dự án và không bị sáo rỗng:
+
+## 1. Màu sắc và Ánh sáng
+* **Cấm tuyệt đối AI Purple/Neon**: Không sử dụng dải chuyển sắc tím rực rỡ, không dùng bóng viền phát sáng (neon/outer glow shadows) hoặc các hiệu ứng chuyển động dải màu neon rườm rà.
+* **Đơn sắc cao cấp**: Chỉ dùng tối đa 1 màu nhấn (Accent) bão hòa thấp (<80%). Sử dụng nền trung tính (Zinc/Slate) và không dùng màu đen thuần (#000000).
+
+## 2. Tiêu đề và Typography
+* **Không chèn biểu tượng tiêu đề cột**: Tiêu đề các cột bảng dữ liệu phải tinh giản, không chèn các icon nhựa (`<i>`) bên cạnh chữ.
+* **Định dạng chữ**: Tiêu đề bảng sử dụng chữ viết hoa nhỏ, giãn chữ (`tracking-wider text-[11px] font-semibold text-slate-400 dark:text-slate-500`).
+* **Cấm phông chữ Inter**: Không dùng phông chữ `Inter` cho các văn bản hiển thị cao cấp.
+
+## 3. Bố cục và Cấu trúc Bảng
+* **Bảng dữ liệu mật độ cao (High-density)**: Không lạm dụng việc bọc các dòng thành thẻ card bo tròn riêng lẻ dính bóng đổ. Thay vào đó, hãy dùng đường chia dòng ngang mảnh (`border-b border-slate-100 dark:border-slate-800/40`) để giao diện được thông thoáng và chuyên nghiệp.
+* **Cấm tuyệt đối Emoji**: Không sử dụng biểu tượng cảm xúc (emoji) ở bất kỳ phần nào trên giao diện ứng dụng.
+
