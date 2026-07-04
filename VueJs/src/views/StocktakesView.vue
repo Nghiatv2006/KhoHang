@@ -1,18 +1,23 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { api } from '../api'
 import { useToast } from '../utils/toast'
+import { draftStocktakeCount, refreshStocktakeBadge } from '../utils/stocktakeStore'
 import AppModal from '../components/AppModal.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 
 const toast = useToast()
 const user = ref<any>(JSON.parse(localStorage.getItem('wh_user') || '{}'))
+
+// ─── Tabs ───────────────────────────────────────────────────────────────────
+const activeTab = ref<'periodic' | 'receipt'>('periodic')
 const isManager = computed(() => ['ADMIN', 'MANAGER'].includes(user.value?.role))
 
 const loading = ref(true)
 const stocktakes = ref<any[]>([])
 const searchKeyword = ref('')
 const selectedStatus = ref('')
+const filterDeviation = ref('')
 
 const filterTimeRange = ref('all')
 const filterFrom = ref('')
@@ -88,6 +93,7 @@ async function createStocktake() {
       toast.success('Khởi tạo phiên kiểm kê thành công!')
       const newSt = await res.json()
       await loadStocktakes()
+      await refreshStocktakeBadge()   // ↠ cập nhật badge ngay
       openDetail(newSt)
     } else {
       const err = await res.text()
@@ -134,6 +140,7 @@ async function saveDraft() {
       toast.success('Lưu số liệu kiểm kê thành công!')
       await loadingDetail(selectedStocktake.value.id)
       await loadStocktakes()
+      await refreshStocktakeBadge() // ↠ Cập nhật số báo đỏ ngay lập tức
     } else {
       const err = await res.text()
       toast.error(err || 'Không thể lưu bản nháp.')
@@ -172,6 +179,7 @@ async function completeStocktake() {
       toast.success('Hoàn tất kiểm kê và cập nhật tồn kho thành công!')
       await loadingDetail(selectedStocktake.value.id)
       await loadStocktakes()
+      await refreshStocktakeBadge()   // ↠ cập nhật badge ngay
     } else {
       const err = await res.text()
       toast.error(err || 'Không thể duyệt hoàn tất phiên kiểm kê.')
@@ -194,6 +202,7 @@ async function cancelStocktake() {
       toast.success('Đã hủy bỏ phiên kiểm kê.')
       await loadingDetail(selectedStocktake.value.id)
       await loadStocktakes()
+      await refreshStocktakeBadge()   // ↠ cập nhật badge ngay
     } else {
       const err = await res.text()
       toast.error(err || 'Không thể hủy phiên kiểm kê.')
@@ -244,13 +253,45 @@ const filteredStocktakes = computed(() => {
       }
     }
     
-    return (codeMatch || noteMatch) && statusMatch && timeMatch
+    let deviationMatch = true
+    if (filterDeviation.value === 'yes') {
+      deviationMatch = !!st.hasDeviation
+    } else if (filterDeviation.value === 'no') {
+      deviationMatch = !st.hasDeviation
+    }
+    
+    return (codeMatch || noteMatch) && statusMatch && timeMatch && deviationMatch
   }).sort((a, b) => {
     const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0
     const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0
     return timeB - timeA
   })
 })
+
+// ──────────────────────────────────────────────────────────────
+// PAGINATION
+// ──────────────────────────────────────────────────────────────
+const currentPagePeriodic = ref(1)
+const currentPageReceipt = ref(1)
+const itemsPerPage = 50
+
+watch([activeTab, searchKeyword, selectedStatus, filterDeviation, filterTimeRange, filterFrom, filterTo], () => {
+  currentPagePeriodic.value = 1
+})
+
+const paginatedStocktakes = computed(() => {
+  const start = (currentPagePeriodic.value - 1) * itemsPerPage
+  return filteredStocktakes.value.slice(start, start + itemsPerPage)
+})
+
+const totalPagesPeriodic = computed(() => Math.ceil(filteredStocktakes.value.length / itemsPerPage) || 1)
+
+const paginatedReceiptStocktakes = computed(() => {
+  const start = (currentPageReceipt.value - 1) * itemsPerPage
+  return filteredReceiptStocktakes.value.slice(start, start + itemsPerPage)
+})
+
+const totalPagesReceipt = computed(() => Math.ceil(filteredReceiptStocktakes.value.length / itemsPerPage) || 1)
 
 const adjustmentReceipts = computed(() => {
   if (!selectedStocktake.value || !selectedStocktake.value.details) return []
@@ -313,92 +354,302 @@ function getStatusLabel(status: string) {
   }
 }
 
-onMounted(loadStocktakes)
+// ─── TAB 2: KIỂM KÊ KHI NHẬN HÀNG (PENDING_STOCKTAKE receipts) ──────────────
+const receiptStocktakes = ref<any[]>([])
+const pendingReceiptStocktakesCount = computed(() => {
+  return receiptStocktakes.value.filter(r => r.status === 'PENDING_STOCKTAKE').length
+})
+const rsLoading = ref(false)
+const rsSearch = ref('')
+const rsFilterType = ref('') // 'IMPORT' | 'TRANSFER' | ''
+
+watch([activeTab, rsFilterType, rsSearch], () => {
+  currentPageReceipt.value = 1
+})
+
+async function loadReceiptStocktakes() {
+  rsLoading.value = true
+  try {
+    const res = await api.get('/api/receipts')
+    if (res.ok) {
+      const all: any[] = await res.json()
+      receiptStocktakes.value = all.filter((r: any) => {
+        const allowedStatuses = [
+          'PENDING_STOCKTAKE',
+          'PENDING_SHORTFALL_MANAGER',
+          'PENDING_SHORTFALL_ADMIN',
+          'PENDING_COMPENSATION',
+          'COMPLETED'
+        ]
+        if (!allowedStatuses.includes(r.status)) return false
+        // Admin thấy tất cả phiếu chờ kiểm kê / đã kiểm kê
+        if (user.value?.role === 'ADMIN') return true
+        const uBranchId = user.value?.branchId || user.value?.branch?.id
+        return Number(r.destBranchId) === Number(uBranchId)
+      })
+    } else {
+      toast.error('Không thể tải danh sách phiếu chờ kiểm kê.')
+    }
+  } catch (err: any) {
+    toast.error('Lỗi kết nối: ' + err.message)
+  } finally {
+    rsLoading.value = false
+  }
+}
+
+const filteredReceiptStocktakes = computed(() => {
+  let list = receiptStocktakes.value
+  if (rsFilterType.value) list = list.filter(r => r.type === rsFilterType.value)
+  if (rsSearch.value.trim()) {
+    const kw = rsSearch.value.trim().toLowerCase()
+    list = list.filter(r => (r.code || '').toLowerCase().includes(kw))
+  }
+  return list.sort((a, b) => {
+    const da = a.createdAt ? new Date(a.createdAt).getTime() : 0
+    const db = b.createdAt ? new Date(b.createdAt).getTime() : 0
+    return db - da
+  })
+})
+
+// Xem chi tiết phiếu nhận hàng
+const selectedRsReceipt = ref<any>(null)
+const showRsDrawer = ref(false)
+const rsDetailLoading = ref(false)
+
+async function openRsDetail(r: any) {
+  rsDetailLoading.value = true
+  showRsDrawer.value = true
+  selectedRsReceipt.value = null
+  try {
+    const res = await api.get(`/api/receipts/${r.id}`)
+    if (res.ok) {
+      const data = await res.json()
+      selectedRsReceipt.value = {
+        ...data,
+        // map items for confirmation
+        confirmItems: (data.details || []).map((d: any) => ({
+          receiptDetailId: d.id,
+          productName: d.productName,
+          productSku: d.productSku,
+          batchCode: d.batchCode,
+          sentQty: d.quantity,
+          actualQuantity: d.receivedQuantity !== null && d.receivedQuantity !== undefined ? d.receivedQuantity : d.quantity,
+          shortfallReason: d.shortfallReason || ''
+        }))
+      }
+    } else {
+      toast.error('Không thể tải chi tiết phiếu.')
+      showRsDrawer.value = false
+    }
+  } catch (err: any) {
+    toast.error('Lỗi kết nối: ' + err.message)
+    showRsDrawer.value = false
+  } finally {
+    rsDetailLoading.value = false
+  }
+}
+
+// Submit xác nhận kiểm kê nhận hàng
+const submittingRs = ref(false)
+
+async function submitRsConfirm() {
+  if (!selectedRsReceipt.value || submittingRs.value) return
+  const items = selectedRsReceipt.value.confirmItems
+  if (items.some((i: any) => i.actualQuantity < 0)) {
+    toast.error('Số lượng thực tế không được âm.'); return
+  }
+  if (items.some((i: any) => i.actualQuantity > i.sentQty)) {
+    toast.error('Số lượng thực tế không được vượt quá số lượng trên phiếu.'); return
+  }
+  if (items.some((i: any) => i.actualQuantity < i.sentQty && (!i.shortfallReason || i.shortfallReason.trim() === ''))) {
+    toast.error('Vui lòng nhập lý do hao hụt cho sản phẩm bị thiếu.'); return
+  }
+  submittingRs.value = true
+  try {
+    const payload = {
+      items: items.map((i: any) => ({
+        receiptDetailId: i.receiptDetailId,
+        actualQuantity: i.actualQuantity,
+        shortfallReason: i.actualQuantity < i.sentQty ? i.shortfallReason : null
+      }))
+    }
+    const res = await api.post(`/api/receipts/${selectedRsReceipt.value.id}/confirm-stocktake`, payload)
+    if (res.ok) {
+      toast.success('Xác nhận kiểm kê thành công! Hàng đã được cộng vào kho.')
+      showRsDrawer.value = false
+      await loadReceiptStocktakes()
+    } else {
+      let msg = 'Lỗi khi xác nhận kiểm kê.'
+      try { const e = await res.json(); msg = e.message || msg } catch {}
+      toast.error(msg)
+    }
+  } catch (err: any) {
+    toast.error('Lỗi kết nối: ' + err.message)
+  } finally {
+    submittingRs.value = false
+  }
+}
+
+function rsTypeLabel(t: string) {
+  return t === 'IMPORT' ? 'Nhập kho' : t === 'TRANSFER' ? 'Điều chuyển' : t
+}
+function rsTypeClass(t: string) {
+  return t === 'IMPORT' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
+}
+function rsStatusClass(s: string) {
+  const map: Record<string, string> = {
+    PENDING_STOCKTAKE: 'bg-purple-100 text-purple-700 border border-purple-300',
+    PENDING_SHORTFALL_MANAGER: 'bg-orange-100 text-orange-700 border border-orange-300',
+    PENDING_SHORTFALL_ADMIN: 'bg-rose-100 text-rose-700 border border-rose-300',
+    PENDING_COMPENSATION: 'bg-indigo-100 text-indigo-700 border border-indigo-300',
+    COMPLETED: 'bg-green-100 text-green-700 border border-green-300',
+    CANCELLED: 'bg-red-100 text-red-600 border border-red-300'
+  }
+  return map[s] || 'bg-gray-100 text-gray-600'
+}
+function rsStatusLabel(s: string) {
+  const map: Record<string, string> = {
+    PENDING_STOCKTAKE: '📦 Chờ kiểm kê',
+    PENDING_SHORTFALL_MANAGER: '⚠️ Thiếu hụt (Chờ duyệt)',
+    PENDING_SHORTFALL_ADMIN: '⚠️ Thiếu hụt (Chờ duyệt)',
+    PENDING_COMPENSATION: '⏳ Chờ điều chuyển bù',
+    COMPLETED: '✅ Đã hoàn tất',
+    CANCELLED: '❌ Đã hủy'
+  }
+  return map[s] || s
+}
+
+const isInitialLoad = ref(true)
+
+watch([loading, rsLoading], ([newL, newRL]) => {
+  if (!newL && !newRL) {
+    setTimeout(() => {
+      isInitialLoad.value = false
+    }, 1000)
+  }
+})
+
+watch(activeTab, () => {
+  isInitialLoad.value = true
+})
+
+function triggerStocktakesAnimation() {
+  isInitialLoad.value = true
+  loadStocktakes()
+  loadReceiptStocktakes()
+}
+
+onMounted(async () => {
+  window.addEventListener('trigger-stocktakes-animation', triggerStocktakesAnimation)
+  await Promise.all([loadStocktakes(), loadReceiptStocktakes()])
+})
+
+onUnmounted(() => {
+  window.removeEventListener('trigger-stocktakes-animation', triggerStocktakesAnimation)
+})
 </script>
 
 <template>
   <div class="space-y-6 max-w-[1400px] mx-auto font-['Inter',sans-serif]">
-    
-    <!-- PAGE HEADER -->
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+
+    <!-- PAGE HEADER + TABS -->
+    <div :class="['flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2', isInitialLoad ? 'header-slide-down' : '']">
       <div>
         <h2 class="text-2xl font-bold text-[#364a63] m-0">Kiểm kê kho</h2>
-        <p class="text-[#8094ae] text-sm mt-1">Định kỳ đối chiếu số liệu tồn kho phần mềm và hàng thực tế</p>
+        <p class="text-[#8094ae] text-sm mt-1">Quản lý kiểm kê định kỳ và xác nhận hàng nhận về</p>
       </div>
-      <div>
+
+      <!-- Tabs -->
+      <div class="flex items-center gap-6 border-b border-[#e2e8f0]">
         <button
-          @click="createStocktake"
-          class="h-11 px-6 bg-gradient-to-r from-[#4361ee] to-[#4cc9f0] hover:from-[#3a0ca3] hover:to-[#4361ee] text-white rounded-xl font-bold transition-all shadow-md flex items-center gap-2 hover:-translate-y-0.5"
+          v-for="tab in [
+            { key: 'periodic', label: 'Kiểm kê định kỳ', icon: 'fas fa-clipboard-list',
+              badge: draftStocktakeCount },
+            { key: 'receipt',  label: 'Kiểm kê nhận hàng', icon: 'fas fa-truck-loading',
+              badge: pendingReceiptStocktakesCount }
+          ]"
+          :key="tab.key"
+          :class="[
+            'flex items-center gap-2 pb-3 px-1 text-sm font-bold transition-colors relative',
+            activeTab === tab.key ? 'text-[#4361ee]' : 'text-[#8094ae] hover:text-[#364a63]'
+          ]"
+          @click="activeTab = tab.key as any"
         >
-          <i class="fas fa-plus"></i>
-          Khởi tạo kiểm kê
+          <i :class="tab.icon"></i>
+          {{ tab.label }}
+          <span
+            v-if="(tab as any).badge > 0"
+            class="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-purple-500 text-white"
+          >{{ (tab as any).badge }}</span>
+          <div v-if="activeTab === tab.key" class="absolute bottom-[-1px] left-0 w-full h-[2px] bg-[#4361ee] rounded-t-full"></div>
         </button>
       </div>
     </div>
 
-    <!-- FILTER & SEARCH BAR -->
-    <div class="bg-white rounded-[16px] p-6 shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-[#f1f5f9] space-y-4">
-      <div class="flex flex-col md:flex-row gap-4">
-        <div class="relative flex-1">
-          <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae]"></i>
-          <input
-            v-model="searchKeyword"
-            type="text"
-            placeholder="Tìm theo mã kiểm kê hoặc ghi chú..."
-            class="w-full h-11 pl-11 pr-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]"
-          />
-        </div>
-        <div class="w-full md:w-[200px]">
-          <select
-            v-model="selectedStatus"
-            class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] font-medium"
-          >
+    <!-- ═══════════════════════════════════════════════════════
+         TAB 1: KIỂM KÊ ĐỊNH KỲ
+    ════════════════════════════════════════════════════════ -->
+    <template v-if="activeTab === 'periodic'">
+
+    <!-- Toolbar: Filter + Khởi tạo -->
+    <div :class="['bg-indigo-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden', isInitialLoad ? 'accordion-filter-expand' : '']">
+      <div class="p-5 border-b border-[#f1f5f9] bg-white/60 space-y-4">
+        <div class="flex flex-col md:flex-row gap-3">
+          <div class="relative flex-1">
+            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae]"></i>
+            <input v-model="searchKeyword" type="text" placeholder="Tìm theo mã kiểm kê hoặc ghi chú..."
+              class="w-full h-11 pl-11 pr-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
+          </div>
+          <select v-model="selectedStatus" class="h-11 px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm text-[#364a63] font-medium outline-none">
             <option value="">Tất cả trạng thái</option>
             <option value="DRAFT">Lưu nháp</option>
             <option value="COMPLETED">Đã hoàn tất</option>
             <option value="CANCELLED">Đã hủy</option>
           </select>
-        </div>
-      </div>
-      
-      <!-- Date filters row -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
-        <div>
-          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-1.5">Thời gian</label>
-          <select
-            v-model="filterTimeRange"
-            class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] font-medium"
-          >
-            <option value="all">Tất cả thời gian</option>
-            <option value="today">Hôm nay</option>
-            <option value="week">7 ngày qua</option>
-            <option value="month">30 ngày qua</option>
-            <option value="custom">Tùy chọn ngày...</option>
+          <select v-model="filterDeviation" class="h-11 px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm text-[#364a63] font-medium outline-none">
+            <option value="">Tất cả chênh lệch</option>
+            <option value="yes">Có chênh lệch</option>
+            <option value="no">Khớp số lượng</option>
           </select>
+          <button @click="createStocktake"
+            class="h-11 px-5 bg-gradient-to-r from-[#4361ee] to-[#4cc9f0] hover:from-[#3a0ca3] hover:to-[#4361ee] text-white rounded-xl font-bold transition-all shadow-md flex items-center gap-2 whitespace-nowrap">
+            <i class="fas fa-plus"></i> Khởi tạo kiểm kê
+          </button>
         </div>
-        <div>
-          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-1.5">Từ ngày</label>
-          <input
-            v-model="filterFrom"
-            type="date"
-            :disabled="filterTimeRange !== 'custom'"
-            class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] disabled:opacity-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
-          />
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-1.5">Đến ngày</label>
-          <input
-            v-model="filterTo"
-            type="date"
-            :disabled="filterTimeRange !== 'custom'"
-            class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] disabled:opacity-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
-          />
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-slate-100">
+          <div>
+            <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-1.5">Thời gian</label>
+            <select v-model="filterTimeRange" class="w-full h-10 px-3 border border-[#e2e8f0] bg-white rounded-xl text-sm text-[#364a63] outline-none">
+              <option value="all">Tất cả</option>
+              <option value="today">Hôm nay</option>
+              <option value="week">7 ngày qua</option>
+              <option value="month">30 ngày qua</option>
+              <option value="custom">Tùy chọn...</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-1.5">Từ ngày</label>
+            <input v-model="filterFrom" type="date" :disabled="filterTimeRange !== 'custom'"
+              class="w-full h-10 px-3 border border-[#e2e8f0] bg-white rounded-xl text-sm text-[#364a63] outline-none disabled:opacity-50 disabled:cursor-not-allowed" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-1.5">Đến ngày</label>
+            <input v-model="filterTo" type="date" :disabled="filterTimeRange !== 'custom'"
+              class="w-full h-10 px-3 border border-[#e2e8f0] bg-white rounded-xl text-sm text-[#364a63] outline-none disabled:opacity-50 disabled:cursor-not-allowed" />
+          </div>
+          <div class="flex items-end">
+            <button v-if="searchKeyword || selectedStatus || filterDeviation || filterTimeRange !== 'all'"
+              @click="searchKeyword=''; selectedStatus=''; filterDeviation=''; filterTimeRange='all'; filterFrom=''; filterTo=''"
+              class="w-full h-10 flex items-center justify-center gap-2 border border-[#e2e8f0] bg-white rounded-xl text-sm font-semibold text-[#8094ae] hover:text-[#364a63] transition-all">
+              <i class="fas fa-times"></i> Xóa lọc
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </div><!-- end bg-indigo-50 filter card -->
 
     <!-- STOCKTAKE TABLE -->
-    <div class="bg-white rounded-[16px] shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-[#f1f5f9] overflow-hidden">
+    <div :class="['bg-white rounded-[16px] shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-[#f1f5f9] overflow-hidden', isInitialLoad ? 'accordion-table-expand' : '']">
       <div v-if="loading" class="flex flex-col items-center justify-center py-16">
         <i class="fas fa-spinner fa-spin text-3xl text-[#4361ee] mb-4"></i>
         <span class="text-sm text-[#8094ae]">Đang tải danh sách...</span>
@@ -422,25 +673,47 @@ onMounted(loadStocktakes)
               <th class="p-4 text-xs font-bold text-[#8094ae] uppercase tracking-wider">Ngày tạo</th>
               <th class="p-4 text-xs font-bold text-[#8094ae] uppercase tracking-wider">Ghi chú</th>
               <th class="p-4 text-xs font-bold text-[#8094ae] uppercase tracking-wider">Trạng thái</th>
+              <th class="p-4 text-xs font-bold text-[#8094ae] uppercase tracking-wider">Chênh lệch</th>
               <th class="p-4 text-xs font-bold text-[#8094ae] uppercase tracking-wider pr-8 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody>
             <tr
-              v-for="st in filteredStocktakes"
+              v-for="(st, index) in paginatedStocktakes"
               :key="st.id"
-              class="border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer group hover:-translate-y-[1px]"
+              :class="[
+                'border-b border-[#f1f5f9] hover:border-transparent hover:bg-[#f8f9fa] transition-all duration-300 cursor-pointer group hover:-translate-y-[1px]',
+                st.hasDeviation && st.status === 'COMPLETED' ? 'bg-rose-50/50 hover:bg-rose-100/50' : '',
+                isInitialLoad ? 'accordion-row-anim' : ''
+              ]"
+              :style="isInitialLoad ? { '--row-delay': `${90 + index * 20}ms` } : {}"
               @dblclick="openDetail(st)"
             >
-              <td class="p-4 pl-8 font-mono font-bold text-[#4361ee]">{{ st.code }}</td>
-              <td class="p-4 text-sm font-semibold text-[#364a63]">{{ st.branchName }}</td>
-              <td class="p-4 text-sm text-[#364a63]">{{ st.createdByName }}</td>
-              <td class="p-4 text-sm text-[#8094ae] font-mono">{{ formatDateTime(st.createdAt) }}</td>
-              <td class="p-4 text-sm text-slate-500 max-w-[200px] truncate" :title="st.notes">{{ st.notes || '-' }}</td>
+              <td class="p-4 pl-8 font-mono font-bold text-[#4361ee]"><div>{{ st.code }}</div></td>
+              <td class="p-4 text-sm font-semibold text-[#364a63]"><div>{{ st.branchName }}</div></td>
+              <td class="p-4 text-sm text-[#364a63]"><div>{{ st.createdByName }}</div></td>
+              <td class="p-4 text-sm text-[#8094ae] font-mono"><div>{{ formatDateTime(st.createdAt) }}</div></td>
+              <td class="p-4 text-sm text-slate-500 max-w-[200px] truncate" :title="st.notes"><div>{{ st.notes || '-' }}</div></td>
               <td class="p-4">
                 <span :class="['inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border', getStatusBadgeClass(st.status)]">
                   {{ getStatusLabel(st.status) }}
                 </span>
+              </td>
+              <td class="p-4">
+                <div v-if="st.hasDeviation" class="flex flex-col max-w-[200px]" :title="st.deviationSummary">
+                  <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-600 border border-rose-100 w-fit">
+                    ⚠️ Lệch số lượng
+                  </span>
+                  <span class="text-xs text-rose-500 mt-1 font-medium truncate" :title="st.deviationSummary">
+                    {{ st.deviationSummary }}
+                  </span>
+                </div>
+                <div v-else-if="st.status === 'COMPLETED'" class="text-[11px] text-emerald-600 font-bold">
+                  <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 w-fit">
+                    ✓ Khớp
+                  </span>
+                </div>
+                <div v-else class="text-xs text-slate-400"><div>—</div></div>
               </td>
               <td class="p-4 pr-8 text-right">
                 <button
@@ -454,6 +727,26 @@ onMounted(loadStocktakes)
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Pagination -->
+      <div v-if="filteredStocktakes.length > 0" class="px-6 py-4 border-t border-[#e2e8f0] flex flex-col sm:flex-row items-center justify-between bg-white rounded-b-2xl gap-4">
+        <div class="text-sm text-[#8094ae]">
+          Trang <span class="font-bold text-[#364a63]">{{ currentPagePeriodic }}/{{ totalPagesPeriodic }}</span> - Hiển thị <span class="font-bold text-[#364a63]">{{ paginatedStocktakes.length }}/{{ filteredStocktakes.length }}</span> phiên kiểm kê
+        </div>
+        <div class="flex items-center gap-2">
+          <button @click="currentPagePeriodic--" :disabled="currentPagePeriodic === 1"
+            class="px-3 py-1.5 flex items-center justify-center rounded-lg border border-[#e2e8f0] bg-white text-[#364a63] font-medium text-sm hover:bg-[#f8f9fa] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            <i class="fas fa-chevron-left mr-1.5 text-[10px]"></i> Trước
+          </button>
+          <div class="px-4 py-1.5 flex items-center justify-center rounded-lg bg-[#f8f9fa] text-[#364a63] font-bold text-sm border border-[#e2e8f0]">
+            {{ currentPagePeriodic }} / {{ totalPagesPeriodic }}
+          </div>
+          <button @click="currentPagePeriodic++" :disabled="currentPagePeriodic === totalPagesPeriodic"
+            class="px-3 py-1.5 flex items-center justify-center rounded-lg border border-[#e2e8f0] bg-white text-[#364a63] font-medium text-sm hover:bg-[#f8f9fa] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            Sau <i class="fas fa-chevron-right ml-1.5 text-[10px]"></i>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -523,7 +816,7 @@ onMounted(loadStocktakes)
                 class="px-4 py-2 bg-white hover:bg-blue-600 hover:text-white text-blue-600 border border-blue-200 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
               >
                 <i class="fas" :class="r.type === 'ADJUST_IN' ? 'fa-plus-circle text-emerald-500' : 'fa-minus-circle text-amber-500'"></i>
-                {{ r.code }} ({{ r.type === 'ADJUST_IN' ? 'Cân bằng Tăng' : 'Cân bằng Giảm' }})
+                {{ r.code }} ({{ r.type === 'ADJUST_IN' ? 'Tăng tồn kho' : 'Giảm tồn kho' }})
               </button>
             </div>
           </div>
@@ -650,6 +943,209 @@ onMounted(loadStocktakes)
       </div>
     </div>
 
+    </template><!-- end periodic tab -->
+
+    <!-- ═══════════════════════════════════════════════════
+         TAB 2: KIỂM KÊ NHẬN HÀNG (PENDING_STOCKTAKE)
+    ════════════════════════════════════════════════════ -->
+    <template v-if="activeTab === 'receipt'">
+    <div :class="['bg-purple-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-purple-500 shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden', isInitialLoad ? 'accordion-filter-expand' : '']">
+      <!-- Toolbar -->
+      <div class="p-5 border-b border-[#f1f5f9] bg-white/60 flex flex-col md:flex-row gap-3 items-center">
+        <div class="relative flex-1">
+          <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae]"></i>
+          <input v-model="rsSearch" type="text" placeholder="Tìm theo mã phiếu..."
+            class="w-full h-11 pl-11 pr-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none transition-all text-[#364a63]" />
+        </div>
+        <select v-model="rsFilterType" class="h-11 px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm text-[#364a63] font-medium outline-none">
+          <option value="">Tất cả loại phiếu</option>
+          <option value="IMPORT">Nhập kho</option>
+          <option value="TRANSFER">Điều chuyển</option>
+        </select>
+        <button @click="loadReceiptStocktakes" class="h-11 px-5 bg-white border border-[#e2e8f0] hover:bg-slate-50 text-[#364a63] rounded-xl font-semibold text-sm flex items-center gap-2 shadow-sm">
+          <i class="fas fa-sync-alt" :class="rsLoading ? 'fa-spin' : ''"></i> Làm mới
+        </button>
+      </div>
+
+      <!-- Table -->
+      <div class="overflow-x-auto">
+        <div v-if="rsLoading" class="flex flex-col items-center justify-center py-16">
+          <i class="fas fa-spinner fa-spin text-3xl text-purple-500 mb-4"></i>
+          <span class="text-sm text-[#8094ae]">Đang tải danh sách...</span>
+        </div>
+        <div v-else-if="filteredReceiptStocktakes.length === 0" class="flex flex-col items-center justify-center py-16 text-center">
+          <div class="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center mb-4">
+            <i class="fas fa-truck-loading text-2xl text-purple-400"></i>
+          </div>
+          <h4 class="text-base font-bold text-[#364a63]">Không có phiếu chờ kiểm kê</h4>
+          <p class="text-[#8094ae] text-xs mt-1">Tất cả phiếu nhập kho / điều chuyển đã được xác nhận.</p>
+        </div>
+        <table v-else class="w-full border-collapse text-left">
+          <thead>
+            <tr class="border-b border-[#f1f5f9] bg-white">
+              <th class="p-4 pl-8 text-xs font-bold text-[#8094ae] uppercase tracking-wider">Mã phiếu</th>
+              <th class="p-4 text-xs font-bold text-[#8094ae] uppercase tracking-wider">Loại</th>
+              <th class="p-4 text-xs font-bold text-[#8094ae] uppercase tracking-wider">Chi nhánh gửi</th>
+              <th class="p-4 text-xs font-bold text-[#8094ae] uppercase tracking-wider">Chi nhánh nhận</th>
+              <th class="p-4 text-xs font-bold text-[#8094ae] uppercase tracking-wider">Người lập</th>
+              <th class="p-4 text-xs font-bold text-[#8094ae] uppercase tracking-wider">Ngày tạo</th>
+              <th class="p-4 text-xs font-bold text-[#8094ae] uppercase tracking-wider">Trạng thái</th>
+              <th class="p-4 pr-8 text-xs font-bold text-[#8094ae] uppercase tracking-wider text-right">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(r, index) in paginatedReceiptStocktakes" :key="r.id"
+              :class="[
+                'border-b border-[#f1f5f9] hover:bg-purple-50/60 transition-all duration-[350ms] cursor-pointer',
+                r.status !== 'PENDING_STOCKTAKE' ? 'bg-slate-50/40' : 'bg-white',
+                isInitialLoad ? 'accordion-row-anim' : ''
+              ]"
+              :style="isInitialLoad ? { '--row-delay': `${90 + index * 20}ms` } : {}"
+              @dblclick="openRsDetail(r)">
+              <td :class="['p-4 pl-8 font-mono font-bold', r.status === 'PENDING_STOCKTAKE' ? 'text-purple-600' : 'text-slate-500']"><div>{{ r.code }}</div></td>
+              <td class="p-4">
+                <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold', rsTypeClass(r.type)]">
+                  {{ rsTypeLabel(r.type) }}
+                </span>
+              </td>
+              <td class="p-4 text-sm text-[#364a63]"><div>{{ r.sourceBranchName || '—' }}</div></td>
+              <td class="p-4 text-sm font-semibold text-[#364a63]"><div>{{ r.destBranchName || '—' }}</div></td>
+              <td class="p-4 text-sm text-[#364a63]"><div>{{ r.createdByName }}</div></td>
+              <td class="p-4 text-sm text-[#8094ae] font-mono"><div>{{ formatDateTime(r.createdAt) }}</div></td>
+              <td class="p-4 text-sm">
+                <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border', rsStatusClass(r.status)]">
+                  {{ rsStatusLabel(r.status) }}
+                </span>
+              </td>
+              <td class="p-4 pr-8 text-right">
+                <button @click="openRsDetail(r)"
+                  :class="[
+                    'h-8 px-4 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 inline-flex',
+                    r.status === 'PENDING_STOCKTAKE'
+                      ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                      : 'bg-slate-100 hover:bg-slate-200 text-[#526484]'
+                  ]">
+                  <i :class="r.status === 'PENDING_STOCKTAKE' ? 'fas fa-clipboard-check' : 'fas fa-check-circle text-emerald-500'"></i>
+                  {{ r.status === 'PENDING_STOCKTAKE' ? 'Kiểm kê ngay' : 'Xem kết quả' }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div v-if="filteredReceiptStocktakes.length > 0" class="px-6 py-4 border-t border-[#e2e8f0] flex flex-col sm:flex-row items-center justify-between bg-white rounded-b-2xl gap-4">
+        <div class="text-sm text-[#8094ae]">
+          Trang <span class="font-bold text-[#364a63]">{{ currentPageReceipt }}/{{ totalPagesReceipt }}</span> - Hiển thị <span class="font-bold text-[#364a63]">{{ paginatedReceiptStocktakes.length }}/{{ filteredReceiptStocktakes.length }}</span> phiếu
+        </div>
+        <div class="flex items-center gap-2">
+          <button @click="currentPageReceipt--" :disabled="currentPageReceipt === 1"
+            class="px-3 py-1.5 flex items-center justify-center rounded-lg border border-[#e2e8f0] bg-white text-[#364a63] font-medium text-sm hover:bg-[#f8f9fa] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            <i class="fas fa-chevron-left mr-1.5 text-[10px]"></i> Trước
+          </button>
+          <div class="px-4 py-1.5 flex items-center justify-center rounded-lg bg-[#f8f9fa] text-[#364a63] font-bold text-sm border border-[#e2e8f0]">
+            {{ currentPageReceipt }} / {{ totalPagesReceipt }}
+          </div>
+          <button @click="currentPageReceipt++" :disabled="currentPageReceipt === totalPagesReceipt"
+            class="px-3 py-1.5 flex items-center justify-center rounded-lg border border-[#e2e8f0] bg-white text-[#364a63] font-medium text-sm hover:bg-[#f8f9fa] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            Sau <i class="fas fa-chevron-right ml-1.5 text-[10px]"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RECEIPT STOCKTAKE DRAWER -->
+    <div v-if="showRsDrawer && selectedRsReceipt" class="fixed inset-0 z-[1000] flex justify-end"
+      style="background:rgba(0,0,0,0.3);backdrop-filter:blur(2px);" @click.self="showRsDrawer=false">
+      <div class="w-full max-w-[860px] bg-white h-full flex flex-col shadow-2xl animate-slide-in">
+        <!-- Header -->
+        <div class="px-8 py-5 border-b border-[#f1f5f9] flex justify-between items-center bg-purple-50">
+          <div>
+            <div class="flex items-center gap-3">
+              <h3 class="text-lg font-bold text-[#364a63] m-0">Xác nhận kiểm kê: {{ selectedRsReceipt.code }}</h3>
+              <span :class="['px-2.5 py-0.5 rounded-full text-[11px] font-bold border', rsTypeClass(selectedRsReceipt.type)]">
+                {{ rsTypeLabel(selectedRsReceipt.type) }}
+              </span>
+            </div>
+            <div class="text-xs text-[#8094ae] mt-1">
+              Từ: <span class="font-bold text-[#364a63]">{{ selectedRsReceipt.sourceBranchName || '—' }}</span>
+              → Đến: <span class="font-bold text-[#364a63]">{{ selectedRsReceipt.destBranchName || '—' }}</span>
+              | Lập bởi: <span class="font-bold">{{ selectedRsReceipt.createdByName }}</span>
+            </div>
+          </div>
+          <button @click="showRsDrawer=false" class="w-9 h-9 rounded-xl hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center">
+            <i class="fas fa-times text-lg"></i>
+          </button>
+        </div>
+
+        <!-- Body -->
+        <div class="flex-1 overflow-y-auto p-8">
+          <div v-if="rsDetailLoading" class="flex items-center justify-center py-16">
+            <i class="fas fa-spinner fa-spin text-2xl text-purple-400"></i>
+          </div>
+          <div v-else class="space-y-4">
+          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wider">
+            {{ selectedRsReceipt.status === 'PENDING_STOCKTAKE' ? 'Nhập số lượng thực tế nhận được' : 'Thông tin số lượng thực tế nhận được' }}
+          </div>
+          <div class="border border-[#e2e8f0] rounded-xl overflow-hidden">
+            <table class="w-full border-collapse text-left text-sm">
+              <thead>
+                <tr class="bg-[#f8f9fa] border-b border-[#e2e8f0]">
+                  <th class="p-3 pl-5 text-xs font-bold text-[#8094ae]">Sản phẩm</th>
+                  <th class="p-3 text-xs font-bold text-[#8094ae]">Lô SX</th>
+                  <th class="p-3 text-right text-xs font-bold text-[#8094ae]">SL gửi</th>
+                  <th class="p-3 text-center text-xs font-bold text-[#8094ae] w-[120px]">SL thực nhận</th>
+                  <th class="p-3 text-xs font-bold text-[#8094ae]">Lý do hao hụt</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in selectedRsReceipt.confirmItems" :key="item.receiptDetailId"
+                  :class="['border-b border-[#f1f5f9] last:border-b-0', item.actualQuantity < item.sentQty ? 'bg-amber-50/50' : '']">
+                  <td class="p-3 pl-5">
+                    <div class="font-bold text-[#364a63]">{{ item.productName }}</div>
+                    <div class="text-[11px] font-mono text-[#8094ae]">{{ item.productSku }}</div>
+                  </td>
+                  <td class="p-3 font-mono text-xs">{{ item.batchCode }}</td>
+                  <td class="p-3 text-right font-mono font-bold">{{ item.sentQty }}</td>
+                  <td class="p-3 text-center">
+                    <input v-model.number="item.actualQuantity" type="number" :min="0" :max="item.sentQty"
+                      :disabled="selectedRsReceipt.status !== 'PENDING_STOCKTAKE'"
+                      class="w-20 h-9 border rounded-lg text-center font-mono font-bold text-[#364a63] outline-none focus:ring-2 disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-200"
+                      :class="item.actualQuantity < item.sentQty ? 'border-amber-400 focus:ring-amber-200' : 'border-[#e2e8f0] focus:ring-[#4361ee]/20'" />
+                  </td>
+                  <td class="p-3">
+                    <textarea v-if="selectedRsReceipt.status === 'PENDING_STOCKTAKE' && item.actualQuantity < item.sentQty" v-model="item.shortfallReason"
+                      placeholder="Bắt buộc nhập lý do..." maxlength="200" rows="2"
+                      class="w-full py-1.5 px-3 border border-amber-400 bg-amber-50 rounded-lg text-xs outline-none focus:ring-2 focus:ring-amber-200 resize-none"></textarea>
+                    <span v-else-if="item.actualQuantity < item.sentQty" class="text-xs text-amber-700 font-semibold bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200 block whitespace-pre-wrap">
+                      {{ item.shortfallReason || 'Không có lý do' }}
+                    </span>
+                    <span v-else class="text-xs text-slate-400">—</span>
+                  </td>
+                </tr>
+              </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-8 py-5 border-t border-[#f1f5f9] bg-[#f8f9fa] flex gap-3 justify-between items-center">
+          <button @click="showRsDrawer=false" class="px-6 h-11 border border-slate-200 bg-white hover:bg-slate-50 text-[#364a63] rounded-xl font-bold text-sm">
+            Đóng
+          </button>
+          <button v-if="selectedRsReceipt.status === 'PENDING_STOCKTAKE'" @click="submitRsConfirm" :disabled="submittingRs || rsDetailLoading"
+            class="px-8 h-11 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm flex items-center gap-2 shadow-sm disabled:opacity-60">
+            <i v-if="submittingRs" class="fas fa-spinner fa-spin"></i>
+            <i v-else class="fas fa-clipboard-check"></i>
+            {{ submittingRs ? 'Đang xác nhận...' : 'Xác nhận kiểm kê & Nhập kho' }}
+          </button>
+        </div>
+      </div>
+    </div>
+    </template><!-- end receipt tab -->
+
     <!-- RECEIPT DETAIL MODAL -->
     <AppModal
       :show="showReceiptModal"
@@ -676,8 +1172,8 @@ onMounted(loadStocktakes)
           <div>
             <div class="text-slate-400 text-xs uppercase font-bold mb-1">Loại phiếu</div>
             <div class="font-bold text-[#364a63]">
-              <span v-if="selectedReceipt.type === 'ADJUST_IN'" class="text-blue-600">Cân bằng Tăng (ADJUST_IN)</span>
-              <span v-else class="text-amber-600">Cân bằng Giảm (ADJUST_OUT)</span>
+              <span v-if="selectedReceipt.type === 'ADJUST_IN'" class="text-blue-600">Tăng tồn kho</span>
+              <span v-else class="text-amber-600">Giảm tồn kho</span>
             </div>
           </div>
           <div>
@@ -775,5 +1271,51 @@ onMounted(loadStocktakes)
 }
 .animate-slide-in {
   animation: slide-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── Accordion Entrance Animations ── */
+@keyframes slideDownHeader {
+  0% { transform: translateY(-30px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.header-slide-down {
+  animation: slideDownHeader 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes accordionExpand {
+  0% { transform: scaleY(0); opacity: 0; }
+  100% { transform: scaleY(1); opacity: 1; }
+}
+.accordion-filter-expand {
+  transform-origin: top;
+  animation: accordionExpand 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+.accordion-table-expand {
+  transform-origin: top;
+  animation: accordionExpand 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 60ms;
+  will-change: transform, opacity;
+}
+
+/* ── Horizontal Meet-in-the-Middle Cell Slide ── */
+@keyframes slideFromLeft {
+  0% { transform: translate3d(-50px, 0, 0); opacity: 0; }
+  100% { transform: translate3d(0, 0, 0); opacity: 1; }
+}
+@keyframes slideFromRight {
+  0% { transform: translate3d(50px, 0, 0); opacity: 0; }
+  100% { transform: translate3d(0, 0, 0); opacity: 1; }
+}
+
+.accordion-row-anim td:nth-child(-n+4) > * {
+  animation: slideFromLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--row-delay, 0ms);
+  will-change: transform, opacity;
+}
+.accordion-row-anim td:nth-child(n+5) > * {
+  animation: slideFromRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--row-delay, 0ms);
+  will-change: transform, opacity;
 }
 </style>

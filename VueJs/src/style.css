@@ -39,6 +39,40 @@
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
+/* ── Dark Theme Variables (only via toggle, NOT OS preference) ── */
+html.dark-mode {
+  --bg-body: #0f172a;
+  --bg-card: #1e293b;
+  --bg-hover: #334155;
+  --bg-active: #1e3a5f;
+
+  --border-light: #334155;
+  --border-medium: #475569;
+
+  --text-main: #f8fafc;
+  --text-body: #e2e8f0;
+  --text-muted: #b8c5d4;
+
+  --primary: #3b82f6;
+  --primary-hover: #60a5fa;
+
+  --success-bg: #064e3b;
+  --success-text: #34d399;
+  --success-border: #065f46;
+
+  --danger-bg: #450a0a;
+  --danger-text: #f87171;
+  --danger-border: #7f1d1d;
+
+  --warning-bg: #451a03;
+  --warning-text: #fbbf24;
+  --warning-border: #78350f;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+}
+
 @theme {
   --font-sans: 'Plus Jakarta Sans', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
@@ -85,3 +119,14 @@ html, body {
 
 .page-enter-active, .page-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
 .page-enter-from, .page-leave-to { opacity: 0; transform: translateY(10px); }
+
+/* Scroll Reveal Animation */
+.reveal-item {
+  opacity: 0;
+  transform: translateY(15px);
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+}
+.reveal-visible {
+  opacity: 1;
+  transform: translateY(0);
+}

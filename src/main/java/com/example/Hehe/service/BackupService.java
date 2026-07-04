@@ -43,4 +43,9 @@ public interface BackupService {
 
     // Xóa file sao lưu cấu hình hệ thống
     void deleteSystemBackup(Integer backupId, User currentUser);
+
+    // ── Demo/Test ──────────────────────────────────────────────────────────────
+
+    // Xóa toàn bộ dữ liệu giao dịch chi nhánh (để test backup/restore)
+    void wipeBranchData(User currentUser);
 }

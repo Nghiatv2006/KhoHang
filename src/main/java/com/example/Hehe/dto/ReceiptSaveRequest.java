@@ -12,6 +12,9 @@ public class ReceiptSaveRequest {
     private String customerName;
     private String customerPhone;
     private String description;
+    private String disposalReason;
+    private String disposalMethod;
+    private String attachmentUrl;
     private List<ReceiptDetailSaveRequest> details;
 
     public ReceiptType getType() { return type; }
@@ -37,6 +40,15 @@ public class ReceiptSaveRequest {
 
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+
+    public String getDisposalReason() { return disposalReason; }
+    public void setDisposalReason(String disposalReason) { this.disposalReason = disposalReason; }
+
+    public String getDisposalMethod() { return disposalMethod; }
+    public void setDisposalMethod(String disposalMethod) { this.disposalMethod = disposalMethod; }
+
+    public String getAttachmentUrl() { return attachmentUrl; }
+    public void setAttachmentUrl(String attachmentUrl) { this.attachmentUrl = attachmentUrl; }
 
     public List<ReceiptDetailSaveRequest> getDetails() { return details; }
     public void setDetails(List<ReceiptDetailSaveRequest> details) { this.details = details; }

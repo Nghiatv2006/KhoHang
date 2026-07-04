@@ -26,15 +26,43 @@ let catRevenueChartInst: echarts.ECharts | null = null
 let branchChartInst: echarts.ECharts | null = null
 let topSoldChartInst: echarts.ECharts | null = null
 
+const headBranchImportChartRef = ref<HTMLElement | null>(null)
+let headBranchImportChartInst: echarts.ECharts | null = null
+
+const isHeadBranchUser = computed(() => {
+  const bId = user.value?.branchId || user.value?.branch?.id
+  return !bId || Number(bId) === 1 || user.value?.role === 'ADMIN'
+})
+
+const totalHeadBranchImport30Days = computed(() => {
+  const now = new Date()
+  let sum = 0
+  const thirtyDaysAgo = new Date(now)
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().substring(0, 10)
+  
+  receipts.value.forEach(r => {
+    if (r.status !== 'COMPLETED' || !r.createdAt) return
+    const receiptDateStr = r.createdAt.substring(0, 10)
+    if (receiptDateStr >= thirtyDaysAgoStr) {
+      if (r.type === 'IMPORT' && r.destBranchId === 1) {
+        const val = (r.details || []).reduce((s: number, det: any) => s + (det.quantity * det.price), 0)
+        sum += val
+      }
+    }
+  })
+  return sum
+})
+
 const receipts = ref<any[]>([])
 const inventories = ref<any[]>([])
 
-// Lá»c receipts theo chi nhÃ¡nh cá»§a user Ä‘Äƒng nháº­p
+// Lọc receipts theo chi nhánh của user đăng nhập
 const myReceipts = computed(() => {
-  const bId = user.value?.branch?.id
+  const bId = user.value?.branchId || user.value?.branch?.id
   // Nếu là Chi nhánh Tổng (id = 1) hoặc không xác định chi nhánh, hiển thị tổng gộp tất cả
-  if (!bId || bId === 1) return receipts.value
-  return receipts.value.filter(r => r.sourceBranchId === bId || r.destBranchId === bId)
+  if (!bId || Number(bId) === 1) return receipts.value
+  return receipts.value.filter(r => Number(r.sourceBranchId) === Number(bId) || Number(r.destBranchId) === Number(bId))
 })
 
 onMounted(async () => {
@@ -44,7 +72,7 @@ onMounted(async () => {
       api.get('/api/categories'),
       api.get('/api/customers'),
       api.get('/api/branches'),
-      api.get('/api/receipts'),
+      api.get('/api/receipts/completed-branch'),
       api.get('/api/inventories'),
       api.get('/api/reports/dashboard/branch-sales')
     ])
@@ -203,6 +231,9 @@ function initCharts() {
   if (branchChartRef.value && !branchChartInst) branchChartInst = echarts.init(branchChartRef.value)
   if (catRevenueChartRef.value && !catRevenueChartInst) catRevenueChartInst = echarts.init(catRevenueChartRef.value)
   if (topSoldChartRef.value && !topSoldChartInst) topSoldChartInst = echarts.init(topSoldChartRef.value)
+  if (isHeadBranchUser.value && headBranchImportChartRef.value && !headBranchImportChartInst) {
+    headBranchImportChartInst = echarts.init(headBranchImportChartRef.value)
+  }
   
   // Thiết lập IntersectionObserver cho hiệu ứng cuộn
   const observer = new IntersectionObserver((entries) => {
@@ -231,6 +262,7 @@ function initCharts() {
     branchChartInst?.resize()
     catRevenueChartInst?.resize()
     topSoldChartInst?.resize()
+    headBranchImportChartInst?.resize()
   })
 
   window.addEventListener('resize', () => {
@@ -238,6 +270,7 @@ function initCharts() {
     branchChartInst?.resize()
     catRevenueChartInst?.resize()
     topSoldChartInst?.resize()
+    headBranchImportChartInst?.resize()
   })
 }
 
@@ -275,11 +308,11 @@ function updateCharts() {
     trendChartInst.setOption({
       tooltip: {
         trigger: 'axis',
-        axisPointer: { type: 'line', lineStyle: { color: '#e2e8f0', width: 1, type: 'dashed' } },
-        backgroundColor: 'rgba(255, 255, 255, 0.98)',
-        borderColor: '#e2e8f0',
+        axisPointer: { type: 'line', lineStyle: { color: document.documentElement.classList.contains('dark-mode') ? '#334155' : '#e2e8f0', width: 1, type: 'dashed' } },
+        backgroundColor: document.documentElement.classList.contains('dark-mode') ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.98)',
+        borderColor: document.documentElement.classList.contains('dark-mode') ? '#475569' : '#e2e8f0',
         borderWidth: 1,
-        textStyle: { color: '#334155', fontSize: 12 },
+        textStyle: { color: document.documentElement.classList.contains('dark-mode') ? '#f8fafc' : '#334155', fontSize: 12 },
         formatter: function (params: any) {
           let res = `<div class="font-bold mb-1.5 text-slate-700">${params[0].name}</div>`
           params.forEach((p: any) => {
@@ -305,7 +338,7 @@ function updateCharts() {
         type: 'value',
         axisLine: { show: false },
         axisTick: { show: false },
-        splitLine: { lineStyle: { color: '#f1f5f9' } },
+        splitLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.15)' } },
         axisLabel: {
           color: '#8094ae',
           fontSize: 11,
@@ -325,7 +358,7 @@ function updateCharts() {
           showSymbol: false,
           data: importValues,
           itemStyle: { color: '#05b171' },
-          lineStyle: { width: 3, shadowColor: 'rgba(5, 177, 113, 0.3)', shadowBlur: 10, shadowOffsetY: 4 },
+          lineStyle: { width: 5, shadowColor: 'rgba(5, 177, 113, 0.3)', shadowBlur: 10, shadowOffsetY: 4 },
           areaStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
               { offset: 0, color: 'rgba(5, 177, 113, 0.2)' },
@@ -340,7 +373,7 @@ function updateCharts() {
           showSymbol: false,
           data: exportValues,
           itemStyle: { color: '#6366f1' },
-          lineStyle: { width: 3, shadowColor: 'rgba(99, 102, 241, 0.3)', shadowBlur: 10, shadowOffsetY: 4 },
+          lineStyle: { width: 5, shadowColor: 'rgba(99, 102, 241, 0.3)', shadowBlur: 10, shadowOffsetY: 4 },
           areaStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
               { offset: 0, color: 'rgba(99, 102, 241, 0.2)' },
@@ -365,10 +398,10 @@ function updateCharts() {
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
-        backgroundColor: 'rgba(255, 255, 255, 0.98)',
-        borderColor: '#e2e8f0',
+        backgroundColor: document.documentElement.classList.contains('dark-mode') ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.98)',
+        borderColor: document.documentElement.classList.contains('dark-mode') ? '#475569' : '#e2e8f0',
         borderWidth: 1,
-        textStyle: { color: '#334155', fontSize: 12 },
+        textStyle: { color: document.documentElement.classList.contains('dark-mode') ? '#f8fafc' : '#334155', fontSize: 12 },
         formatter: function (params: any) {
           const valFormatted = new Intl.NumberFormat('vi-VN').format(params[0].value) + 'đ'
           return `<div class="font-bold mb-1 text-slate-700">${params[0].name}</div>
@@ -391,7 +424,7 @@ function updateCharts() {
       xAxis: { type: 'category', data: names, axisLabel: { color: '#8094ae', width: 90, overflow: 'truncate' } },
       yAxis: {
         type: 'value',
-        splitLine: { lineStyle: { color: '#f1f5f9' } },
+        splitLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.15)' } },
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: {
@@ -467,10 +500,10 @@ function updateCharts() {
           }
           return html
         },
-        backgroundColor: 'rgba(255, 255, 255, 0.98)',
-        borderColor: '#e2e8f0',
+        backgroundColor: document.documentElement.classList.contains('dark-mode') ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.98)',
+        borderColor: document.documentElement.classList.contains('dark-mode') ? '#475569' : '#e2e8f0',
         borderWidth: 1,
-        textStyle: { color: '#334155', fontSize: 12 },
+        textStyle: { color: document.documentElement.classList.contains('dark-mode') ? '#f8fafc' : '#334155', fontSize: 12 },
         padding: [10, 15]
       },
       legend: { show: false }, // Ẩn legend ở dưới, dùng label chỉa ra ngoài cho Pro
@@ -483,7 +516,7 @@ function updateCharts() {
             style: {
               text: 'Tổng thu\n' + totalRevStr,
               textAlign: 'center',
-              fill: '#475569',
+              fill: document.documentElement.classList.contains('dark-mode') ? '#cbd5e1' : '#475569',
               fontSize: 14,
               fontWeight: 'bold',
               lineHeight: 22
@@ -516,9 +549,9 @@ function updateCharts() {
             return `{b|${params.name}}\n{c|${valStr}} {d|(${params.percent}%)}`;
           },
           rich: {
-            b: { color: '#475569', fontSize: 11, fontWeight: 'bold', padding: [0, 0, 4, 0] },
-            c: { color: '#6366f1', fontSize: 11, fontWeight: 'bold' },
-            d: { color: '#10b981', fontSize: 11, fontWeight: 'bold' }
+            b: { color: document.documentElement.classList.contains('dark-mode') ? '#cbd5e1' : '#475569', fontSize: 13, fontWeight: 'bold', padding: [0, 0, 4, 0] },
+            c: { color: document.documentElement.classList.contains('dark-mode') ? '#a5b4fc' : '#6366f1', fontSize: 13, fontWeight: 'bold' },
+            d: { color: document.documentElement.classList.contains('dark-mode') ? '#6ee7b7' : '#10b981', fontSize: 13, fontWeight: 'bold' }
           }
         },
         labelLine: {
@@ -549,9 +582,9 @@ function updateCharts() {
       tooltip: {
         trigger: 'item',
         formatter: '<div class="font-bold mb-1">{b}</div><div class="flex justify-between gap-4"><span class="text-slate-500">Đã bán:</span> <span class="text-indigo-600 font-bold">{c} sp</span></div><div class="flex justify-between gap-4"><span class="text-slate-500">Tỷ trọng:</span> <span class="text-emerald-500 font-bold">{d}%</span></div>',
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderColor: '#e2e8f0',
-        textStyle: { color: '#1e293b' },
+        backgroundColor: document.documentElement.classList.contains('dark-mode') ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+        borderColor: document.documentElement.classList.contains('dark-mode') ? '#475569' : '#e2e8f0',
+        textStyle: { color: document.documentElement.classList.contains('dark-mode') ? '#f8fafc' : '#1e293b' },
         padding: [10, 15]
       },
       // TiÃªu Ä‘á» Typography xá»‹n xÃ² á»Ÿ giá»¯a tÃ¢m
@@ -561,7 +594,7 @@ function updateCharts() {
         left: 'center',
         top: 'center',
         textStyle: {
-          color: '#334155',
+          color: document.documentElement.classList.contains('dark-mode') ? '#f8fafc' : '#334155',
           fontSize: 16,
           fontWeight: '900',
           lineHeight: 24
@@ -585,8 +618,8 @@ function updateCharts() {
             show: true,
             formatter: '{b|{b}}\n{c|{c} sp}',
             rich: {
-              b: { color: '#1e293b', fontSize: 13, fontWeight: '800', padding: [0, 0, 4, 0] },
-              c: { color: '#4f46e5', fontSize: 15, fontWeight: '900', textShadowBlur: 4, textShadowColor: 'rgba(79, 70, 229, 0.2)' }
+              b: { color: document.documentElement.classList.contains('dark-mode') ? '#cbd5e1' : '#1e293b', fontSize: 13, fontWeight: '800', padding: [0, 0, 4, 0] },
+              c: { color: document.documentElement.classList.contains('dark-mode') ? '#a5b4fc' : '#4f46e5', fontSize: 15, fontWeight: '900', textShadowBlur: 4, textShadowColor: 'rgba(79, 70, 229, 0.2)' }
             }
           },
           labelLine: {
@@ -614,6 +647,99 @@ function updateCharts() {
           animationDuration: 1200,
           animationDelay: function (idx: number) {
             return idx * 100;
+          }
+        }
+      ]
+    }, true)
+  }
+
+  // Chart: Head Branch Import Trend
+  if (isHeadBranchUser.value && headBranchImportChartInst && revealedCharts.has('head-import')) {
+    const dates: string[] = []
+    const importValues: number[] = []
+    
+    const now = new Date()
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now)
+      d.setDate(d.getDate() - i)
+      const dateStr = d.toISOString().substring(0, 10)
+      
+      const day = d.getDate().toString().padStart(2, '0')
+      const month = (d.getMonth() + 1).toString().padStart(2, '0')
+      dates.push(`${day}/${month}`)
+      
+      let impSum = 0
+      receipts.value.forEach(r => {
+        if (r.status !== 'COMPLETED' || !r.createdAt) return
+        if (r.createdAt.substring(0, 10) === dateStr) {
+          if (r.type === 'IMPORT' && r.destBranchId === 1) {
+            const val = (r.details || []).reduce((s: number, det: any) => s + (det.quantity * det.price), 0)
+            impSum += val
+          }
+        }
+      })
+      importValues.push(impSum)
+    }
+
+    headBranchImportChartInst.setOption({
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'line', lineStyle: { color: document.documentElement.classList.contains('dark-mode') ? '#334155' : '#e2e8f0', width: 1, type: 'dashed' } },
+        backgroundColor: document.documentElement.classList.contains('dark-mode') ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.98)',
+        borderColor: document.documentElement.classList.contains('dark-mode') ? '#475569' : '#e2e8f0',
+        borderWidth: 1,
+        textStyle: { color: document.documentElement.classList.contains('dark-mode') ? '#f8fafc' : '#334155', fontSize: 12 },
+        formatter: function (params: any) {
+          let res = `<div class="font-bold mb-1.5 text-slate-700">${params[0].name}</div>`
+          params.forEach((p: any) => {
+            const formattedVal = new Intl.NumberFormat('vi-VN').format(p.value) + 'đ'
+            res += `<div class="flex items-center gap-4 mt-1 text-xs">
+              <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${p.color}; box-shadow: 0 0 8px ${p.color}"></span>
+              <span class="text-slate-500">${p.seriesName}:</span>
+              <span class="font-bold text-slate-700 ml-auto">${formattedVal}</span>
+            </div>`
+          })
+          return res
+        }
+      },
+      grid: { left: '3%', right: '4%', bottom: '3%', top: '5%', containLabel: true },
+      xAxis: {
+        type: 'category',
+        boundaryGap: false,
+        data: dates,
+        axisLine: { lineStyle: { color: '#cbd5e1' } },
+        axisLabel: { color: '#8094ae', fontSize: 11 }
+      },
+      yAxis: {
+        type: 'value',
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.15)' } },
+        axisLabel: {
+          color: '#8094ae',
+          fontSize: 11,
+          formatter: function (value: number) {
+            if (value >= 1e9) return (value / 1e9).toFixed(1) + ' tỷ'
+            if (value >= 1e6) return (value / 1e6).toFixed(0) + ' tr'
+            if (value >= 1e3) return (value / 1e3).toFixed(0) + ' k'
+            return value
+          }
+        }
+      },
+      series: [
+        {
+          name: 'Nhập kho',
+          type: 'line',
+          smooth: true,
+          showSymbol: false,
+          data: importValues,
+          itemStyle: { color: '#05b171' },
+          lineStyle: { width: 5, shadowColor: 'rgba(5, 177, 113, 0.3)', shadowBlur: 10, shadowOffsetY: 4 },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: 'rgba(5, 177, 113, 0.2)' },
+              { offset: 1, color: 'rgba(5, 177, 113, 0)' }
+            ])
           }
         }
       ]
@@ -683,6 +809,7 @@ async function exportRevenueExcel() {
     </div>
 
     <div class="space-y-6">
+
       <!-- Line Chart (Trend) -->
       <div data-reveal-id="trend" class="scroll-reveal-card bg-white rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col relative">
         <div class="p-6 border-b border-[#f1f5f9] flex justify-between items-center bg-[#f8f9fa]/50">
@@ -742,32 +869,31 @@ async function exportRevenueExcel() {
             Top 5 Sản phẩm Bán chạy (30 ngày)
           </h6>
         </div>
-<<<<<<< HEAD
-        <div class="p-4 relative" style="height: 400px;">
-          <div ref="soldProductChartRef" class="w-full h-full"></div>
-        </div>
-      </div>
-
-      <!-- Inventory Runway (Horizontal Bar Chart) -->
-      <div class="bg-amber-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#f59e0b] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col">
-        <div class="p-6 border-b border-[#f1f5f9] flex justify-between items-center">
-          <h6 class="font-bold text-[#364a63] m-0"><i class="fas fa-hourglass-half text-[#f59e0b] mr-2"></i>Dự báo số ngày bán hàng còn lại theo Danh mục (Inventory Runway)</h6>
-          <span class="px-3 py-1 bg-white shadow-sm text-[#f59e0b] rounded-full text-xs font-bold">
-            Theo tốc độ bán 30 ngày qua
-          </span>
-        </div>
-        <div class="p-4 relative" style="height: 400px;">
-          <div ref="runwayChartRef" class="w-full h-full"></div>
-        </div>
-      </div>
-    </div>
-
-
-
-  </div>
-
         <div class="p-4 relative bg-white/40 backdrop-blur-sm z-10" style="height: 350px;">
           <div ref="topSoldChartRef" class="w-full h-full"></div>
+        </div>
+      </div>
+
+      <!-- Xu hướng Nhập kho Chi nhánh Tổng (Chỉ hiển thị cho chi nhánh tổng) -->
+      <div v-if="isHeadBranchUser" data-reveal-id="head-import" class="scroll-reveal-card bg-white rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#10b981] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col relative" style="transition-delay: 400ms">
+        <div class="p-6 border-b border-[#f1f5f9] flex justify-between items-center bg-[#f8f9fa]/50">
+          <div>
+            <h6 class="font-bold text-[#364a63] m-0">
+              <i class="fas fa-arrow-down text-[#10b981] mr-2"></i>Xu hướng Nhập kho Chi nhánh Tổng (30 ngày gần nhất)
+            </h6>
+            <div class="mt-2 text-sm">
+              <span class="text-[#8094ae] mr-2">Tổng giá trị nhập kho:</span>
+              <span class="font-extrabold text-lg text-emerald-500">
+                {{ formatVND(totalHeadBranchImport30Days) }}
+              </span>
+            </div>
+          </div>
+          <div class="flex items-center gap-4 text-xs font-semibold text-[#8094ae]">
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-[#05b171]"></span>Nhập kho</span>
+          </div>
+        </div>
+        <div class="p-4 relative" style="height: 350px;">
+          <div ref="headBranchImportChartRef" class="w-full h-full"></div>
         </div>
       </div>
     </div>

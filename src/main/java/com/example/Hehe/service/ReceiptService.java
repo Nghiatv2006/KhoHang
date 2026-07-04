@@ -18,4 +18,5 @@ public interface ReceiptService {
     ReceiptResponse approveShortfall(Integer id, boolean isApproved, User currentUser);
     ReceiptResponse compensateShortfall(Integer id, User currentUser);
     List<ReceiptResponse> getReceiptsByCustomer(Integer customerId, User currentUser);
+    List<ReceiptResponse> getCompletedBranchReceipts(User currentUser);
 }

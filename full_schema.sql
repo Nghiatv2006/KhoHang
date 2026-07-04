@@ -10,8 +10,8 @@ DROP TYPE IF EXISTS user_role, user_status, receipt_type, receipt_status, stockt
 -- 1. ENUM TYPES
 CREATE TYPE user_role AS ENUM ('ADMIN', 'MANAGER', 'STAFF');
 CREATE TYPE user_status AS ENUM ('ACTIVE', 'LOCKED');
-CREATE TYPE receipt_type AS ENUM ('IMPORT', 'EXPORT', 'TRANSFER', 'ADJUST_IN', 'ADJUST_OUT');
-CREATE TYPE receipt_status AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED', 'PENDING_ADMIN', 'PENDING_STOCKTAKE', 'PENDING_SHORTFALL_MANAGER', 'PENDING_SHORTFALL_ADMIN');
+CREATE TYPE receipt_type AS ENUM ('IMPORT', 'EXPORT', 'TRANSFER', 'ADJUST_IN', 'ADJUST_OUT', 'DISPOSAL');
+CREATE TYPE receipt_status AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED', 'PENDING_ADMIN', 'PENDING_STOCKTAKE', 'PENDING_SHORTFALL_MANAGER', 'PENDING_SHORTFALL_ADMIN', 'RETURN');
 CREATE TYPE stocktake_status AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED');
 
 -- Bảng Chi nhánh (Branches)
@@ -130,12 +130,17 @@ CREATE TABLE receipts (
     customer_phone VARCHAR(50),    -- SĐT khách hàng
     description VARCHAR(500),
     stocktake_by_id INT,           -- Người xác nhận kiểm kê (phiếu PENDING_STOCKTAKE)
+    approved_by_id INT,            -- Người duyệt phiếu
+    disposal_reason VARCHAR(255),   -- Lý do tiêu hủy (Hết hạn, Hư hỏng, Lỗi mốt...)
+    disposal_method VARCHAR(255),   -- Phương pháp tiêu hủy (Đốt, Hóa chất, Thuê xử lý...)
+    attachment_url VARCHAR(500),    -- File đính kèm biên bản tiêu hủy (PDF/Hình ảnh)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_receipt_source_branch FOREIGN KEY (source_branch_id) REFERENCES branches(id) ON DELETE RESTRICT,
     CONSTRAINT fk_receipt_dest_branch FOREIGN KEY (dest_branch_id) REFERENCES branches(id) ON DELETE RESTRICT,
     CONSTRAINT fk_receipt_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
     CONSTRAINT fk_receipt_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT,
-    CONSTRAINT fk_receipt_stocktake_by FOREIGN KEY (stocktake_by_id) REFERENCES users(id)
+    CONSTRAINT fk_receipt_stocktake_by FOREIGN KEY (stocktake_by_id) REFERENCES users(id),
+    CONSTRAINT fk_receipt_approved_by FOREIGN KEY (approved_by_id) REFERENCES users(id)
 );
 
 -- Bảng Chi tiết phiếu kho (Receipt Details)
@@ -231,4 +236,12 @@ CREATE TABLE backups (
 );
 
 CREATE INDEX idx_backups_branch_id ON backups (branch_id);
+
+-- Migration command to apply update on existing database
+-- ALTER TYPE receipt_status ADD VALUE 'RETURN';
+-- ALTER TYPE receipt_type ADD VALUE 'DISPOSAL';
+-- ALTER TABLE receipts ADD COLUMN disposal_reason VARCHAR(255);
+-- ALTER TABLE receipts ADD COLUMN disposal_method VARCHAR(255);
+-- ALTER TABLE receipts ADD COLUMN attachment_url VARCHAR(500);
+-- UPDATE receipts SET type = 'DISPOSAL' WHERE type = 'ADJUST_OUT' AND id IN (SELECT id FROM receipts WHERE type = 'ADJUST_OUT');
 

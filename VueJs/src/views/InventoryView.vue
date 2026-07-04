@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { api } from '../api'
 import { useToast } from '../utils/toast'
 import AppModal from '../components/AppModal.vue'
@@ -69,29 +69,7 @@ const selectedInv = ref<any>(null)
 // Add Stock Modal state
 
 
-// Create Inventory Modal state (Thêm sản phẩm vào Kho Tổng)
-const showCreateModal = ref(false)
-const submittingCreate = ref(false)
-const createForm = ref({
-  categoryId: '' as number | '',
-  productId: '' as number | '',
-  batchCode: '',
-  hasExpiry: false,
-  expiryWarningDays: 30,
-  manufacturingDate: '',
-  expirationDate: '',
-  quantity: 1
-})
 
-const filteredProductsForCreate = computed(() => {
-  if (!createForm.value.categoryId) return []
-  return products.value.filter(p => p.categoryId === Number(createForm.value.categoryId))
-})
-
-const selectedProductInCreateForm = computed(() => {
-  if (!createForm.value.productId) return null
-  return products.value.find(p => p.id === Number(createForm.value.productId)) || null
-})
 
 // Find Head Branch from list
 const headBranch = computed(() => {
@@ -269,7 +247,40 @@ const totalExpiredCount = computed(() => {
   return activeTabInventories.value.filter(inv => inv.isExpired).length
 })
 
-onMounted(loadData)
+const isInitialLoad = ref(true)
+let initialLoadTimeout: ReturnType<typeof setTimeout> | null = null
+
+function startInitialLoadTimer() {
+  if (initialLoadTimeout) clearTimeout(initialLoadTimeout)
+  initialLoadTimeout = setTimeout(() => {
+    isInitialLoad.value = false
+  }, 1000)
+}
+
+watch(loading, (newVal) => {
+  if (!newVal) {
+    startInitialLoadTimer()
+  }
+})
+
+watch([activeTab, selectedSubBranchId], () => {
+  isInitialLoad.value = true
+  startInitialLoadTimer()
+})
+
+function triggerInventoryAnimation() {
+  isInitialLoad.value = true
+  loadData()
+}
+
+onMounted(() => {
+  window.addEventListener('trigger-inventory-animation', triggerInventoryAnimation)
+  loadData()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('trigger-inventory-animation', triggerInventoryAnimation)
+})
 
 // Open Configure Threshold
 function openConfigModal() {
@@ -331,126 +342,6 @@ function openDetails(inv: any) {
   showDetailPanel.value = true
 }
 
-async function deleteInventory() {
-  if (!selectedInv.value) return;
-  if (!confirm('Bạn có chắc chắn muốn xoá dòng tồn kho này không? Dữ liệu bị xoá sẽ không thể khôi phục.')) return;
-  
-  if (selectedInv.value.quantity > 0) {
-    if (!confirm(`Cảnh báo: Dòng tồn kho này vẫn còn số lượng tồn là ${selectedInv.value.quantity} ${selectedInv.value.unit}. Bạn có thực sự chắc chắn muốn xoá không?`)) return;
-  }
-  
-  try {
-    const res = await api.delete(`/api/inventories/${selectedInv.value.id}`);
-    if (res.ok) {
-      toast.success('Xoá tồn kho thành công!');
-      showDetailPanel.value = false;
-      await loadData();
-    } else {
-      const text = await res.text();
-      let errMessage = 'Lỗi khi xoá tồn kho';
-      if (text) {
-        try {
-          const err = JSON.parse(text);
-          errMessage = err.message || errMessage;
-        } catch(e) {}
-      }
-      toast.error(errMessage);
-    }
-  } catch (err: any) {
-    toast.error('Lỗi kết nối: ' + err.message);
-  }
-}
-
-function openCreateInventoryModal() {
-  createForm.value = {
-    categoryId: '',
-    productId: '',
-    batchCode: '',
-    hasExpiry: false,
-    expiryWarningDays: 30,
-    manufacturingDate: '',
-    expirationDate: '',
-    quantity: 1
-  }
-  showCreateModal.value = true
-}
-
-async function submitCreateInventory() {
-  const form = createForm.value
-  if (!form.categoryId) {
-    toast.error('Vui lòng chọn danh mục.')
-    return
-  }
-  if (!form.productId) {
-    toast.error('Vui lòng chọn sản phẩm.')
-    return
-  }
-  if (!form.batchCode.trim()) {
-    toast.error('Vui lòng nhập mã lô sản xuất.')
-    return
-  }
-  if (form.quantity <= 0) {
-    toast.error('Số lượng nhập phải lớn hơn 0.')
-    return
-  }
-
-  if (!form.manufacturingDate) {
-    toast.error('Vui lòng nhập Ngày sản xuất (NSX).')
-    return
-  }
-
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const mfgDate = new Date(form.manufacturingDate)
-  mfgDate.setHours(0, 0, 0, 0)
-  if (mfgDate > today) {
-    toast.error('Ngày sản xuất (NSX) không được lớn hơn ngày hiện tại.')
-    return
-  }
-
-  if (form.hasExpiry) {
-    if (!form.expirationDate) {
-      toast.error('Vui lòng nhập Hạn sử dụng (HSD).')
-      return
-    }
-    if (new Date(form.expirationDate) < new Date(form.manufacturingDate)) {
-      toast.error('Hạn sử dụng không được nhỏ hơn Ngày sản xuất.')
-      return
-    }
-    if (!form.expiryWarningDays || Number(form.expiryWarningDays) <= 0) {
-      toast.error('Số ngày cảnh báo hạn dùng phải lớn hơn 0.');
-      return;
-    }
-  }
-
-  submittingCreate.value = true
-  try {
-    const payload = {
-      productId: Number(form.productId),
-      branchId: headBranch.value ? headBranch.value.id : 1,
-      batchCode: form.batchCode.trim(),
-      quantity: form.quantity,
-      hasExpiry: form.hasExpiry,
-      expiryWarningDays: form.hasExpiry ? Number(form.expiryWarningDays) : 30,
-      manufacturingDate: form.manufacturingDate,
-      expirationDate: form.hasExpiry ? form.expirationDate : null
-    }
-
-    const res = await api.post('/api/inventories', payload)
-    if (res.ok) {
-      toast.success('Thêm sản phẩm vào Kho Tổng thành công!')
-      showCreateModal.value = false
-      await loadData()
-    } else {
-      const errData = await res.json()
-      toast.error(errData.message || 'Lỗi khi thêm sản phẩm.')
-    }
-  } catch (err: any) {
-    toast.error('Lỗi kết nối: ' + err.message)
-  } finally {
-    submittingCreate.value = false
-  }
-}
 
 // Get lot status
 function getLotStatus(inv: any) {
@@ -557,7 +448,7 @@ function exportExcel() {
   <div class="space-y-6 max-w-[1400px] mx-auto font-['Inter',sans-serif]">
     
     <!-- Title & Controls -->
-    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
+    <div :class="['flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6', isInitialLoad ? 'header-slide-down' : '']">
       <div>
         <h2 class="text-2xl font-bold text-[#364a63] m-0 flex items-center gap-3">
           Quản lý Tồn kho
@@ -645,15 +536,7 @@ function exportExcel() {
           <i class="fas fa-file-excel"></i> Xuất Excel
         </button>
 
-        <!-- Add Product to Head Branch -->
-        <button 
-          v-if="activeTab === 'head' && !isAdmin && userIsAtHeadBranch"
 
-          @click="openCreateInventoryModal" 
-          class="h-[42px] bg-[#4361ee] hover:bg-[#3a0ca3] text-white px-5 rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-2"
-        >
-          <i class="fas fa-plus"></i> Thêm sản phẩm
-        </button>
       </div>
     </div>
 
@@ -676,11 +559,12 @@ function exportExcel() {
     </div>
 
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+    <div :key="`stats-${activeTab}-${selectedSubBranchId}`" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
       <!-- Distinct products -->
       <div 
         @click="clearFilters"
-        class="bg-white rounded-2xl p-6 border border-[#f1f5f9] hover:border-blue-300 hover:shadow-md cursor-pointer transition-all flex items-center justify-between gap-4 group relative"
+        :class="['bg-white rounded-2xl p-6 border border-[#f1f5f9] hover:border-blue-300 hover:shadow-md cursor-pointer transition-all flex items-center justify-between gap-4 group relative', isInitialLoad ? 'stat-card-3d' : '']"
+        :style="isInitialLoad ? { '--card-delay': '20ms' } : {}"
       >
         <!-- Custom Tooltip Bubble -->
         <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-blue-200 text-[#4361ee] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(67,97,238,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
@@ -698,7 +582,10 @@ function exportExcel() {
       </div>
 
       <!-- Total value -->
-      <div class="bg-white rounded-2xl p-6 border border-[#f1f5f9] shadow-sm flex items-center justify-between gap-4 group relative">
+      <div 
+        :class="['bg-white rounded-2xl p-6 border border-[#f1f5f9] shadow-sm flex items-center justify-between gap-4 group relative', isInitialLoad ? 'stat-card-3d' : '']"
+        :style="isInitialLoad ? { '--card-delay': '60ms' } : {}"
+      >
         <!-- Custom Tooltip Bubble -->
         <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-emerald-200 text-[#05b171] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(5,177,113,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
           <span class="font-mono text-sm">{{ formatVND(totalInventoryValue) }}</span>
@@ -721,8 +608,10 @@ function exportExcel() {
           'bg-white rounded-2xl p-6 border transition-all flex items-center justify-between gap-4 cursor-pointer select-none group relative', 
           onlyWarning 
             ? 'border-yellow-400 ring-2 ring-yellow-400/20 shadow-md' 
-            : 'border-[#f1f5f9] hover:border-yellow-300 hover:shadow-md'
+            : 'border-[#f1f5f9] hover:border-yellow-300 hover:shadow-md',
+          isInitialLoad ? 'stat-card-3d' : ''
         ]"
+        :style="isInitialLoad ? { '--card-delay': '100ms' } : {}"
       >
         <!-- Custom Tooltip Bubble -->
         <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-yellow-200 text-[#d9a80c] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(217,168,12,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
@@ -751,8 +640,10 @@ function exportExcel() {
           'bg-white rounded-2xl p-6 border transition-all flex items-center justify-between gap-4 cursor-pointer select-none group relative', 
           onlyExpired 
             ? 'border-[#ea4f52] ring-2 ring-[#ea4f52]/20 shadow-md' 
-            : 'border-[#f1f5f9] hover:border-red-300 hover:shadow-md'
+            : 'border-[#f1f5f9] hover:border-red-300 hover:shadow-md',
+          isInitialLoad ? 'stat-card-3d' : ''
         ]"
+        :style="isInitialLoad ? { '--card-delay': '140ms' } : {}"
       >
         <!-- Custom Tooltip Bubble -->
         <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-red-200 text-[#ea4f52] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(234,79,82,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
@@ -776,7 +667,7 @@ function exportExcel() {
     </div>
 
     <!-- INVENTORY TAB (Combined Toolbar & Table) -->
-    <div class="bg-indigo-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden">
+    <div :key="`table-${activeTab}-${selectedSubBranchId}`" :class="['bg-indigo-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden', isInitialLoad ? 'table-card-conveyor' : '']">
       
       <!-- Search & Filters Toolbar -->
       <div class="p-5 border-b border-[#f1f5f9] flex flex-col lg:flex-row items-center justify-between gap-4 bg-[#f8f9fa]/50">
@@ -851,9 +742,10 @@ function exportExcel() {
             </thead>
             <tbody>
               <tr 
-                v-for="inv in filteredInventories" 
+                v-for="(inv, index) in filteredInventories" 
                 :key="inv.id" 
-                class="border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer select-none group hover:-translate-y-[1px]"
+                :class="['border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer select-none group hover:-translate-y-[1px]', isInitialLoad ? 'inventory-row-anim' : '']"
+                :style="isInitialLoad ? { '--row-delay': `${200 + index * 15}ms` } : {}"
                 @dblclick="openDetails(inv)"
               >
               <!-- Name -->
@@ -879,7 +771,7 @@ function exportExcel() {
               </td>
 
               <!-- Lot Code -->
-              <td class="p-4 font-bold text-[#364a63] text-xs font-mono first:rounded-l-xl last:rounded-r-xl">{{ inv.batchCode }}</td>
+              <td class="p-4 font-bold text-[#364a63] text-xs font-mono first:rounded-l-xl last:rounded-r-xl"><div>{{ inv.batchCode }}</div></td>
 
               <!-- Branch / Category -->
               <td class="p-4 text-[#364a63] font-medium first:rounded-l-xl last:rounded-r-xl">
@@ -889,12 +781,12 @@ function exportExcel() {
                   </span>
                 </template>
                 <template v-else>
-                  {{ inv.branchName }}
+                  <div>{{ inv.branchName }}</div>
                 </template>
               </td>
 
               <!-- Unit -->
-              <td class="p-4 text-[#364a63] font-medium first:rounded-l-xl last:rounded-r-xl">{{ inv.unit }}</td>
+              <td class="p-4 text-[#364a63] font-medium first:rounded-l-xl last:rounded-r-xl"><div>{{ inv.unit }}</div></td>
 
               <!-- Quantity -->
               <td class="p-4 text-center first:rounded-l-xl last:rounded-r-xl">
@@ -906,7 +798,7 @@ function exportExcel() {
               </td>
 
               <!-- Total value -->
-              <td class="p-4 text-right font-extrabold text-[#364a63] first:rounded-l-xl last:rounded-r-xl">{{ formatVND(inv.totalValue) }}</td>
+              <td class="p-4 text-right font-extrabold text-[#364a63] first:rounded-l-xl last:rounded-r-xl"><div>{{ formatVND(inv.totalValue) }}</div></td>
             </tr>
           </tbody>
         </table>
@@ -958,163 +850,6 @@ function exportExcel() {
       </div>
     </AppModal>
 
-    <!-- Create Inventory Modal (Thêm sản phẩm vào Kho Tổng) -->
-    <AppModal 
-      :show="showCreateModal" 
-      title="Thêm sản phẩm vào Kho Tổng" 
-      size="md" 
-      @close="showCreateModal = false"
-    >
-      <div class="p-6 space-y-4 text-sm">
-        <!-- Dòng 1: Danh mục -->
-        <div>
-          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Danh mục</label>
-          <select 
-            v-model="createForm.categoryId" 
-            @change="createForm.productId = ''; createForm.manufacturingDate = ''; createForm.expirationDate = ''"
-            class="w-full h-11 px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all shadow-sm"
-          >
-            <option value="">-- Chọn danh mục --</option>
-            <option v-for="c in categories" :key="c.id" :value="c.id">
-              {{ c.name }}
-            </option>
-          </select>
-        </div>
-
-        <!-- Dòng 2: Sản phẩm -->
-        <div>
-          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Sản phẩm</label>
-          <select 
-            v-model="createForm.productId" 
-            :disabled="!createForm.categoryId"
-            class="w-full h-11 px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all shadow-sm disabled:bg-[#f1f5f9] disabled:text-slate-400"
-          >
-            <option value="">-- Chọn sản phẩm --</option>
-            <option v-for="p in filteredProductsForCreate" :key="p.id" :value="p.id">
-              [{{ p.sku }}] {{ p.name }}
-            </option>
-          </select>
-        </div>
-
-        <!-- Dòng 3: Đơn vị tính, Giá nhập & Giá bán (Read-only) -->
-        <div class="grid grid-cols-3 gap-4">
-          <div>
-            <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Đơn vị tính</label>
-            <input 
-              :value="selectedProductInCreateForm ? selectedProductInCreateForm.unit : '-'" 
-              type="text" 
-              disabled 
-              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#eef2ff] text-[#4361ee] rounded-xl text-sm outline-none font-extrabold transition-all" 
-            />
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Giá nhập</label>
-            <input 
-              :value="selectedProductInCreateForm ? formatVND(selectedProductInCreateForm.importPrice) : '-'" 
-              type="text" 
-              disabled 
-              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none text-slate-500 font-semibold transition-all" 
-            />
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Giá bán</label>
-            <input 
-              :value="selectedProductInCreateForm ? formatVND(selectedProductInCreateForm.price) : '-'" 
-              type="text" 
-              disabled 
-              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none text-slate-500 font-semibold transition-all" 
-            />
-          </div>
-        </div>
-
-        <!-- Dòng 4: Mã lô sản xuất & Số lượng nhập -->
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Mã lô sản xuất</label>
-            <input 
-              v-model="createForm.batchCode" 
-              type="text" 
-              placeholder="Ví dụ: BATCH-01, MILK-2026..." 
-              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
-            />
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số lượng nhập</label>
-            <input 
-              v-model="createForm.quantity" 
-              type="number" 
-              min="1" 
-              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
-            />
-          </div>
-        </div>
-
-        <!-- Ngày sản xuất (NSX) - Bắt buộc -->
-        <div>
-          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Ngày sản xuất (NSX)</label>
-          <input 
-            v-model="createForm.manufacturingDate" 
-            type="date" 
-            class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
-          />
-        </div>
-        <!-- Checkbox quản lý theo hạn dùng -->
-        <div class="flex items-center gap-2 py-1">
-          <input 
-            id="hasExpiry" 
-            v-model="createForm.hasExpiry" 
-            type="checkbox" 
-            class="w-5 h-5 accent-[#4361ee] cursor-pointer rounded-md border-slate-300" 
-          />
-          <label for="hasExpiry" class="cursor-pointer select-none font-bold text-xs text-[#8094ae] uppercase tracking-wider">
-            Sản phẩm quản lý theo hạn dùng
-          </label>
-        </div>
-
-        <!-- Các trường hạn dùng (chỉ hiện khi hasExpiry được tích chọn) -->
-        <Transition name="fade">
-          <div v-if="createForm.hasExpiry" class="space-y-4">
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Hạn sử dụng (HSD)</label>
-                <input 
-                  v-model="createForm.expirationDate" 
-                  type="date" 
-                  class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
-                />
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số ngày cảnh báo hạn dùng</label>
-                <input 
-                  v-model="createForm.expiryWarningDays" 
-                  type="number" 
-                  min="1"
-                  placeholder="Mặc định: 30" 
-                  class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
-                />
-              </div>
-            </div>
-          </div>
-        </Transition>
-
-        <div class="flex gap-3 pt-4 border-t border-[#f1f5f9]">
-          <button 
-            class="flex-1 h-11 bg-[#f8f9fa] hover:bg-[#e2e8f0] text-[#364a63] rounded-xl text-sm font-bold transition-colors" 
-            @click="showCreateModal = false"
-          >
-            Hủy bỏ
-          </button>
-          <button 
-            class="flex-1 h-11 bg-[#4361ee] hover:bg-[#3a0ca3] text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2" 
-            :disabled="submittingCreate"
-            @click="submitCreateInventory"
-          >
-            <i v-if="submittingCreate" class="fas fa-spinner fa-spin"></i>
-            Xác nhận thêm
-          </button>
-        </div>
-      </div>
-    </AppModal>
 
     <!-- ── INVENTORY DETAIL PANEL ── -->
     <Teleport to="body">
@@ -1134,7 +869,7 @@ function exportExcel() {
           class="fixed inset-y-0 right-0 z-[101] w-[450px] bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] flex flex-col border-l border-[#e2e8f0]"
         >
           <!-- Header -->
-          <div class="px-6 py-5 border-b border-[#f1f5f9] flex justify-between items-center bg-gradient-to-r from-[#f8fafc] to-white">
+          <div class="px-6 py-5 border-b border-[#f1f5f9] flex justify-between items-center bg-white">
             <h3 class="font-bold text-[#364a63] text-lg flex items-center gap-2">
               <i class="fas fa-info-circle text-[#4361ee]"></i>
               Chi tiết lô tồn kho
@@ -1164,13 +899,13 @@ function exportExcel() {
 
             <!-- Basic lot metrics -->
             <div class="grid grid-cols-2 gap-4">
-              <div class="bg-slate-50/60 rounded-xl p-4 border border-slate-100">
+              <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
                 <div class="text-[10px] text-[#8094ae] font-bold uppercase tracking-wider mb-1">Số lượng</div>
                 <div class="text-xl font-extrabold text-[#364a63]">
                   {{ selectedInv.quantity }} <span class="text-xs text-slate-500 font-normal">{{ selectedInv.unit }}</span>
                 </div>
               </div>
-              <div class="bg-slate-50/60 rounded-xl p-4 border border-slate-100">
+              <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
                 <div class="text-[10px] text-[#8094ae] font-bold uppercase tracking-wider mb-1">Giá trị tồn</div>
                 <div class="text-xl font-extrabold text-emerald-600">{{ formatVND(selectedInv.totalValue) }}</div>
               </div>
@@ -1273,14 +1008,6 @@ function exportExcel() {
           <!-- Footer -->
           <div class="p-6 border-t border-[#f1f5f9] bg-[#f8fafc] flex gap-3">
             <button 
-              v-if="user?.role !== 'STAFF'"
-              class="h-11 px-4 bg-white border border-[#ea4f52] hover:bg-[#ea4f52] text-[#ea4f52] hover:text-white rounded-xl text-sm font-bold transition-all shadow-sm group" 
-              title="Xoá dòng tồn kho này"
-              @click="deleteInventory"
-            >
-              <i class="fas fa-trash"></i>
-            </button>
-            <button 
               class="flex-1 h-11 bg-white border border-[#e2e8f0] hover:bg-[#f8f9fa] text-[#364a63] rounded-xl text-sm font-bold transition-colors shadow-sm" 
               @click="showDetailPanel = false"
             >
@@ -1315,4 +1042,61 @@ function exportExcel() {
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ── 3D Isometric Box Stack Animations ── */
+@keyframes slideDownHeader {
+  0% { transform: translateY(-30px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.header-slide-down {
+  animation: slideDownHeader 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes boxStack3D {
+  0% {
+    transform: perspective(1000px) rotateX(20deg) rotateY(-15deg) translate3d(0, -60px, -150px);
+    opacity: 0;
+  }
+  100% {
+    transform: perspective(1000px) rotateX(0deg) rotateY(0deg) translate3d(0, 0, 0);
+    opacity: 1;
+  }
+}
+.stat-card-3d {
+  animation: boxStack3D 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: var(--card-delay, 0ms);
+  will-change: transform, opacity;
+}
+
+@keyframes conveyorSlide {
+  0% {
+    transform: perspective(1000px) translate3d(0, 40px, -200px) scale(0.92);
+    opacity: 0;
+  }
+  100% {
+    transform: perspective(1000px) translate3d(0, 0, 0) scale(1);
+    opacity: 1;
+  }
+}
+.table-card-conveyor {
+  animation: conveyorSlide 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 120ms;
+  will-change: transform, opacity;
+}
+
+@keyframes rowSlideUp {
+  0% {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.inventory-row-anim {
+  animation: rowSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--row-delay, 0ms);
+  will-change: transform, opacity;
+}
 </style>

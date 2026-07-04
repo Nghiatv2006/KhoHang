@@ -537,7 +537,7 @@ function formatCurrency(val: any) {
       <Transition name="slide-panel">
         <div v-if="showProductModal" class="fixed inset-y-0 right-0 z-[101] w-[450px] bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] flex flex-col border-l border-[#e2e8f0]">
           <!-- Header -->
-          <div class="px-6 py-5 border-b border-[#f1f5f9] flex justify-between items-center bg-gradient-to-r from-[#f8fafc] to-white">
+          <div class="px-6 py-5 border-b border-[#f1f5f9] flex justify-between items-center bg-[#f8f9fa]">
             <h3 class="font-bold text-[#364a63] text-lg flex items-center gap-2">
               <i class="fas fa-box text-[#4361ee]"></i>
               {{ editingProduct ? 'Sửa sản phẩm' : 'Thêm sản phẩm mới' }}

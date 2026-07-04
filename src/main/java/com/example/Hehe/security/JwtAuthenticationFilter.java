@@ -55,6 +55,30 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         return;
                     }
 
+                    // --- Sliding Window Token Refresh ---
+                    // Tự động gia hạn token nếu sắp hết hạn (còn dưới 12 giờ)
+                    try {
+                        java.util.Date expiration = jwtTokenProvider.getExpirationDateFromToken(jwt);
+                        long remainingMs = expiration.getTime() - System.currentTimeMillis();
+                        long thresholdMs = 12 * 60 * 60 * 1000L; // 12 giờ
+
+                        if (remainingMs < thresholdMs) {
+                            String newJwt = jwtTokenProvider.generateToken(username, user.getRole().name());
+                            org.springframework.http.ResponseCookie newCookie = org.springframework.http.ResponseCookie.from("accessToken", newJwt)
+                                    .httpOnly(true)
+                                    .secure(false) // chạy local http
+                                    .path("/")
+                                    .maxAge(86400) // 24 giờ
+                                    .sameSite("Lax")
+                                    .build();
+                            response.setHeader(org.springframework.http.HttpHeaders.SET_COOKIE, newCookie.toString());
+                            System.out.println("DEBUG JwtAuthenticationFilter: Reissued JWT cookie due to low remaining duration (" + (remainingMs / 1000 / 60) + " minutes left)");
+                        }
+                    } catch (Exception e) {
+                        System.err.println("DEBUG JwtAuthenticationFilter: Failed to auto-refresh JWT: " + e.getMessage());
+                    }
+                    // ------------------------------------
+
                     // Thiết lập quyền dựa trên vai trò (ROLE_ADMIN, ROLE_MANAGER, ROLE_STAFF)
                     SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + user.getRole().name());
                     
