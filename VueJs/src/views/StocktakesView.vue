@@ -57,6 +57,7 @@ watch([filterFrom, filterTo], () => {
 const selectedStocktake = ref<any>(null)
 const showDetailDrawer = ref(false)
 const savingDraft = ref(false)
+const isSpaceEasterEgg = ref(false)
 
 // Confirm dialogs
 const showCompleteConfirm = ref(false)
@@ -114,6 +115,7 @@ async function loadingDetail(id: number) {
     const res = await api.get(`/api/stocktakes/${id}`)
     if (res.ok) {
       selectedStocktake.value = await res.json()
+      isSpaceEasterEgg.value = Math.random() < 0.004
       showDetailDrawer.value = true
     } else {
       toast.error('Không thể tải chi tiết phiên kiểm kê.')
@@ -417,6 +419,7 @@ const showRsDrawer = ref(false)
 const rsDetailLoading = ref(false)
 
 async function openRsDetail(r: any) {
+  isSpaceEasterEgg.value = Math.random() < 0.004
   rsDetailLoading.value = true
   showRsDrawer.value = true
   selectedRsReceipt.value = null
@@ -760,23 +763,56 @@ onUnmounted(() => {
       <div class="w-full max-w-[950px] bg-white h-full flex flex-col shadow-2xl relative animate-slide-in">
         
         <!-- Drawer Header -->
-        <div class="px-8 py-5 border-b border-[#f1f5f9] flex justify-between items-center bg-[#f8f9fa]">
-          <div>
+        <div class="theme-modal-header relative overflow-hidden flex items-center justify-between px-8 py-6 transition-colors duration-500" :class="{ 'easter-egg-space': isSpaceEasterEgg }">
+          <template v-if="isSpaceEasterEgg">
+            <!-- Space Easter Egg Decor -->
+            <div class="absolute inset-0 pointer-events-none">
+              <i class="fas fa-rocket absolute top-4 right-32 text-white/80 text-4xl animate-[bounce_3s_infinite] -rotate-45"></i>
+              <i class="fas fa-meteor absolute -top-4 right-16 text-orange-400/60 text-6xl rotate-[120deg] drop-shadow-[0_0_15px_rgba(251,146,60,0.8)]"></i>
+              <i class="fas fa-user-astronaut absolute bottom-2 right-64 text-white/60 text-3xl animate-[bounce_4s_infinite]"></i>
+              <i class="fas fa-star absolute top-2 right-48 text-white/90 text-[8px] animate-pulse"></i>
+              <i class="fas fa-star absolute bottom-4 right-20 text-white/70 text-[6px] animate-pulse" style="animation-delay: 1s"></i>
+              <i class="fas fa-satellite absolute top-8 right-80 text-white/50 text-2xl animate-[spin_20s_linear_infinite]"></i>
+            </div>
+          </template>
+          <template v-else>
+            <!-- Light Mode Decor: Sun & Clouds -->
+            <div :key="'light-st-detail-' + selectedStocktake?.id" class="theme-light-decor absolute inset-0 pointer-events-none transition-all duration-500">
+              <i class="fas fa-sun absolute -top-12 right-8 text-yellow-300 text-[140px] opacity-10 animate-[spin_40s_linear_infinite]"></i>
+              <i class="fas fa-sun absolute top-3 right-24 text-yellow-300 text-5xl drop-shadow-[0_0_20px_rgba(253,224,71,0.8)] animate-[spin_20s_linear_infinite]"></i>
+              <i class="fas fa-cloud absolute top-8 right-44 text-white/50 text-5xl drop-shadow-sm"></i>
+              <i class="fas fa-cloud absolute top-2 right-64 text-white/40 text-3xl"></i>
+              <i class="fas fa-cloud absolute -bottom-2 right-28 text-white/30 text-7xl"></i>
+            </div>
+
+            <!-- Dark Mode Decor: Moon & Stars -->
+            <div :key="'dark-st-detail-' + selectedStocktake?.id" class="theme-dark-decor absolute inset-0 pointer-events-none transition-all duration-500">
+              <i class="fas fa-moon absolute -top-8 right-12 text-blue-100 text-[120px] opacity-[0.03] -rotate-12"></i>
+              <i class="fas fa-moon absolute top-3 right-24 text-yellow-200 text-4xl drop-shadow-[0_0_15px_rgba(254,240,138,0.5)] -rotate-12"></i>
+              <i class="fas fa-star absolute top-4 right-48 text-white/80 text-[8px] animate-pulse"></i>
+              <i class="fas fa-star absolute top-8 right-60 text-white/60 text-[10px] animate-pulse" style="animation-delay: 1s"></i>
+              <i class="fas fa-star absolute top-3 right-72 text-white/90 text-[6px] animate-pulse" style="animation-delay: 0.5s"></i>
+              <i class="fas fa-star absolute bottom-4 right-36 text-white/50 text-[12px] animate-pulse" style="animation-delay: 1.5s"></i>
+              <i class="fas fa-star absolute bottom-2 right-56 text-white/70 text-[8px] animate-pulse"></i>
+            </div>
+          </template>
+
+          <div class="relative z-10 text-white drop-shadow-md">
             <div class="flex items-center gap-3">
-              <h3 class="text-lg font-bold text-[#364a63] m-0">Phiên kiểm kê: {{ selectedStocktake.code }}</h3>
-              <span :class="['inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border', getStatusBadgeClass(selectedStocktake.status)]">
+              <h3 class="text-lg font-bold text-white m-0">Phiên kiểm kê: {{ selectedStocktake.code }}</h3>
+              <span :class="['inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-white/20 bg-white/10 text-white']">
                 {{ getStatusLabel(selectedStocktake.status) }}
               </span>
             </div>
-            <div class="text-xs text-[#8094ae] mt-1">
-              Người tạo: <span class="font-bold text-[#364a63]">{{ selectedStocktake.createdByName }}</span>
-              | Chi nhánh: <span class="font-bold text-[#364a63]">{{ selectedStocktake.branchName }}</span>
-              | Thời gian: <span class="font-mono font-bold">{{ formatDateTime(selectedStocktake.createdAt) }}</span>
+            <div class="text-xs text-white/80 mt-1">
+              Người tạo: <span class="font-bold text-white">{{ selectedStocktake.createdByName }}</span>
+              | Chi nhánh: <span class="font-bold text-white">{{ selectedStocktake.branchName }}</span>
+              | Thời gian: <span class="font-mono font-bold text-white">{{ formatDateTime(selectedStocktake.createdAt) }}</span>
             </div>
           </div>
           <button
             @click="showDetailDrawer = false"
-            class="w-9 h-9 rounded-xl hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors"
+            class="relative z-10 w-9 h-9 flex items-center justify-center rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-sm transition-all shadow-sm border border-white/10"
           >
             <i class="fas fa-times text-lg"></i>
           </button>
@@ -1060,21 +1096,54 @@ onUnmounted(() => {
       style="background:rgba(0,0,0,0.3);backdrop-filter:blur(2px);" @click.self="showRsDrawer=false">
       <div class="w-full max-w-[860px] bg-white h-full flex flex-col shadow-2xl animate-slide-in">
         <!-- Header -->
-        <div class="px-8 py-5 border-b border-[#f1f5f9] flex justify-between items-center bg-purple-50">
-          <div>
+        <div class="theme-modal-header relative overflow-hidden flex items-center justify-between px-8 py-6 transition-colors duration-500" :class="{ 'easter-egg-space': isSpaceEasterEgg }">
+          <template v-if="isSpaceEasterEgg">
+            <!-- Space Easter Egg Decor -->
+            <div class="absolute inset-0 pointer-events-none">
+              <i class="fas fa-rocket absolute top-4 right-32 text-white/80 text-4xl animate-[bounce_3s_infinite] -rotate-45"></i>
+              <i class="fas fa-meteor absolute -top-4 right-16 text-orange-400/60 text-6xl rotate-[120deg] drop-shadow-[0_0_15px_rgba(251,146,60,0.8)]"></i>
+              <i class="fas fa-user-astronaut absolute bottom-2 right-64 text-white/60 text-3xl animate-[bounce_4s_infinite]"></i>
+              <i class="fas fa-star absolute top-2 right-48 text-white/90 text-[8px] animate-pulse"></i>
+              <i class="fas fa-star absolute bottom-4 right-20 text-white/70 text-[6px] animate-pulse" style="animation-delay: 1s"></i>
+              <i class="fas fa-satellite absolute top-8 right-80 text-white/50 text-2xl animate-[spin_20s_linear_infinite]"></i>
+            </div>
+          </template>
+          <template v-else>
+            <!-- Light Mode Decor: Sun & Clouds -->
+            <div :key="'light-rs-detail-' + selectedRsReceipt?.id" class="theme-light-decor absolute inset-0 pointer-events-none transition-all duration-500">
+              <i class="fas fa-sun absolute -top-12 right-8 text-yellow-300 text-[140px] opacity-10 animate-[spin_40s_linear_infinite]"></i>
+              <i class="fas fa-sun absolute top-3 right-24 text-yellow-300 text-5xl drop-shadow-[0_0_20px_rgba(253,224,71,0.8)] animate-[spin_20s_linear_infinite]"></i>
+              <i class="fas fa-cloud absolute top-8 right-44 text-white/50 text-5xl drop-shadow-sm"></i>
+              <i class="fas fa-cloud absolute top-2 right-64 text-white/40 text-3xl"></i>
+              <i class="fas fa-cloud absolute -bottom-2 right-28 text-white/30 text-7xl"></i>
+            </div>
+
+            <!-- Dark Mode Decor: Moon & Stars -->
+            <div :key="'dark-rs-detail-' + selectedRsReceipt?.id" class="theme-dark-decor absolute inset-0 pointer-events-none transition-all duration-500">
+              <i class="fas fa-moon absolute -top-8 right-12 text-blue-100 text-[120px] opacity-[0.03] -rotate-12"></i>
+              <i class="fas fa-moon absolute top-3 right-24 text-yellow-200 text-4xl drop-shadow-[0_0_15px_rgba(254,240,138,0.5)] -rotate-12"></i>
+              <i class="fas fa-star absolute top-4 right-48 text-white/80 text-[8px] animate-pulse"></i>
+              <i class="fas fa-star absolute top-8 right-60 text-white/60 text-[10px] animate-pulse" style="animation-delay: 1s"></i>
+              <i class="fas fa-star absolute top-3 right-72 text-white/90 text-[6px] animate-pulse" style="animation-delay: 0.5s"></i>
+              <i class="fas fa-star absolute bottom-4 right-36 text-white/50 text-[12px] animate-pulse" style="animation-delay: 1.5s"></i>
+              <i class="fas fa-star absolute bottom-2 right-56 text-white/70 text-[8px] animate-pulse"></i>
+            </div>
+          </template>
+
+          <div class="relative z-10 text-white drop-shadow-md">
             <div class="flex items-center gap-3">
-              <h3 class="text-lg font-bold text-[#364a63] m-0">Xác nhận kiểm kê: {{ selectedRsReceipt.code }}</h3>
-              <span :class="['px-2.5 py-0.5 rounded-full text-[11px] font-bold border', rsTypeClass(selectedRsReceipt.type)]">
+              <h3 class="text-lg font-bold text-white m-0">Xác nhận kiểm kê: {{ selectedRsReceipt.code }}</h3>
+              <span :class="['px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-white/20 bg-white/10 text-white']">
                 {{ rsTypeLabel(selectedRsReceipt.type) }}
               </span>
             </div>
-            <div class="text-xs text-[#8094ae] mt-1">
-              Từ: <span class="font-bold text-[#364a63]">{{ selectedRsReceipt.sourceBranchName || '—' }}</span>
-              → Đến: <span class="font-bold text-[#364a63]">{{ selectedRsReceipt.destBranchName || '—' }}</span>
-              | Lập bởi: <span class="font-bold">{{ selectedRsReceipt.createdByName }}</span>
+            <div class="text-xs text-white/80 mt-1">
+              Từ: <span class="font-bold text-white">{{ selectedRsReceipt.sourceBranchName || '—' }}</span>
+              → Đến: <span class="font-bold text-white">{{ selectedRsReceipt.destBranchName || '—' }}</span>
+              | Lập bởi: <span class="font-bold text-white">{{ selectedRsReceipt.createdByName }}</span>
             </div>
           </div>
-          <button @click="showRsDrawer=false" class="w-9 h-9 rounded-xl hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center">
+          <button @click="showRsDrawer=false" class="relative z-10 w-9 h-9 flex items-center justify-center rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-sm transition-all shadow-sm border border-white/10">
             <i class="fas fa-times text-lg"></i>
           </button>
         </div>
@@ -1273,6 +1342,19 @@ onUnmounted(() => {
   animation: slide-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Dynamic Modal Header Styles */
+.theme-modal-header {
+  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+}
+.theme-light-decor {
+  opacity: 1;
+  transform: translateY(0);
+}
+.theme-dark-decor {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
 /* ── Accordion Entrance Animations ── */
 @keyframes slideDownHeader {
   0% { transform: translateY(-30px); opacity: 0; }
@@ -1317,5 +1399,26 @@ onUnmounted(() => {
   animation: slideFromRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
   animation-delay: var(--row-delay, 0ms);
   will-change: transform, opacity;
+}
+</style>
+
+<style>
+/* Dark Mode Overrides for Stocktake Modal Header */
+html.dark-mode .theme-modal-header {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+}
+html.dark-mode .theme-modal-header.easter-egg-space {
+  background: linear-gradient(135deg, #090a0f 0%, #1b1130 50%, #0c0817 100%) !important;
+}
+html.dark-mode .theme-light-decor {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+html.dark-mode .theme-dark-decor {
+  opacity: 1;
+  transform: translateY(0);
+}
+.theme-modal-header.easter-egg-space {
+  background: linear-gradient(135deg, #090a0f 0%, #1b1130 50%, #0c0817 100%) !important;
 }
 </style>
