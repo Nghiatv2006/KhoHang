@@ -43,8 +43,10 @@ public class ReceiptServiceImpl implements ReceiptService {
             Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
             return receiptRepository.findAll().stream()
                     .filter(r -> {
-                        if (r.getType() == ReceiptType.IMPORT && r.getStatus() == ReceiptStatus.DRAFT) {
-                            boolean isMyBranch = myBranchId != null && r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId);
+                        if (r.getStatus() == ReceiptStatus.DRAFT) {
+                            boolean isMyBranch = myBranchId != null && 
+                                ((r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId)) || 
+                                 (r.getSourceBranch() != null && r.getSourceBranch().getId().equals(myBranchId)));
                             boolean isCreator = r.getCreatedBy() != null && r.getCreatedBy().getId().equals(currentUser.getId());
                             return isMyBranch || isCreator;
                         }
@@ -92,11 +94,13 @@ public class ReceiptServiceImpl implements ReceiptService {
         Receipt r = receiptRepository.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
         if (currentUser.getRole() == UserRole.ADMIN) {
             Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
-            if (r.getType() == ReceiptType.IMPORT && r.getStatus() == ReceiptStatus.DRAFT) {
-                boolean isMyBranch = myBranchId != null && r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId);
+            if (r.getStatus() == ReceiptStatus.DRAFT) {
+                boolean isMyBranch = myBranchId != null && 
+                    ((r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId)) || 
+                     (r.getSourceBranch() != null && r.getSourceBranch().getId().equals(myBranchId)));
                 boolean isCreator = r.getCreatedBy() != null && r.getCreatedBy().getId().equals(currentUser.getId());
                 if (!isMyBranch && !isCreator) {
-                    throw new RuntimeException("Phiếu nhập kho này chưa được quản lý chi nhánh duyệt.");
+                    throw new RuntimeException("Phiếu nháp này không thuộc quyền quản lý của bạn.");
                 }
             }
             if (r.getType() == ReceiptType.TRANSFER) {
@@ -137,9 +141,11 @@ public class ReceiptServiceImpl implements ReceiptService {
         return receipts.stream()
                 .filter(r -> {
                     if (currentUser.getRole() == UserRole.ADMIN) {
-                        if (r.getType() == ReceiptType.IMPORT && r.getStatus() == ReceiptStatus.DRAFT) {
+                        if (r.getStatus() == ReceiptStatus.DRAFT) {
                             Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
-                            boolean isMyBranch = myBranchId != null && r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId);
+                            boolean isMyBranch = myBranchId != null && 
+                                ((r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId)) || 
+                                 (r.getSourceBranch() != null && r.getSourceBranch().getId().equals(myBranchId)));
                             boolean isCreator = r.getCreatedBy() != null && r.getCreatedBy().getId().equals(currentUser.getId());
                             return isMyBranch || isCreator;
                         }
@@ -351,40 +357,43 @@ public class ReceiptServiceImpl implements ReceiptService {
         if (r.getStatus() == ReceiptStatus.CANCELLED) throw new RuntimeException("Receipt is already cancelled.");
         if (r.getStatus() == ReceiptStatus.PENDING_SHORTFALL_ADMIN) throw new RuntimeException("Phiếu đã chuyển lên Admin duyệt thiếu hụt thì không thể hủy.");
         
-        if (currentUser.getRole() == UserRole.ADMIN) {
-            if (r.getType() == ReceiptType.EXPORT && r.getSourceBranch() != null && r.getSourceBranch().getId() != 1) {
-                throw new RuntimeException("Admin chỉ quản lý phiếu xuất bán của Chi nhánh tổng.");
+        if (r.getStatus() == ReceiptStatus.DRAFT) {
+            if (!currentUser.getId().equals(r.getCreatedBy().getId())) {
+                throw new RuntimeException("Chỉ người lập phiếu mới được quyền xóa/hủy phiếu nháp.");
             }
-        }
-        
-        // ADMIN can cancel any, MANAGER can cancel their own branch's
-        if (currentUser.getRole() != UserRole.ADMIN) {
-            Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
-            if (myBranchId == null) throw new RuntimeException("Bạn chưa thuộc chi nhánh nào.");
-            if (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.ADJUST_IN) {
-                boolean isCrossBranch = (r.getType() == ReceiptType.IMPORT && r.getSourceBranch() != null && r.getDestBranch() != null && !r.getSourceBranch().getId().equals(r.getDestBranch().getId()));
-                if (isCrossBranch) {
-                    if (!r.getDestBranch().getId().equals(myBranchId) && !r.getSourceBranch().getId().equals(myBranchId)) {
-                        throw new RuntimeException("Bạn không có quyền hủy phiếu của chi nhánh khác.");
-                    }
-                } else {
-                    if (r.getDestBranch() == null || !r.getDestBranch().getId().equals(myBranchId)) {
-                        throw new RuntimeException("Bạn không có quyền hủy phiếu của chi nhánh khác.");
-                    }
-                }
-            } else if (r.getType() == ReceiptType.TRANSFER) {
-                if ((r.getSourceBranch() == null || !r.getSourceBranch().getId().equals(myBranchId)) && 
-                    (r.getDestBranch() == null || !r.getDestBranch().getId().equals(myBranchId))) {
-                    throw new RuntimeException("Bạn không có quyền hủy phiếu điều chuyển của chi nhánh khác.");
+        } else {
+            if (currentUser.getRole() == UserRole.STAFF) {
+                throw new RuntimeException("Nhân viên không có quyền hủy phiếu đã được xử lý.");
+            }
+            
+            if (currentUser.getRole() == UserRole.ADMIN) {
+                if (r.getType() == ReceiptType.EXPORT && r.getSourceBranch() != null && r.getSourceBranch().getId() != 1) {
+                    throw new RuntimeException("Admin chỉ quản lý phiếu xuất bán của Chi nhánh tổng.");
                 }
             } else {
-                // EXPORT, ADJUST_OUT, DISPOSAL
-                if (r.getSourceBranch() == null || !r.getSourceBranch().getId().equals(myBranchId)) {
-                    throw new RuntimeException("Bạn không có quyền hủy phiếu của chi nhánh khác.");
+                Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
+                if (myBranchId == null) throw new RuntimeException("Bạn chưa thuộc chi nhánh nào.");
+                if (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.ADJUST_IN) {
+                    boolean isCrossBranch = (r.getType() == ReceiptType.IMPORT && r.getSourceBranch() != null && r.getDestBranch() != null && !r.getSourceBranch().getId().equals(r.getDestBranch().getId()));
+                    if (isCrossBranch) {
+                        if (!r.getDestBranch().getId().equals(myBranchId) && !r.getSourceBranch().getId().equals(myBranchId)) {
+                            throw new RuntimeException("Bạn không có quyền hủy phiếu của chi nhánh khác.");
+                        }
+                    } else {
+                        if (r.getDestBranch() == null || !r.getDestBranch().getId().equals(myBranchId)) {
+                            throw new RuntimeException("Bạn không có quyền hủy phiếu của chi nhánh khác.");
+                        }
+                    }
+                } else if (r.getType() == ReceiptType.TRANSFER) {
+                    if ((r.getSourceBranch() == null || !r.getSourceBranch().getId().equals(myBranchId)) && 
+                        (r.getDestBranch() == null || !r.getDestBranch().getId().equals(myBranchId))) {
+                        throw new RuntimeException("Bạn không có quyền hủy phiếu điều chuyển của chi nhánh khác.");
+                    }
+                } else {
+                    if (r.getSourceBranch() == null || !r.getSourceBranch().getId().equals(myBranchId)) {
+                        throw new RuntimeException("Bạn không có quyền hủy phiếu của chi nhánh khác.");
+                    }
                 }
-            }
-            if (currentUser.getRole() == UserRole.STAFF) {
-                throw new RuntimeException("Nhân viên không có quyền hủy phiếu.");
             }
         }
 
@@ -574,6 +583,12 @@ public class ReceiptServiceImpl implements ReceiptService {
         
         if (currentUser.getRole() == UserRole.ADMIN && r.getType() == ReceiptType.TRANSFER) {
             throw new RuntimeException("Admin không được quyền can thiệp vào phiếu điều chuyển giữa các chi nhánh.");
+        }
+
+        if (r.getType() == ReceiptType.EXPORT && r.getStatus() == ReceiptStatus.DRAFT) {
+            if (!currentUser.getId().equals(r.getCreatedBy().getId())) {
+                throw new RuntimeException("Chỉ người lập Hóa đơn mới được quyền hoàn thành (duyệt) Hóa đơn nháp.");
+            }
         }
 
         if (currentUser.getRole() == UserRole.STAFF) {

@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { api } from '../api'
 import { useToast } from '../utils/toast'
 import StatusBadge from '../components/StatusBadge.vue'
 
 const toast = useToast()
+const router = useRouter()
 const user = ref<any>(JSON.parse(localStorage.getItem('wh_user') || '{}'))
 
 const pwForm = reactive({ currentPassword: '', newPassword: '', confirmPassword: '' })
 const pwSaving = ref(false)
 const showPwds = reactive({ current: false, new: false, confirm: false })
 const pwError = ref('')
+const showConfirmModal = ref(false)
 
 async function refreshUser() {
   try {
@@ -23,7 +26,7 @@ async function refreshUser() {
   } catch {}
 }
 
-async function changePassword() {
+function prepareChangePassword() {
   pwError.value = ''
   if (!pwForm.currentPassword || !pwForm.newPassword || !pwForm.confirmPassword) {
     pwError.value = 'Vui lòng nhập đầy đủ tất cả các trường.'; return
@@ -34,6 +37,10 @@ async function changePassword() {
   if (pwForm.newPassword !== pwForm.confirmPassword) {
     pwError.value = 'Mật khẩu mới và xác nhận không khớp.'; return
   }
+  showConfirmModal.value = true
+}
+
+async function executeChangePassword() {
   pwSaving.value = true
   try {
     const res = await api.put('/api/users/me/change-password', {
@@ -43,12 +50,20 @@ async function changePassword() {
     })
     const data = await res.json()
     if (res.ok) {
-      toast.success('Đổi mật khẩu thành công!')
-      Object.assign(pwForm, { currentPassword: '', newPassword: '', confirmPassword: '' })
+      toast.success('Đổi mật khẩu thành công! Hệ thống sẽ tự động đăng xuất.')
+      try { await api.post('/api/auth/logout', {}) } catch (e) {}
+      localStorage.removeItem('wh_user')
+      localStorage.removeItem('wh_token')
+      showConfirmModal.value = false
+      router.push('/login')
     } else {
       pwError.value = data.message || 'Có lỗi xảy ra.'
+      showConfirmModal.value = false
     }
-  } catch { pwError.value = 'Không thể kết nối máy chủ.' }
+  } catch { 
+    pwError.value = 'Không thể kết nối máy chủ.' 
+    showConfirmModal.value = false
+  }
   finally { pwSaving.value = false }
 }
 
@@ -248,7 +263,7 @@ onMounted(refreshUser)
             class="h-11 px-6 bg-[#4361ee] hover:bg-[#3a0ca3] text-white rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md hover:-translate-y-0.5"
             :disabled="pwSaving"
             :style="pwSaving ? 'opacity:0.7;cursor:not-allowed;transform:none' : ''"
-            @click="changePassword"
+            @click="prepareChangePassword"
           >
             <i v-if="pwSaving" class="fas fa-spinner fa-spin"></i>
             <i v-else class="fas fa-save"></i>
@@ -258,6 +273,39 @@ onMounted(refreshUser)
       </div>
     </div>
   </div>
+
+  <Teleport to="body">
+    <div v-if="showConfirmModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all">
+        <!-- Header -->
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3 bg-amber-50/50 text-amber-600">
+          <i class="fas fa-exclamation-triangle text-xl"></i>
+          <h3 class="font-bold text-lg">Xác nhận đổi mật khẩu</h3>
+        </div>
+        
+        <!-- Body -->
+        <div class="p-6 text-slate-600">
+          <p class="mb-4">Bạn có chắc chắn muốn đổi mật khẩu?</p>
+          <p class="font-medium text-rose-600 bg-rose-50 p-3 rounded-lg text-sm flex gap-2">
+            <i class="fas fa-info-circle mt-0.5"></i>
+            Hệ thống sẽ đăng xuất tài khoản của bạn ngay sau khi đổi thành công. Bạn sẽ cần sử dụng mật khẩu mới ở lần đăng nhập tiếp theo.
+          </p>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+          <button @click="showConfirmModal = false" :disabled="pwSaving" class="px-5 py-2.5 rounded-xl font-bold text-slate-500 hover:bg-slate-200 transition-colors disabled:opacity-50">
+            Hủy bỏ
+          </button>
+          <button @click="executeChangePassword" :disabled="pwSaving" class="px-5 py-2.5 rounded-xl font-bold text-white bg-amber-500 hover:bg-amber-600 shadow hover:shadow-md transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            <i v-if="pwSaving" class="fas fa-spinner fa-spin"></i>
+            <i v-else class="fas fa-check"></i>
+            Xác nhận đổi
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>

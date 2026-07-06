@@ -1385,7 +1385,7 @@ const pageIcon = computed(() => {
       </div>
       <div class="flex items-center gap-3">
         <button
-          v-if="isAdmin"
+          v-if="isAdmin && filterType === 'IMPORT'"
           @click="openDirectImportModal"
           class="h-[42px] bg-[#05b171] hover:bg-[#04965e] text-white px-5 rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-2"
         >
