@@ -4,16 +4,16 @@
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
-                <mxCell id="bg_user" value="" style="fillColor=#f2f7fc;strokeColor=none;" parent="1" vertex="1">
+                <mxCell id="bg_user" value="" style="fillColor=#ffffff;strokeColor=none;" parent="1" vertex="1">
                     <mxGeometry x="40" y="50" width="220" height="768" as="geometry"/>
                 </mxCell>
-                <mxCell id="bg_ui" value="" style="fillColor=#fffdf0;strokeColor=none;" parent="1" vertex="1">
+                <mxCell id="bg_ui" value="" style="fillColor=#ffffff;strokeColor=none;" parent="1" vertex="1">
                     <mxGeometry x="280" y="50" width="220" height="768" as="geometry"/>
                 </mxCell>
-                <mxCell id="bg_backend" value="" style="fillColor=#faf5fc;strokeColor=none;" parent="1" vertex="1">
+                <mxCell id="bg_backend" value="" style="fillColor=#ffffff;strokeColor=none;" parent="1" vertex="1">
                     <mxGeometry x="520" y="50" width="320" height="768" as="geometry"/>
                 </mxCell>
-                <mxCell id="bg_db" value="" style="fillColor=#f5faf5;strokeColor=none;" parent="1" vertex="1">
+                <mxCell id="bg_db" value="" style="fillColor=#ffffff;strokeColor=none;" parent="1" vertex="1">
                     <mxGeometry x="860" y="50" width="220" height="768" as="geometry"/>
                 </mxCell>
                 <mxCell id="user_header" value="1. Manager" style="fillColor=#f5f5f5;strokeColor=#cccccc;fontStyle=1;align=center;whiteSpace=wrap;html=1;" parent="1" vertex="1">
@@ -88,7 +88,7 @@
                 <mxCell id="edge_1002" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;endArrow=classic;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" parent="1" source="F1" target="B1" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="edge_1003" value="Query user" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;endArrow=classic;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" parent="1" source="B1" target="D1" edge="1">
+                <mxCell id="edge_1003" value="Truy vấn user" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;endArrow=classic;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" parent="1" source="B1" target="D1" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
                 <mxCell id="edge_1004" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" parent="1" source="B1" target="B2" edge="1">
