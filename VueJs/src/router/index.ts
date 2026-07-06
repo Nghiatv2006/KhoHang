@@ -103,6 +103,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/AuditLogView.vue'),
         meta: { roles: ['ADMIN', 'MANAGER'] },
       },
+      {
+        path: '/revenue',
+        name: 'Revenue',
+        component: () => import('../views/RevenueView.vue'),
+        meta: { roles: ['ADMIN', 'MANAGER'] },
+      },
     ],
   },
 ]
@@ -128,6 +134,14 @@ router.beforeEach((to, _from, next) => {
     next('/login')
   } else if (to.path === '/login' && isLoggedIn) {
     next('/dashboard')
+  } else if (to.path === '/revenue') {
+    // Chỉ ADMIN và MANAGER mới được vào Doanh thu — STAFF bị chặn
+    const canView = user && ['ADMIN', 'MANAGER'].includes(user.role)
+    if (!canView) {
+      next('/dashboard')
+    } else {
+      next()
+    }
   } else if (to.path === '/products') {
     // Chỉ ADMIN mới được vào Products
     const hasCrud = user && user.role === 'ADMIN'

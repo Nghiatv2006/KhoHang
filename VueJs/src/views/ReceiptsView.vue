@@ -143,17 +143,31 @@ const loading = ref(true)
 // ──────────────────────────────────────────────────────────────
 // FILTER
 // ──────────────────────────────────────────────────────────────
+const initToday = new Date()
+const initFmt = (d: Date) => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+const initFirstDay = new Date(initToday.getFullYear(), initToday.getMonth(), 1)
+
 const filterType = ref(props.receiptType || '')
 const filterStatus = ref('')
 const searchKeyword = ref('')
-const filterTimeRange = ref('custom')
-const filterStartDate = ref('')
-const filterEndDate = ref('')
+const filterTimeRange = ref('this_month')
+const filterStartDate = ref(initFmt(initFirstDay))
+const filterEndDate = ref(initFmt(initToday))
 const filterDeviation = ref('')
 
 watch(filterTimeRange, (val) => {
   const today = new Date()
-  const fmt = (d: Date) => d.toISOString().substring(0, 10)
+  const fmt = (d: Date) => {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
   
   if (val === 'today') {
     filterStartDate.value = fmt(today)
@@ -170,6 +184,10 @@ watch(filterTimeRange, (val) => {
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
     filterStartDate.value = fmt(twoWeeksAgo)
     filterEndDate.value = fmt(oneWeekAgo)
+  } else if (val === 'this_month') {
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
+    filterStartDate.value = fmt(firstDay)
+    filterEndDate.value = fmt(today)
   } else if (val === 'month') {
     const monthAgo = new Date(today)
     monthAgo.setMonth(monthAgo.getMonth() - 1)
@@ -1593,6 +1611,7 @@ async function exportExcel() {
                 <option value="today">Hôm nay</option>
                 <option value="week">7 ngày qua</option>
                 <option value="last_week">Tuần trước (14 ngày qua)</option>
+                <option value="this_month">Tháng này</option>
                 <option value="month">30 ngày qua</option>
                 <option value="custom">Tùy chọn...</option>
               </select>
@@ -1611,8 +1630,8 @@ async function exportExcel() {
             </div>
             <!-- Nút Xóa lọc -->
             <div class="flex items-end">
-              <button v-if="filterType || filterStatus || searchKeyword || filterStartDate || filterEndDate || filterDeviation || filterTimeRange !== 'custom'"
-                @click="filterType = ''; filterStatus = ''; searchKeyword = ''; filterTimeRange = 'custom'; filterStartDate = ''; filterEndDate = ''; filterDeviation = ''"
+              <button v-if="filterType || filterStatus || searchKeyword || filterDeviation || filterTimeRange !== 'this_month'"
+                @click="filterType = ''; filterStatus = ''; searchKeyword = ''; filterTimeRange = 'this_month'; filterDeviation = ''"
                 class="w-full h-11 flex items-center justify-center gap-2 px-6 bg-white border border-[#e2e8f0] rounded-xl text-sm font-semibold text-[#8094ae] hover:text-[#364a63] hover:bg-[#f8f9fa] transition-all shadow-sm">
                 <i class="fas fa-times"></i> Xóa lọc
               </button>

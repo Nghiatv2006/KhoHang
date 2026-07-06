@@ -12,7 +12,6 @@ const branches = ref<any[]>([])
 const loading = ref(true)
 const errorMsg = ref('')
 
-const isExportingRevenue = ref(false)
 const branchSalesDataRaw = ref<any>({})
 const user = ref<any>(JSON.parse(localStorage.getItem('wh_user') || '{}'))
 
@@ -758,29 +757,7 @@ function formatVND(val: number) {
   return new Intl.NumberFormat('vi-VN').format(val) + 'đ'
 }
 
-async function exportRevenueExcel() {
-  isExportingRevenue.value = true
-  try {
-    const token = localStorage.getItem('wh_token')
-    const res = await fetch('/api/reports/revenue/excel', {
-      headers: { 'Authorization': 'Bearer ' + token }
-    })
-    if (!res.ok) throw new Error('Lỗi tải báo cáo')
-    const blob = await res.blob()
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'Bao_Cao_Doanh_Thu.xlsx'
-    document.body.appendChild(a)
-    a.click()
-    window.URL.revokeObjectURL(url)
-    document.body.removeChild(a)
-  } catch (err: any) {
-    alert('Có lỗi xảy ra khi xuất file Excel: ' + err.message)
-  } finally {
-    isExportingRevenue.value = false
-  }
-}
+
 </script>
 <template>
   <div v-if="loading" class="text-center p-12 text-[#8094ae]">
@@ -792,12 +769,6 @@ async function exportRevenueExcel() {
 
     <div class="mb-6">
       <h2 class="text-2xl font-bold text-slate-800">Tổng quan Dashboard</h2>
-      <button v-if="['ADMIN', 'MANAGER'].includes(user?.role)"
-        @click="exportRevenueExcel" :disabled="isExportingRevenue"
-        class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-md disabled:opacity-50 flex items-center transition-colors">
-        <i class="fas" :class="isExportingRevenue ? 'fa-spinner fa-spin' : 'fa-file-excel'"></i>
-        <span class="ml-2">{{ isExportingRevenue ? 'Đang xuất...' : 'Xuất Excel Báo cáo' }}</span>
-      </button>
     </div>
 
     <div v-if="errorMsg" class="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl flex items-start shadow-sm">

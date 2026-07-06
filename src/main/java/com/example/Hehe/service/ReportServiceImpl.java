@@ -1203,7 +1203,9 @@ public class ReportServiceImpl implements ReportService {
                     break;
                 case "QUARTER":
                     int quarter = (dt.getMonthValue() - 1) / 3 + 1;
-                    period = String.format("Quý %d - %d", quarter, dt.getYear());
+                    int startMonth = (quarter - 1) * 3 + 1;
+                    int endMonth = startMonth + 2;
+                    period = String.format("Quý %d (T%d-T%d/%d)", quarter, startMonth, endMonth, dt.getYear());
                     break;
                 case "YEAR":
                     period = String.format("Năm %d", dt.getYear());
@@ -1387,6 +1389,126 @@ public class ReportServiceImpl implements ReportService {
         }
         
         return branchSalesMap;
+    }
+
+    // ================================================================
+    //  REVENUE SUMMARY: Tuần / Tháng / Quý / Năm (Real-time)
+    // ================================================================
+    @Override
+    public java.util.Map<String, Object> getRevenueSummary(User currentUser, Integer branchId) {
+        if (currentUser.getRole() == UserRole.STAFF) {
+            throw new org.springframework.security.access.AccessDeniedException("Staff không có quyền xem báo cáo doanh thu.");
+        }
+
+        // Determine which branch(es) to query
+        List<Receipt> allExportReceipts;
+        if (currentUser.getRole() == UserRole.ADMIN) {
+            if (branchId != null) {
+                // Admin chọn xem một chi nhánh cụ thể
+                allExportReceipts = receiptRepository.findByTypeAndStatusAndSourceBranchId(
+                        ReceiptType.EXPORT, ReceiptStatus.COMPLETED, branchId);
+            } else {
+                // Admin xem toàn hệ thống
+                allExportReceipts = receiptRepository.findByTypeAndStatus(ReceiptType.EXPORT, ReceiptStatus.COMPLETED);
+            }
+        } else {
+            // Manager chỉ xem được chi nhánh của mình
+            Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
+            if (myBranchId == null) {
+                allExportReceipts = java.util.Collections.emptyList();
+            } else {
+                allExportReceipts = receiptRepository.findByTypeAndStatusAndSourceBranchId(
+                        ReceiptType.EXPORT, ReceiptStatus.COMPLETED, myBranchId);
+            }
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        // ── Tuần hiện tại (Mon–Sun) & tuần trước ──────────────────────
+        java.time.LocalDate today = now.toLocalDate();
+        java.time.DayOfWeek dow = today.getDayOfWeek();
+        int dayValue = dow.getValue(); // Mon=1 ... Sun=7
+        java.time.LocalDate thisWeekStart  = today.minusDays(dayValue - 1);
+        java.time.LocalDate lastWeekStart  = thisWeekStart.minusWeeks(1);
+        java.time.LocalDate lastWeekEnd    = thisWeekStart.minusDays(1);
+
+        // ── Tháng hiện tại & tháng trước ──────────────────────────────
+        java.time.LocalDate thisMonthStart = today.withDayOfMonth(1);
+        java.time.LocalDate lastMonthStart = thisMonthStart.minusMonths(1);
+        java.time.LocalDate lastMonthEnd   = thisMonthStart.minusDays(1);
+
+        // ── Quý hiện tại ──────────────────────────────────────────────
+        int currentMonth = today.getMonthValue();
+        int thisQuarter  = (currentMonth - 1) / 3 + 1;
+        java.time.LocalDate thisQuarterStart = java.time.LocalDate.of(today.getYear(), (thisQuarter - 1) * 3 + 1, 1);
+
+        // ── Năm hiện tại ──────────────────────────────────────────────
+        java.time.LocalDate thisYearStart = java.time.LocalDate.of(today.getYear(), 1, 1);
+
+        BigDecimal weekRevenue      = BigDecimal.ZERO;
+        BigDecimal lastWeekRevenue  = BigDecimal.ZERO;
+        BigDecimal monthRevenue     = BigDecimal.ZERO;
+        BigDecimal lastMonthRevenue = BigDecimal.ZERO;
+        BigDecimal quarterRevenue   = BigDecimal.ZERO;
+        BigDecimal yearRevenue      = BigDecimal.ZERO;
+
+        for (Receipt r : allExportReceipts) {
+            if (r.getCreatedAt() == null) continue;
+            java.time.LocalDate rDate = r.getCreatedAt().toLocalDate();
+            BigDecimal amount = r.getDetails().stream()
+                    .map(d -> d.getPrice().multiply(BigDecimal.valueOf(d.getQuantity())))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            // Tuần này
+            if (!rDate.isBefore(thisWeekStart) && !rDate.isAfter(today)) {
+                weekRevenue = weekRevenue.add(amount);
+            }
+            // Tuần trước
+            if (!rDate.isBefore(lastWeekStart) && !rDate.isAfter(lastWeekEnd)) {
+                lastWeekRevenue = lastWeekRevenue.add(amount);
+            }
+            // Tháng này
+            if (!rDate.isBefore(thisMonthStart) && !rDate.isAfter(today)) {
+                monthRevenue = monthRevenue.add(amount);
+            }
+            // Tháng trước
+            if (!rDate.isBefore(lastMonthStart) && !rDate.isAfter(lastMonthEnd)) {
+                lastMonthRevenue = lastMonthRevenue.add(amount);
+            }
+            // Quý này
+            if (!rDate.isBefore(thisQuarterStart) && !rDate.isAfter(today)) {
+                quarterRevenue = quarterRevenue.add(amount);
+            }
+            // Năm nay
+            if (!rDate.isBefore(thisYearStart) && !rDate.isAfter(today)) {
+                yearRevenue = yearRevenue.add(amount);
+            }
+        }
+
+        // Tính % thay đổi (null nếu không có dữ liệu kỳ trước)
+        Double weekChangePct  = calcChangePct(weekRevenue,  lastWeekRevenue);
+        Double monthChangePct = calcChangePct(monthRevenue, lastMonthRevenue);
+
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+        result.put("weekRevenue",      weekRevenue);
+        result.put("lastWeekRevenue",  lastWeekRevenue);
+        result.put("weekChangePct",    weekChangePct);
+        result.put("monthRevenue",     monthRevenue);
+        result.put("lastMonthRevenue", lastMonthRevenue);
+        result.put("monthChangePct",   monthChangePct);
+        result.put("quarterRevenue",   quarterRevenue);
+        result.put("yearRevenue",      yearRevenue);
+        return result;
+    }
+
+    private Double calcChangePct(BigDecimal current, BigDecimal previous) {
+        if (previous == null || previous.compareTo(BigDecimal.ZERO) == 0) {
+            return current.compareTo(BigDecimal.ZERO) > 0 ? 100.0 : null;
+        }
+        return current.subtract(previous)
+                .divide(previous, 4, java.math.RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(100))
+                .doubleValue();
     }
 }
 

@@ -81,5 +81,13 @@ public class ReportController {
     public ResponseEntity<java.util.Map<Integer, java.util.List<java.math.BigDecimal>>> getBranchSalesTrend30Days() {
         return ResponseEntity.ok(reportService.getBranchSalesTrend30Days());
     }
+
+    @GetMapping("/revenue/summary")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<java.util.Map<String, Object>> getRevenueSummary(
+            @RequestParam(required = false) Integer branchId,
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(reportService.getRevenueSummary(currentUser, branchId));
+    }
 }
 
