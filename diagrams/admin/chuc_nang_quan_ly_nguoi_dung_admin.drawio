@@ -44,7 +44,7 @@
                     <mxGeometry x="90" y="130" width="160" height="50" as="geometry"/>
                 </mxCell>
                 <mxCell id="B1" value="Lấy danh sách người dùng:&lt;br/&gt;- Bản thân&lt;br/&gt;- Nhân viên cùng chi nhánh tổng&lt;br/&gt;- Manager chi nhánh con" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
-                    <mxGeometry x="630" y="130" width="160" height="65" as="geometry"/>
+                    <mxGeometry x="630" y="130" width="160" height="80" as="geometry"/>
                 </mxCell>
                 <mxCell id="D1" value="Bảng Users" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.database;whiteSpace=wrap;fillColor=#e8f5e9;strokeColor=#43a047;fontColor=#000000;align=center;" parent="1" vertex="1">
                     <mxGeometry x="920" y="120" width="160" height="50" as="geometry"/>
@@ -56,7 +56,7 @@
                     <mxGeometry x="90" y="270" width="160" height="60" as="geometry"/>
                 </mxCell>
                 <mxCell id="B2" value="Kiểm tra quyền &amp; ràng buộc:&lt;br/&gt;- Không tự khóa/hạ quyền mình&lt;br/&gt;- CN tổng không có Manager&lt;br/&gt;- Không xóa user đã giao dịch" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
-                    <mxGeometry x="650" y="270" width="160" height="70" as="geometry"/>
+                    <mxGeometry x="650" y="250" width="170" height="90" as="geometry"/>
                 </mxCell>
                 <mxCell id="B2_rhombus" value="" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#fb8c00;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
                     <mxGeometry x="690" y="390" width="40" height="40" as="geometry"/>

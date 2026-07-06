@@ -23,7 +23,7 @@
                     <mxGeometry x="580" y="10" width="260" height="40" as="geometry"/>
                 </mxCell>
                 <mxCell id="bg_db" value="" style="fillColor=#f5faf5;strokeColor=none;" parent="1" vertex="1">
-                    <mxGeometry x="850" y="50" width="260" height="650" as="geometry"/>
+                    <mxGeometry x="860" y="50" width="260" height="650" as="geometry"/>
                 </mxCell>
                 <mxCell id="bg_db_header" value="4. Cơ sở dữ liệu PostgreSQL" style="fillColor=#f5f5f5;strokeColor=#cccccc;fontStyle=1;align=center;whiteSpace=wrap;html=1;" parent="1" vertex="1">
                     <mxGeometry x="850" y="10" width="260" height="40" as="geometry"/>
@@ -43,26 +43,26 @@
                 <mxCell id="U1" value="Mở xem Lịch sử sao lưu" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
                     <mxGeometry x="90" y="130" width="160" height="50" as="geometry"/>
                 </mxCell>
-                <mxCell id="B1" value="Truy vấn danh sách bản ghi sao lưu&lt;br/&gt;của chi nhánh (Admin thuộc CN Tổng)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
+                <mxCell id="B1" value="Truy vấn lịch sử sao lưu:&lt;br/&gt;- Sao lưu Chi nhánh Tổng&lt;br/&gt;- Sao lưu Cấu hình hệ thống" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
                     <mxGeometry x="630" y="130" width="160" height="60" as="geometry"/>
                 </mxCell>
                 <mxCell id="D1" value="Bảng Backups" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.database;whiteSpace=wrap;fillColor=#e8f5e9;strokeColor=#43a047;fontColor=#000000;align=center;" parent="1" vertex="1">
                     <mxGeometry x="920" y="120" width="160" height="50" as="geometry"/>
                 </mxCell>
-                <mxCell id="F1" value="Hiển thị danh sách sao lưu,&lt;br/&gt;nút Sao lưu &amp; nút Trigger Tự động" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
+                <mxCell id="F1" value="Hiển thị Lịch sử 2 tab,&lt;br/&gt;các nút Sao lưu &amp; Trigger tự động" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
                     <mxGeometry x="360" y="210" width="160" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="U2" value="Click nút &#39;Sao lưu thủ công&#39; (Export)&lt;br/&gt;hoặc &#39;Trigger sao lưu tự động&#39;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
+                <mxCell id="U2" value="Click nút Sao lưu (Chi nhánh / Hệ thống)&lt;br/&gt;hoặc Trigger sao lưu tự động" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
                     <mxGeometry x="90" y="300" width="160" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="B2" value="Sao lưu thủ công: Gom dữ liệu,&lt;br/&gt;ký HMAC-SHA256, mã hóa AES-256-GCM" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
+                <mxCell id="B2" value="Sao lưu: Gom dữ liệu tương ứng (Chi nhánh / Hệ thống),&lt;br/&gt;ký HMAC-SHA256, mã hóa AES-256-GCM" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
                     <mxGeometry x="630" y="300" width="160" height="60" as="geometry"/>
                 </mxCell>
                 <mxCell id="B3" value="Trigger tự động (ADMIN only):&lt;br/&gt;chạy task sao lưu cho tất cả CN" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
                     <mxGeometry x="630" y="390" width="160" height="60" as="geometry"/>
                 </mxCell>
                 <mxCell id="D2" value="Ghi tệp tin vào thư mục server,&lt;br/&gt;lưu bảng Backups &amp; Ghi Audit Log" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.database;whiteSpace=wrap;fillColor=#e8f5e9;strokeColor=#43a047;fontColor=#000000;align=center;" parent="1" vertex="1">
-                    <mxGeometry x="920" y="330" width="130" height="50" as="geometry"/>
+                    <mxGeometry x="920" y="330" width="140" height="60" as="geometry"/>
                 </mxCell>
                 <mxCell id="F2" value="Tải file .wbk về trình duyệt&lt;br/&gt;hoặc báo trigger thành công" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#d4edda;strokeColor=#c3e6cb;strokeWidth=2;fontColor=#155724;align=center;" parent="1" vertex="1">
                     <mxGeometry x="360" y="480" width="160" height="60" as="geometry"/>

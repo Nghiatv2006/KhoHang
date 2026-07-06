@@ -49,28 +49,28 @@
                 <mxCell id="U2" value="Chọn tải file Excel lên" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
                     <mxGeometry x="110" y="260" width="160" height="50" as="geometry"/>
                 </mxCell>
-                <mxCell id="B1" value="Kiểm tra quyền ADMIN.&lt;br/&gt;Đọc file Excel, tìm dòng tiêu đề" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
+                <mxCell id="B1" value="Kiểm tra quyền ADMIN.&lt;br/&gt;Đọc file Excel &amp; phân tích Xem trước (Preview)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
                     <mxGeometry x="630" y="210" width="160" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="B2" value="Validate: Tên SP, tên DM bắt buộc,&lt;br/&gt;Mã SKU duy nhất (nếu có, tự sinh nếu trống),&lt;br/&gt;Giá bán &gt;= 0, Giá nhập &gt;= 0" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
+                <mxCell id="B2" value="Validate: Tên SP, tên DM bắt buộc,&lt;br/&gt;Giá bán &gt;= 0, Giá nhập &gt;= 0. Có dòng lỗi?" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
                     <mxGeometry x="630" y="300" width="160" height="70" as="geometry"/>
                 </mxCell>
                 <mxCell id="B2_rhombus" value="" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#fb8c00;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
                     <mxGeometry x="690" y="400" width="40" height="40" as="geometry"/>
                 </mxCell>
-                <mxCell id="B3_fail" value="Gom danh sách lỗi các dòng chi tiết" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
+                <mxCell id="B3_fail" value="Lưu các dòng hợp lệ vào DB,&lt;br/&gt;báo lỗi chi tiết các dòng bị sai" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
                     <mxGeometry x="630" y="470" width="160" height="50" as="geometry"/>
                 </mxCell>
-                <mxCell id="F_fail" value="Hiển thị chi tiết lỗi từng dòng" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#f8d7da;strokeColor=#f5c6cb;strokeWidth=2;fontColor=#721c24;align=center;" parent="1" vertex="1">
+                <mxCell id="F_fail" value="Hiển thị kết quả nhập thành công&lt;br/&gt;và danh sách dòng lỗi chi tiết" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#f8d7da;strokeColor=#f5c6cb;strokeWidth=2;fontColor=#721c24;align=center;" parent="1" vertex="1">
                     <mxGeometry x="360" y="470" width="160" height="50" as="geometry"/>
                 </mxCell>
-                <mxCell id="B3_success" value="Lưu danh sách sản phẩm mới vào DB&lt;br/&gt;(Lưu ý: KHÔNG khởi tạo tồn kho)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
+                <mxCell id="B3_success" value="Lưu tất cả sản phẩm mới vào DB&lt;br/&gt;(Lưu ý: KHÔNG khởi tạo tồn kho)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#e3f2fd;strokeColor=#1e88e5;strokeWidth=2;fontColor=#000000;align=center;" parent="1" vertex="1">
                     <mxGeometry x="630" y="550" width="160" height="60" as="geometry"/>
                 </mxCell>
                 <mxCell id="D1" value="Bảng Products" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.database;whiteSpace=wrap;fillColor=#e8f5e9;strokeColor=#43a047;fontColor=#000000;align=center;" parent="1" vertex="1">
                     <mxGeometry x="920" y="540" width="160" height="50" as="geometry"/>
                 </mxCell>
-                <mxCell id="F_success" value="Thông báo số lượng nhập thành công" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#d4edda;strokeColor=#c3e6cb;strokeWidth=2;fontColor=#155724;align=center;" parent="1" vertex="1">
+                <mxCell id="F_success" value="Thông báo nhập toàn bộ thành công" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#d4edda;strokeColor=#c3e6cb;strokeWidth=2;fontColor=#155724;align=center;" parent="1" vertex="1">
                     <mxGeometry x="360" y="550" width="160" height="60" as="geometry"/>
                 </mxCell>
                 <mxCell id="EndNode" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#ffffff;strokeColor=#000000;strokeWidth=2;" parent="1" vertex="1">
