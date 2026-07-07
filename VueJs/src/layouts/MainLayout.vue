@@ -153,10 +153,6 @@ const mainNavItems = computed(() => {
     items.push({ label: 'Sản phẩm', to: '/products', icon: 'fas fa-box-open' })
   }
   items.push({ label: 'Tồn kho', to: '/inventory', icon: 'fas fa-warehouse' })
-  // @ts-ignore
-  if (user.value) {
-    items.push({ label: 'Kiểm kê kho', to: '/stocktakes', icon: 'fas fa-clipboard-list' })
-  }
   return items
 })
 
