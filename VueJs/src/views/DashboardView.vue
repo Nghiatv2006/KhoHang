@@ -767,6 +767,7 @@ function formatVND(val: number) {
   return new Intl.NumberFormat('vi-VN').format(val) + 'đ'
 }
 
+
 </script>
 <template>
   <div v-if="loading" class="text-center p-12 text-[#8094ae]">

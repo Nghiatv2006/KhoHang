@@ -37,6 +37,11 @@ git diff <đường-dẫn-file>
 * **Localhost (Dev):** Khóa bí mật `jwt.secret` (đọc từ biến môi trường `JWT_SECRET`) phải là **khóa cố định** để khi nhà phát triển sửa code Java/restart server không bị văng đăng xuất (logout).
 * **AWS (Production):** Khóa `jwt.secret` phải được cấu hình là `"generate-on-startup"`. Khi đó, backend sẽ tự động sinh khóa ngẫu nhiên mỗi lần khởi động lại ứng dụng, ép toàn bộ thiết bị đang đăng nhập phải đăng xuất để bảo mật.
 
+## 6. Quy tắc khi thực hiện Merge (Gộp nhánh)
+* **Luôn lập đề xuất/kế hoạch trước khi Merge:** Khi nhận được yêu cầu gộp nhánh (merge), đặc biệt là các nhánh có nguy cơ gây xung đột (conflict) hoặc thay đổi cấu trúc mã nguồn, AI phải liệt kê các file bị ảnh hưởng, phân tích các xung đột tiềm tàng và đề xuất phương án giải quyết cụ thể trước khi chạy lệnh merge chính thức.
+* **Đợi xác nhận từ người dùng:** Tuyệt đối không tự ý thực hiện commit merge, sửa file xung đột hoặc push code lên các nhánh chung mà chưa được người dùng duyệt qua và đồng ý với phương án đề xuất.
+* **Bắt buộc kiểm tra biên dịch (Build) trước khi staging hoặc commit:** Sau khi sửa code hoặc giải quyết xung đột, **trước khi** chạy lệnh `git add` hoặc `git commit`, AI bắt buộc phải chạy lệnh build thử cả Backend và Frontend (ví dụ: `./gradlew build` hoặc `npm run build`) để đề phòng lỗi cú pháp/biên dịch làm hỏng nhánh chung khi push lên.
+
 # Quy tắc thiết kế Giao diện (UI/UX Premium Standards)
 
 Để đảm bảo giao diện luôn đạt tiêu chuẩn thẩm mỹ cao cấp (Premium) của dự án và không bị sáo rỗng:

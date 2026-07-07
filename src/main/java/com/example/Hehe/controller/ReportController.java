@@ -67,7 +67,7 @@ public class ReportController {
     }
 
     @GetMapping("/dashboard/debt-aging")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<java.util.Map<String, Object>> getDebtAgingAnalysis(@AuthenticationPrincipal User currentUser) {
         return ResponseEntity.ok(reportService.getDebtAgingAnalysis(currentUser));
     }
@@ -88,9 +88,17 @@ public class ReportController {
     }
 
     @GetMapping("/dashboard/branch-sales")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<java.util.Map<Integer, java.util.List<java.math.BigDecimal>>> getBranchSalesTrend30Days() {
         return ResponseEntity.ok(reportService.getBranchSalesTrend30Days());
+    }
+
+    @GetMapping("/revenue/summary")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<java.util.Map<String, Object>> getRevenueSummary(
+            @RequestParam(required = false) Integer branchId,
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(reportService.getRevenueSummary(currentUser, branchId));
     }
 }
 

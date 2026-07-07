@@ -78,7 +78,7 @@ public class ReceiptServiceImpl implements ReceiptService {
                         boolean isMyReceipt = r.getCreatedBy() != null && r.getCreatedBy().getId().equals(currentUser.getId());
                         boolean isIncoming = (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.TRANSFER) 
                                              && r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId)
-                                             && (r.getStatus() == ReceiptStatus.PENDING_STOCKTAKE || r.getStatus() == ReceiptStatus.COMPLETED || r.getStatus() == ReceiptStatus.PENDING_SHORTFALL_MANAGER || r.getStatus() == ReceiptStatus.PENDING_SHORTFALL_ADMIN);
+                                             && (r.getStatus() != ReceiptStatus.DRAFT && r.getStatus() != ReceiptStatus.PENDING_ADMIN);
                         return isMyReceipt || isIncoming;
                     }
                     
@@ -125,7 +125,7 @@ public class ReceiptServiceImpl implements ReceiptService {
                 boolean isMyReceipt = r.getCreatedBy() != null && r.getCreatedBy().getId().equals(currentUser.getId());
                 boolean isIncoming = (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.TRANSFER) 
                                      && r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId)
-                                     && (r.getStatus() == ReceiptStatus.PENDING_STOCKTAKE || r.getStatus() == ReceiptStatus.COMPLETED || r.getStatus() == ReceiptStatus.PENDING_SHORTFALL_MANAGER || r.getStatus() == ReceiptStatus.PENDING_SHORTFALL_ADMIN);
+                                     && (r.getStatus() != ReceiptStatus.DRAFT && r.getStatus() != ReceiptStatus.PENDING_ADMIN);
                 if (!isMyReceipt && !isIncoming) {
                     throw new RuntimeException("Bạn không có quyền xem phiếu này.");
                 }
@@ -657,6 +657,7 @@ public class ReceiptServiceImpl implements ReceiptService {
                 } else if (currentUser.getRole() != UserRole.ADMIN) {
                     r.setStatus(ReceiptStatus.PENDING_ADMIN);
                     receiptRepository.save(r);
+                    auditLogService.logAction(currentUser, "APPROVE", "receipts", String.valueOf(r.getId()), "Duyệt phiếu " + r.getType().name() + " " + r.getCode() + " -> " + r.getStatus().name());
                     return new ReceiptResponse(r);
                 }
             } else if (r.getStatus() == ReceiptStatus.PENDING_ADMIN) {
@@ -701,6 +702,7 @@ public class ReceiptServiceImpl implements ReceiptService {
                         if (!hasMilk && totalValue.compareTo(new java.math.BigDecimal("45000000")) >= 0) {
                             r.setStatus(ReceiptStatus.PENDING_ADMIN);
                             receiptRepository.save(r);
+                            auditLogService.logAction(currentUser, "APPROVE", "receipts", String.valueOf(r.getId()), "Duyệt phiếu " + r.getType().name() + " " + r.getCode() + " -> " + r.getStatus().name());
                             return new ReceiptResponse(r);
                         }
                     }
@@ -717,6 +719,7 @@ public class ReceiptServiceImpl implements ReceiptService {
                         }
                         r.setStatus(ReceiptStatus.PENDING_ADMIN);
                         receiptRepository.save(r);
+                        auditLogService.logAction(currentUser, "APPROVE", "receipts", String.valueOf(r.getId()), "Duyệt phiếu " + r.getType().name() + " " + r.getCode() + " -> " + r.getStatus().name());
                         return new ReceiptResponse(r);
                     }
                 }
@@ -749,6 +752,7 @@ public class ReceiptServiceImpl implements ReceiptService {
 
                     r.setStatus(ReceiptStatus.PENDING_STOCKTAKE);
                     receiptRepository.save(r);
+                    auditLogService.logAction(currentUser, "APPROVE", "receipts", String.valueOf(r.getId()), "Duyệt phiếu " + r.getType().name() + " " + r.getCode() + " -> " + r.getStatus().name());
                     return new ReceiptResponse(r);
                 }
             }
@@ -769,6 +773,7 @@ public class ReceiptServiceImpl implements ReceiptService {
         }
         
         receiptRepository.save(r);
+        auditLogService.logAction(currentUser, "APPROVE", "receipts", String.valueOf(r.getId()), "Hoàn tất phiếu " + r.getType().name() + " " + r.getCode() + " -> COMPLETED");
         return new ReceiptResponse(r);
     }
 
@@ -1056,6 +1061,7 @@ public class ReceiptServiceImpl implements ReceiptService {
         }
         r.setPaymentStatus("PAID");
         receiptRepository.save(r);
+        auditLogService.logAction(currentUser, "MARK_PAID", "receipts", String.valueOf(r.getId()), "Xác nhận thanh toán phiếu " + r.getType().name() + " " + r.getCode() + " -> PAID");
         return new ReceiptResponse(r);
     }
 
