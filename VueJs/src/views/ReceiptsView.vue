@@ -1450,7 +1450,7 @@ async function exportExcel() {
       </div>
       <div class="flex items-center gap-3">
         <button
-          v-if="isAdmin || isManager"
+          v-if="receiptType === 'EXPORT' && (isAdmin || isManager)"
           @click="exportExcel"
           :disabled="exportingExcel"
           class="h-[42px] bg-emerald-600 hover:bg-emerald-700 text-white px-5 rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
