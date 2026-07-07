@@ -1311,7 +1311,7 @@ onUnmounted(() => {
     <ConfirmDialog
       :show="showCompleteConfirm"
       title="Xác nhận duyệt kiểm kê"
-      message="Hành động này sẽ chốt số liệu thực tế kiểm đếm, tự động sinh phiếu điều chỉnh kho ADJUST_IN / ADJUST_OUT và cập nhật lại số lượng tồn kho. Bạn có chắc chắn muốn hoàn tất?"
+      message="Hành động này sẽ chốt số liệu thực tế kiểm đếm, tự động tạo phiếu tăng/giảm để cân bằng và cập nhật lại số lượng tồn kho. Bạn có chắc chắn muốn hoàn tất?"
       confirmText="Duyệt hoàn tất"
       cancelText="Hủy"
       @confirm="completeStocktake"
