@@ -25,4 +25,13 @@ public interface ProductRepository extends JpaRepository<Product, Integer>, JpaS
     
     // Tìm sản phẩm theo tên (đang hoạt động)
     java.util.Optional<Product> findFirstByNameAndIsDeletedFalse(String name);
+
+    // Tìm sản phẩm theo tên và danh mục (đang hoạt động)
+    java.util.Optional<Product> findFirstByNameIgnoreCaseAndCategoryIdAndIsDeletedFalse(String name, Integer categoryId);
+
+    // Kiểm tra trùng tên trong cùng một danh mục (khi tạo mới)
+    boolean existsByNameIgnoreCaseAndCategoryIdAndIsDeletedFalse(String name, Integer categoryId);
+
+    // Kiểm tra trùng tên trong cùng một danh mục (loại trừ chính nó khi cập nhật)
+    boolean existsByNameIgnoreCaseAndCategoryIdAndIdNotAndIsDeletedFalse(String name, Integer categoryId, Integer id);
 }

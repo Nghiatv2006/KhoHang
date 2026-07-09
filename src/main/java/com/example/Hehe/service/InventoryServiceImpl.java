@@ -60,16 +60,26 @@ public class InventoryServiceImpl implements InventoryService {
                 inventories = inventoryRepository.findAll();
             }
         } else {
-            // MANAGER and STAFF can only view their own branch
             if (currentUser.getBranch() == null) {
                 throw new RuntimeException("Bạn chưa được phân công vào chi nhánh nào.");
             }
             Integer myBranchId = currentUser.getBranch().getId();
             
-            if (branchId != null && !branchId.equals(myBranchId)) {
-                throw new RuntimeException("Bạn chỉ có quyền xem tồn kho của chi nhánh mình.");
+            Branch headBranch = branchRepository.findByIsHeadTrue().stream().findFirst()
+                    .orElseGet(() -> branchRepository.findById(1).orElse(null));
+            Integer headId = headBranch != null ? headBranch.getId() : 1;
+
+            if (branchId != null) {
+                if (!branchId.equals(myBranchId) && !branchId.equals(headId)) {
+                    throw new RuntimeException("Bạn chỉ có quyền xem tồn kho của chi nhánh mình hoặc Kho tổng.");
+                }
+                inventories = inventoryRepository.findByBranchId(branchId);
+            } else {
+                inventories = new java.util.ArrayList<>(inventoryRepository.findByBranchId(myBranchId));
+                if (!myBranchId.equals(headId)) {
+                    inventories.addAll(inventoryRepository.findByBranchId(headId));
+                }
             }
-            inventories = inventoryRepository.findByBranchId(myBranchId);
         }
 
         return inventories.stream()

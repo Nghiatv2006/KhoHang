@@ -34,6 +34,12 @@ const ACTION_LABELS: Record<string, string> = {
   'UPDATE_STOCKTAKE': 'Sửa kiểm kê',
   'COMPLETE_STOCKTAKE': 'Chốt kiểm kê',
   'CANCEL_STOCKTAKE': 'Hủy kiểm kê',
+  'MARK_PAID': 'Xác nhận thanh toán',
+  'CONFIRM_STOCKTAKE': 'Xác nhận kiểm kê',
+  'APPROVE_SHORTFALL': 'Duyệt bù hao hụt',
+  'REJECT_SHORTFALL': 'Từ chối bù hao hụt',
+  'COMPENSATE_SHORTFALL': 'Tạo phiếu bù',
+  'CONFIRM_TRANSFER': 'Nhận điều chuyển',
 }
 
 const ACTION_OPTIONS = Object.entries(ACTION_LABELS).map(([value, label]) => ({ value, label }))
@@ -136,6 +142,12 @@ function actionColor(action: string, isWarning: boolean) {
     'UPDATE_STOCKTAKE': 'bg-amber-50 text-amber-700 border-amber-200',
     'COMPLETE_STOCKTAKE': 'bg-emerald-50 text-emerald-700 border-emerald-200',
     'CANCEL_STOCKTAKE': 'bg-orange-50 text-orange-700 border-orange-200',
+    'MARK_PAID': 'bg-blue-50 text-blue-700 border-blue-200',
+    'CONFIRM_STOCKTAKE': 'bg-purple-50 text-purple-700 border-purple-200',
+    'APPROVE_SHORTFALL': 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    'REJECT_SHORTFALL': 'bg-red-50 text-red-700 border-red-200',
+    'COMPENSATE_SHORTFALL': 'bg-sky-50 text-sky-700 border-sky-200',
+    'CONFIRM_TRANSFER': 'bg-teal-50 text-teal-700 border-teal-200',
   }
   return map[action] || 'bg-slate-50 text-slate-600 border-slate-200'
 }

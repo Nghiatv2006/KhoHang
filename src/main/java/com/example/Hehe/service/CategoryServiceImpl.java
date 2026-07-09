@@ -42,18 +42,27 @@ public class CategoryServiceImpl implements CategoryService {
         }
     }
 
+    private String normalizeString(String input) {
+        if (input == null) return null;
+        String s = input.replaceAll("[\u200B-\u200D\uFEFF]", "").replaceAll("\\s+", " ").trim().toLowerCase();
+        s = s.replace("đ", "d");
+        String unaccented = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD);
+        return java.util.regex.Pattern.compile("\\p{InCombiningDiacriticalMarks}+").matcher(unaccented).replaceAll("");
+    }
+
     @Override
-    public List<CategoryResponse> getAllCategories(String keyword) {
-        List<Category> categories;
+    public org.springframework.data.domain.Page<CategoryResponse> getAllCategories(String keyword, int page) {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, 10);
+        org.springframework.data.domain.Page<Category> categoryPage;
         // Nếu có keyword truyền lên, thực hiện tìm kiếm theo tên không phân biệt hoa thường
         if (keyword != null && !keyword.trim().isEmpty()) {
-            categories = categoryRepository.findByNameContainingIgnoreCase(keyword.trim());
+            categoryPage = categoryRepository.findByNameContainingIgnoreCase(keyword.trim(), pageable);
         } else {
             // Nếu không có keyword, lấy toàn bộ danh sách
-            categories = categoryRepository.findAll();
+            categoryPage = categoryRepository.findAll(pageable);
         }
         // Chuyển đổi từ Entity sang DTO để trả về cho client
-        return categories.stream().map(CategoryResponse::new).collect(Collectors.toList());
+        return categoryPage.map(CategoryResponse::new);
     }
 
     @Override
@@ -61,19 +70,27 @@ public class CategoryServiceImpl implements CategoryService {
         // 1. Kiểm tra quyền của người dùng hiện tại
         checkPermission(currentUser);
 
-        // 2. Kiểm tra tính hợp lệ của dữ liệu đầu vào (tên danh mục không rỗng)
-        if (request.getName() == null || request.getName().trim().isEmpty()) {
+        // 2. Kiểm tra tính hợp lệ của dữ liệu đầu vào
+        if (request.getName() == null) {
+            throw new RuntimeException("Tên danh mục không được để trống.");
+        }
+        String normalizedName = request.getName().replaceAll("[\u200B-\u200D\uFEFF]", "").replaceAll("\\s+", " ").trim();
+        if (normalizedName.isEmpty()) {
             throw new RuntimeException("Tên danh mục không được để trống.");
         }
 
-        // 3. Kiểm tra trùng lặp tên danh mục
-        if (categoryRepository.existsByName(request.getName().trim())) {
-            throw new RuntimeException("Tên danh mục đã tồn tại.");
+        // 3. Kiểm tra trùng lặp tên danh mục (bao gồm cả phân biệt hoa/thường, dấu tiếng Việt)
+        String checkName = normalizeString(normalizedName);
+        List<Category> allCategories = categoryRepository.findAll();
+        for (Category c : allCategories) {
+            if (normalizeString(c.getName()).equals(checkName)) {
+                throw new RuntimeException("Tên bạn nhập bị trùng lặp hoặc quá giống với danh mục hiện có: '" + c.getName() + "'");
+            }
         }
 
         // 4. Tạo thực thể mới và lưu vào cơ sở dữ liệu
         Category category = new Category();
-        category.setName(request.getName().trim());
+        category.setName(normalizedName);
 
         category = categoryRepository.save(category);
         
@@ -100,19 +117,25 @@ public class CategoryServiceImpl implements CategoryService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy danh mục."));
 
         // 3. Kiểm tra tính hợp lệ của dữ liệu gửi lên
-        if (request.getName() == null || request.getName().trim().isEmpty()) {
+        if (request.getName() == null) {
+            throw new RuntimeException("Tên danh mục không được để trống.");
+        }
+        String normalizedName = request.getName().replaceAll("[\u200B-\u200D\uFEFF]", "").replaceAll("\\s+", " ").trim();
+        if (normalizedName.isEmpty()) {
             throw new RuntimeException("Tên danh mục không được để trống.");
         }
 
-        String newName = request.getName().trim();
-        
-        // 4. Kiểm tra trùng lặp tên với các danh mục khác
-        if (!category.getName().equalsIgnoreCase(newName) && categoryRepository.existsByName(newName)) {
-            throw new RuntimeException("Tên danh mục đã tồn tại.");
+        // 4. Kiểm tra trùng lặp tên với các danh mục khác (chống lách luật hoa/thường, dấu)
+        String checkName = normalizeString(normalizedName);
+        List<Category> allCategories = categoryRepository.findAll();
+        for (Category c : allCategories) {
+            if (!c.getId().equals(id) && normalizeString(c.getName()).equals(checkName)) {
+                throw new RuntimeException("Tên bạn nhập bị trùng lặp hoặc quá giống với danh mục hiện có: '" + c.getName() + "'");
+            }
         }
 
         // 5. Cập nhật tên và lưu thay đổi
-        category.setName(newName);
+        category.setName(normalizedName);
         category = categoryRepository.save(category);
 
         // Ghi log

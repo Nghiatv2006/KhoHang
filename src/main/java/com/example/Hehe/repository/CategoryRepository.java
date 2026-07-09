@@ -26,6 +26,7 @@ public interface CategoryRepository extends JpaRepository<Category, Integer> {
      * @return Danh sách các danh mục khớp
      */
     List<Category> findByNameContainingIgnoreCase(String name);
+    org.springframework.data.domain.Page<Category> findByNameContainingIgnoreCase(String name, org.springframework.data.domain.Pageable pageable);
 
     /**
      * Tìm danh mục chính xác theo tên (không phân biệt chữ hoa/thường)

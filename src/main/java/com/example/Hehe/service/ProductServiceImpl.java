@@ -20,6 +20,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.Set;
+import java.util.HashSet;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -76,7 +78,7 @@ public class ProductServiceImpl implements ProductService {
      * Bất kỳ ai (đã đăng nhập) cũng có thể xem và tìm kiếm danh sách sản phẩm.
      */
     @Override
-    public List<ProductResponse> getAllProducts(String keyword, Integer categoryId, BigDecimal minPrice, BigDecimal maxPrice) {
+    public org.springframework.data.domain.Page<ProductResponse> getAllProducts(String keyword, Integer categoryId, BigDecimal minPrice, BigDecimal maxPrice, int page) {
         Specification<Product> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -104,12 +106,10 @@ public class ProductServiceImpl implements ProductService {
             return cb.and(predicates.toArray(new Predicate[0]));
         };
 
-        List<Product> products = productRepository.findAll(spec);
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, 10);
+        org.springframework.data.domain.Page<Product> productPage = productRepository.findAll(spec, pageable);
         
-        // Chuyển List<Product> thành List<ProductResponse>
-        return products.stream()
-                .map(ProductResponse::new)
-                .collect(Collectors.toList());
+        return productPage.map(ProductResponse::new);
     }
 
     /**
@@ -148,22 +148,21 @@ public class ProductServiceImpl implements ProductService {
                 throw new RuntimeException("Ngày sản xuất không thể lớn hơn hạn sử dụng.");
             }
         }
-        if (!Boolean.TRUE.equals(request.getForceCreate())) {
-            java.util.Optional<Product> deletedProduct = productRepository.findFirstByNameAndIsDeletedTrue(request.getName());
-            if (deletedProduct.isPresent()) {
-                throw new com.example.Hehe.exception.ProductDeletedConflictException(
-                    deletedProduct.get().getId(),
-                    "Sản phẩm này từng tồn tại và đã bị xóa. Bạn có muốn khôi phục lại nó không hay vẫn muốn tạo một mã sản phẩm mới hoàn toàn?"
-                );
-            }
+        String normalizedName = request.getName().replaceAll("[\u200B-\u200D\uFEFF]", "").replaceAll("\\s+", " ").trim();
+
+        // Kiểm tra xem trong danh mục đã có sản phẩm này chưa
+        if (productRepository.existsByNameIgnoreCaseAndCategoryIdAndIsDeletedFalse(normalizedName, categoryId)) {
+            throw new RuntimeException("Sản phẩm có tên '" + normalizedName + "' đã tồn tại trong danh mục này.");
         }
+
+        // Deleted product logic removed
 
         Product product = new Product();
         // Sinh SKU tự động: Kết hợp tiền tố PRD- với một chuỗi UUID ngẫu nhiên (cắt ngắn)
         product.setSku("PRD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         
         // Gán các trường khác
-        product.setName(request.getName());
+        product.setName(normalizedName);
         product.setImportPrice(request.getImportPrice() != null ? request.getImportPrice() : BigDecimal.ZERO);
         product.setPrice(request.getPrice());
         product.setImageUrl(request.getImageUrl());
@@ -204,6 +203,13 @@ public class ProductServiceImpl implements ProductService {
         Category category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new RuntimeException("Danh mục không tồn tại trong hệ thống."));
 
+        String normalizedName = request.getName().replaceAll("[\u200B-\u200D\uFEFF]", "").replaceAll("\\s+", " ").trim();
+
+        // Kiểm tra trùng tên trong cùng danh mục (loại trừ chính nó)
+        if (productRepository.existsByNameIgnoreCaseAndCategoryIdAndIdNotAndIsDeletedFalse(normalizedName, categoryId, id)) {
+            throw new RuntimeException("Sản phẩm có tên '" + normalizedName + "' đã tồn tại trong danh mục này.");
+        }
+
         // Kiểm tra ngày sản xuất và hạn sử dụng (nếu có nhập cả 2)
         if (request.getManufacturingDate() != null && request.getExpirationDate() != null) {
             if (request.getManufacturingDate().isAfter(request.getExpirationDate())) {
@@ -231,7 +237,7 @@ public class ProductServiceImpl implements ProductService {
         }
 
         // Cập nhật thông tin (Bỏ qua SKU)
-        product.setName(request.getName());
+        product.setName(normalizedName);
         if (request.getImportPrice() != null) {
             product.setImportPrice(request.getImportPrice());
         }
@@ -246,25 +252,12 @@ public class ProductServiceImpl implements ProductService {
             product.setExpirationDate(LocalDate.of(1970, 1, 1));
         }
 
-        // Khôi phục lại nếu sản phẩm đang bị xóa mềm
-        boolean isRestoring = false;
-        if (Boolean.TRUE.equals(product.getIsDeleted())) {
-            product.setIsDeleted(false);
-            isRestoring = true;
-        }
-
         Product updatedProduct = productRepository.save(product);
 
         // Ghi Nhật ký
-        if (isRestoring) {
-            auditLogService.logAction(currentUser, "RESTORE", "products",
-                    String.valueOf(updatedProduct.getId()),
-                    "Khôi phục sản phẩm: " + updatedProduct.getName());
-        } else {
-            auditLogService.logAction(currentUser, "UPDATE", "products",
-                    String.valueOf(updatedProduct.getId()),
-                    "Cập nhật thông tin sản phẩm: " + updatedProduct.getName());
-        }
+        auditLogService.logAction(currentUser, "UPDATE", "products",
+                String.valueOf(updatedProduct.getId()),
+                "Cập nhật thông tin sản phẩm: " + updatedProduct.getName());
 
         return new ProductResponse(updatedProduct);
     }
@@ -384,6 +377,14 @@ public class ProductServiceImpl implements ProductService {
         }
     }
 
+    private String normalizeString(String input) {
+        if (input == null) return null;
+        String s = input.replaceAll("[\u200B-\u200D\uFEFF]", "").replaceAll("\\s+", " ").trim().toLowerCase();
+        s = s.replace("đ", "d");
+        String unaccented = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD);
+        return java.util.regex.Pattern.compile("\\p{InCombiningDiacriticalMarks}+").matcher(unaccented).replaceAll("");
+    }
+
     @Override
     public Map<String, Object> importProductsFromExcel(MultipartFile file, boolean preview, User currentUser) {
         checkPermission(currentUser);
@@ -393,6 +394,8 @@ public class ProductServiceImpl implements ProductService {
         int skippedCount = 0;
         List<String> errors = new ArrayList<>();
         List<Map<String, Object>> updateDetails = new ArrayList<>();
+        Set<String> seenInExcel = new HashSet<>();
+        List<Category> allCategories = categoryRepository.findAll();
 
         try (InputStream is = file.getInputStream(); Workbook workbook = new XSSFWorkbook(is)) {
             Sheet sheet = workbook.getSheetAt(0);
@@ -434,12 +437,28 @@ public class ProductServiceImpl implements ProductService {
                 try {
                     String name = getCellValueAsString(row.getCell(headerMap.get("Tên sản phẩm")));
                     if (name.isEmpty()) throw new RuntimeException("Tên sản phẩm không được để trống.");
+                    name = name.replaceAll("[\u200B-\u200D\uFEFF]", "").replaceAll("\\s+", " ").trim();
 
                     String categoryName = getCellValueAsString(row.getCell(headerMap.get(catColName)));
                     if (categoryName.isEmpty()) throw new RuntimeException("Tên Danh mục không được để trống.");
 
-                    Category category = categoryRepository.findFirstByNameIgnoreCase(categoryName)
-                            .orElseThrow(() -> new RuntimeException("Danh mục '" + categoryName + "' không tồn tại trong hệ thống."));
+                    String normalizedSearchName = normalizeString(categoryName);
+                    Category category = null;
+                    for (Category c : allCategories) {
+                        if (normalizeString(c.getName()).equals(normalizedSearchName)) {
+                            category = c;
+                            break;
+                        }
+                    }
+                    if (category == null) {
+                        throw new RuntimeException("Danh mục '" + categoryName + "' không tồn tại trong hệ thống.");
+                    }
+
+                    String cacheKey = category.getId() + "_" + name.toLowerCase();
+                    if (seenInExcel.contains(cacheKey)) {
+                        throw new RuntimeException("Sản phẩm '" + name + "' bị lặp lại nhiều lần trong chính file Excel này.");
+                    }
+                    seenInExcel.add(cacheKey);
 
                     String sku = "";
                     if (headerMap.containsKey("Mã SKU")) {
@@ -472,8 +491,8 @@ public class ProductServiceImpl implements ProductService {
                         imageUrl = getCellValueAsString(row.getCell(headerMap.get("Đường dẫn ảnh (URL)")));
                     }
 
-                    // Xử lý Upsert dựa trên Tên sản phẩm
-                    java.util.Optional<Product> existingOpt = productRepository.findFirstByNameAndIsDeletedFalse(name);
+                    // Xử lý Upsert dựa trên Tên sản phẩm và Danh mục
+                    java.util.Optional<Product> existingOpt = productRepository.findFirstByNameIgnoreCaseAndCategoryIdAndIsDeletedFalse(name, category.getId());
                     
                     if (existingOpt.isPresent()) {
                         Product existing = existingOpt.get();

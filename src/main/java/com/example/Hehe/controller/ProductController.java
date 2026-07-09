@@ -38,9 +38,10 @@ public class ProductController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Integer categoryId,
             @RequestParam(required = false) BigDecimal minPrice,
-            @RequestParam(required = false) BigDecimal maxPrice) {
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(defaultValue = "0") int page) {
         try {
-            List<ProductResponse> products = productService.getAllProducts(keyword, categoryId, minPrice, maxPrice);
+            org.springframework.data.domain.Page<ProductResponse> products = productService.getAllProducts(keyword, categoryId, minPrice, maxPrice, page);
             return ResponseEntity.ok(products);
         } catch (RuntimeException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
@@ -75,12 +76,6 @@ public class ProductController {
         try {
             ProductResponse response = productService.createProduct(request, currentUser);
             return ResponseEntity.ok(response);
-        } catch (com.example.Hehe.exception.ProductDeletedConflictException ex) {
-            return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).body(Map.of(
-                "code", "DELETED_CONFLICT",
-                "message", ex.getMessage(),
-                "productId", ex.getProductId()
-            ));
         } catch (RuntimeException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }

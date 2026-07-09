@@ -153,6 +153,11 @@ const mainNavItems = computed(() => {
     items.push({ label: 'Sản phẩm', to: '/products', icon: 'fas fa-box-open' })
   }
   items.push({ label: 'Tồn kho', to: '/inventory', icon: 'fas fa-warehouse' })
+  // Doanh thu — chỉ hiển thị với ADMIN và MANAGER
+  if (isManagerOrAdmin.value) {
+    items.push({ label: 'Doanh thu', to: '/revenue', icon: 'fas fa-chart-line' })
+  }
+
   return items
 })
 

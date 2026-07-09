@@ -238,10 +238,10 @@ CREATE TABLE backups (
 CREATE INDEX idx_backups_branch_id ON backups (branch_id);
 
 -- Migration command to apply update on existing database
--- ALTER TYPE receipt_status ADD VALUE 'RETURN';
--- ALTER TYPE receipt_type ADD VALUE 'DISPOSAL';
--- ALTER TABLE receipts ADD COLUMN disposal_reason VARCHAR(255);
--- ALTER TABLE receipts ADD COLUMN disposal_method VARCHAR(255);
--- ALTER TABLE receipts ADD COLUMN attachment_url VARCHAR(500);
--- UPDATE receipts SET type = 'DISPOSAL' WHERE type = 'ADJUST_OUT' AND id IN (SELECT id FROM receipts WHERE type = 'ADJUST_OUT');
+ALTER TYPE receipt_status ADD VALUE 'RETURN';
+ALTER TYPE receipt_type ADD VALUE 'DISPOSAL';
+ALTER TABLE receipts ADD COLUMN disposal_reason VARCHAR(255);
+ALTER TABLE receipts ADD COLUMN disposal_method VARCHAR(255);
+ALTER TABLE receipts ADD COLUMN attachment_url VARCHAR(500);
+UPDATE receipts SET type = 'DISPOSAL' WHERE type = 'ADJUST_OUT' AND id IN (SELECT id FROM receipts WHERE type = 'ADJUST_OUT');
 
