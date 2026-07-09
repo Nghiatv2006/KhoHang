@@ -47,10 +47,7 @@ const productForm = reactive({
 const pSaving = ref(false)
 const uploadingImage = ref(false)
 
-// Conflict Dialog
-const showConflictDialog = ref(false)
-const conflictProductId = ref<number | null>(null)
-const conflictMessage = ref('')
+// Conflict Dialog removed
 
 async function handleImageUpload(event: Event) {
   const target = event.target as HTMLInputElement
@@ -94,7 +91,7 @@ function openEditProduct(p: any) {
   })
   showProductModal.value = true
 }
-async function saveProduct(forceCreate = false) {
+async function saveProduct() {
   if (!productForm.name?.trim()) {
     toast.error('Tên sản phẩm là bắt buộc.')
     return
@@ -668,7 +665,7 @@ function formatCurrency(val: any) {
           <!-- Footer -->
           <div class="p-6 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50/80 dark:bg-slate-900/50 backdrop-blur-md flex gap-3">
             <button class="flex-1 h-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-bold transition-colors shadow-sm" @click="showProductModal = false">Hủy bỏ</button>
-            <button class="flex-[2] h-12 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-xl text-sm font-bold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2" :disabled="pSaving" @click="saveProduct(false)">
+            <button class="flex-[2] h-12 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-xl text-sm font-bold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2" :disabled="pSaving" @click="saveProduct()">
               <i v-if="pSaving" class="fas fa-spinner fa-spin"></i>
               <i v-else class="fas fa-check"></i>
               {{ pSaving ? 'Đang lưu...' : 'Lưu sản phẩm' }}
