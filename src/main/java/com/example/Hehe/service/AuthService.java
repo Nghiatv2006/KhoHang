@@ -17,6 +17,8 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final AuditLogService auditLogService;
 
+    private final java.util.concurrent.ConcurrentHashMap<String, Integer> failedAttempts = new java.util.concurrent.ConcurrentHashMap<>();
+
     public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
                        JwtTokenProvider jwtTokenProvider, AuditLogService auditLogService) {
         this.userRepository = userRepository;
@@ -30,11 +32,28 @@ public class AuthService {
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new RuntimeException("Tài khoản hoặc mật khẩu không chính xác"));
 
+        // Kiểm tra xem có đang bị chặn do đăng nhập sai không
+        if (user.getBanUntil() != null && user.getBanUntil().isAfter(java.time.LocalDateTime.now())) {
+            throw new RuntimeException("Bạn đã nhập sai mật khẩu quá nhiều lần. Vui lòng thử lại sau.");
+        }
+
         // 2. Kiểm tra mật khẩu (so khớp bằng BCrypt)
         boolean isMatch = passwordEncoder.matches(request.getPassword(), user.getPassword());
         if (!isMatch) {
-            throw new RuntimeException("Tài khoản hoặc mật khẩu không chính xác");
+            int attempts = failedAttempts.getOrDefault(user.getUsername(), 0) + 1;
+            if (attempts >= 5) {
+                user.setBanUntil(java.time.LocalDateTime.now().plusSeconds(30));
+                userRepository.save(user);
+                failedAttempts.remove(user.getUsername());
+                throw new RuntimeException("Bạn đã nhập sai mật khẩu quá nhiều lần. Vui lòng thử lại sau.");
+            } else {
+                failedAttempts.put(user.getUsername(), attempts);
+                throw new RuntimeException("Tài khoản hoặc mật khẩu không chính xác");
+            }
         }
+        
+        // Đăng nhập thành công, reset đếm sai
+        failedAttempts.remove(user.getUsername());
 
         // 3. Kiểm tra trạng thái tài khoản (ACTIVE hay LOCKED)
         if (user.getStatus() == UserStatus.LOCKED) {

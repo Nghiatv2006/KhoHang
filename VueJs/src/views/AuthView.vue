@@ -16,6 +16,12 @@ const banMsg = ref('') // Thông báo bị phạt spam
 const successMsg = ref('') // Thông báo thành công khôi phục mật khẩu
 const showPwd = ref(false)
 
+// Trạng thái khoá đăng nhập (riêng biệt, không đụng vào code cũ)
+const loginAttempts = ref(0)
+const loginLocked = ref(false)
+const loginLockSeconds = ref(0)
+let loginLockTimer: any = null
+
 // State cho quy trình Quên mật khẩu
 const mode = ref<'login' | 'forgot_email' | 'forgot_select_acc' | 'forgot_otp' | 'forgot_reset'>('login')
 const forgotEmail = ref('')
@@ -86,6 +92,7 @@ onBeforeUnmount(() => {
     handleResizeListener = null
   }
   if (renderer) renderer.dispose()
+  if (loginLockTimer) clearInterval(loginLockTimer)
 })
 
 function skipIntro() {
@@ -112,6 +119,7 @@ function skipIntro() {
 }
 
 async function handleLogin() {
+  if (loginLocked.value) return
   if (!form.username.trim() || !form.password) {
     errorMsg.value = 'Vui lòng nhập đầy đủ thông tin.'
     return
@@ -127,6 +135,7 @@ async function handleLogin() {
     })
     const data = await res.json()
     if (res.ok) {
+      loginAttempts.value = 0
       localStorage.setItem('wh_user', JSON.stringify(data))
       router.push('/dashboard')
     } else if (res.status === 429) {
@@ -140,6 +149,25 @@ async function handleLogin() {
       }
     } else {
       errorMsg.value = data.message || 'Tên đăng nhập hoặc mật khẩu không đúng.'
+      
+      // Xử lý bộ đếm riêng cho vụ sai mật khẩu
+      loginAttempts.value++
+      if (loginAttempts.value >= 5 || data.message?.includes('Bạn đã nhập sai mật khẩu quá nhiều lần')) {
+        loginLocked.value = true
+        loginLockSeconds.value = 30
+        errorMsg.value = 'Bạn đã nhập sai 5 lần liên tiếp. Vui lòng đợi 30 giây.'
+        if (loginLockTimer) clearInterval(loginLockTimer)
+        loginLockTimer = setInterval(() => {
+          loginLockSeconds.value--
+          if (loginLockSeconds.value <= 0) {
+            clearInterval(loginLockTimer)
+            loginLockTimer = null
+            loginLocked.value = false
+            loginAttempts.value = 0
+            errorMsg.value = ''
+          }
+        }, 1000)
+      }
     }
   } catch (err: any) {
     errorMsg.value = 'Không thể kết nối đến máy chủ. ' + (err.message || '')
@@ -885,12 +913,14 @@ onMounted(async () => {
           <!-- Nút Đăng nhập -->
           <button 
             type="submit" 
-            :disabled="loading"
-            class="w-full bg-gradient-to-r from-[#d63031] to-[#ff7675] hover:from-[#c0392b] hover:to-[#d63031] text-white font-[800] p-[14px] rounded-[10px] text-[1.1rem] tracking-[1px] transition-transform hover:-translate-y-[2px] shadow-[0_5px_15px_rgba(214,48,49,0.3)] flex items-center justify-center gap-2"
+            :disabled="loading || loginLocked"
+            class="w-full font-[800] p-[14px] rounded-[10px] text-[1.1rem] tracking-[1px] transition-transform shadow-[0_5px_15px_rgba(214,48,49,0.3)] flex items-center justify-center gap-2 bg-gradient-to-r from-[#d63031] to-[#ff7675] hover:from-[#c0392b] hover:to-[#d63031] text-white hover:-translate-y-[2px] disabled:bg-none disabled:bg-gray-400 disabled:text-gray-200 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
           >
             <i v-if="loading" class="fas fa-spinner fa-spin"></i>
+            <i v-else-if="loginLocked" class="fas fa-lock"></i>
             <i v-else class="fas fa-sign-in-alt"></i>
-            {{ loading ? 'ĐANG XỬ LÝ...' : 'ĐĂNG NHẬP NGAY' }}
+            <span v-if="loginLocked">THỬ LẠI SAU {{ loginLockSeconds }}s</span>
+            <span v-else>{{ loading ? 'ĐANG XỬ LÝ...' : 'ĐĂNG NHẬP NGAY' }}</span>
           </button>
         </form>
 

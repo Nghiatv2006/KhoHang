@@ -42,6 +42,7 @@ git diff <đường-dẫn-file>
 * **Đợi xác nhận từ người dùng:** Tuyệt đối không tự ý thực hiện commit merge, sửa file xung đột hoặc push code lên các nhánh chung mà chưa được người dùng duyệt qua và đồng ý với phương án đề xuất.
 * **Bắt buộc kiểm tra biên dịch (Build) trước khi staging hoặc commit:** Sau khi sửa code hoặc giải quyết xung đột, **trước khi** chạy lệnh `git add` hoặc `git commit`, AI bắt buộc phải chạy lệnh build thử cả Backend và Frontend (ví dụ: `./gradlew build` hoặc `npm run build`) để đề phòng lỗi cú pháp/biên dịch làm hỏng nhánh chung khi push lên.
 
+
 # Quy tắc thiết kế Giao diện (UI/UX Premium Standards)
 
 Để đảm bảo giao diện luôn đạt tiêu chuẩn thẩm mỹ cao cấp (Premium) của dự án và không bị sáo rỗng:
@@ -58,4 +59,15 @@ git diff <đường-dẫn-file>
 ## 3. Bố cục và Cấu trúc Bảng
 * **Bảng dữ liệu mật độ cao (High-density)**: Không lạm dụng việc bọc các dòng thành thẻ card bo tròn riêng lẻ dính bóng đổ. Thay vào đó, hãy dùng đường chia dòng ngang mảnh (`border-b border-slate-100 dark:border-slate-800/40`) để giao diện được thông thoáng và chuyên nghiệp.
 * **Cấm tuyệt đối Emoji**: Không sử dụng biểu tượng cảm xúc (emoji) ở bất kỳ phần nào trên giao diện ứng dụng.
+
+# Quy tắc khi bổ sung tính năng mới (Tránh phá hoại code cũ)
+
+## 1. Không tái sử dụng hoặc ghi đè (override) logic có sẵn sai mục đích
+* **Tôn trọng luồng xử lý gốc**: Khi thêm tính năng mới, tuyệt đối không được ghi đè, xóa, hoặc tận dụng (hijack) các khối code đang hoạt động bình thường cho mục đích khác ngoài thiết kế ban đầu.
+* **Tạo luồng xử lý độc lập**: Phải tự xây dựng trạng thái (state), biến cục bộ, và khối `if/else` biệt lập cho tính năng mới. Giữ nguyên 100% logic cũ.
+
+## 2. Cẩn trọng tuyệt đối với từ ngữ hiển thị (UI/UX)
+* **Không dùng từ ngữ gây hoang mang**: Từ ngữ hiển thị phải phản ánh đúng bản chất và phạm vi thực tế của hành động (tạm thời hay vĩnh viễn, cá nhân hay hệ thống). Tránh dùng từ ngữ nặng nề hoặc có nghĩa vĩnh viễn cho các trạng thái tạm thời.
+* **Xác nhận nghiệp vụ trước khi viết thông báo**: Luôn cân nhắc ảnh hưởng của từ ngữ đến người dùng cuối và bộ phận Hỗ trợ (Support) trước khi quyết định nội dung thông báo.
+
 
