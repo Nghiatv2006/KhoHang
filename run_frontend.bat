@@ -1,6 +1,6 @@
 @echo off
 title WareHub Frontend
-cd /d "%~dp0VueJs"
+cd /d "%~dp0\VueJs"
 
 :menu
 cls
@@ -53,3 +53,4 @@ if "%choice%"=="2" (
     goto menu
 )
 exit
+

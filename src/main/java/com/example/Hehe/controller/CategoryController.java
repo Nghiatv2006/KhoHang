@@ -30,9 +30,11 @@ public class CategoryController {
      * Path: /api/categories hoặc /api/categories?keyword=abc
      */
     @GetMapping
-    public ResponseEntity<?> getAllCategories(@RequestParam(required = false) String keyword) {
+    public ResponseEntity<?> getAllCategories(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "0") int page) {
         try {
-            List<CategoryResponse> categories = categoryService.getAllCategories(keyword);
+            org.springframework.data.domain.Page<CategoryResponse> categories = categoryService.getAllCategories(keyword, page);
             return ResponseEntity.ok(categories);
         } catch (RuntimeException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));

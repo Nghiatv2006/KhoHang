@@ -16,7 +16,7 @@ public interface CategoryService {
      * @param keyword Từ khóa tìm kiếm (có thể null)
      * @return Danh sách các danh mục (DTO)
      */
-    List<CategoryResponse> getAllCategories(String keyword);
+    org.springframework.data.domain.Page<CategoryResponse> getAllCategories(String keyword, int page);
 
     /**
      * Thêm mới một danh mục.

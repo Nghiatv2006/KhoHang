@@ -63,6 +63,9 @@ function canApproveReceipt(r: any) {
               if (r.sourceBranchId === user.value?.branchId) return true;
           }
       }
+      if (user.value?.role === 'STAFF') {
+          if (r.type === 'EXPORT' && r.sourceBranchId === user.value?.branchId) return true;
+      }
       return false;
   }
   if (r.status === 'PENDING_ADMIN') {

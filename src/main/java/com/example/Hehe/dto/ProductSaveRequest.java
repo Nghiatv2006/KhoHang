@@ -23,8 +23,7 @@ public class ProductSaveRequest {
     private LocalDate expirationDate;
     private Boolean hasExpiry;
     
-    // Đánh dấu người dùng muốn ép tạo mới dù trùng tên sản phẩm đã xóa
-    private Boolean forceCreate;
+    // Removed forceCreate
 
     // Getters and Setters
 
@@ -100,11 +99,5 @@ public class ProductSaveRequest {
         this.hasExpiry = hasExpiry;
     }
 
-    public Boolean getForceCreate() {
-        return forceCreate;
-    }
 
-    public void setForceCreate(Boolean forceCreate) {
-        this.forceCreate = forceCreate;
-    }
 }

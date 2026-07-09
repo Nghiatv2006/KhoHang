@@ -128,15 +128,13 @@ const filteredTotal = computed(() =>
 
 // ── Helpers ─────────────────────────────────────────────────
 function formatVND(val: number | null | undefined) {
-  if (!val || val === 0) return '0đ'
-  if (val >= 1e9) return (val / 1e9).toFixed(2) + ' tỷ đ'
-  if (val >= 1e6) return (val / 1e6).toFixed(1) + ' triệu đ'
-  return new Intl.NumberFormat('vi-VN').format(val) + 'đ'
+  if (!val || val === 0) return '0 VNĐ'
+  return new Intl.NumberFormat('vi-VN').format(val) + ' VNĐ'
 }
 
 function formatVNDFull(val: number | null | undefined) {
-  if (!val) return '0đ'
-  return new Intl.NumberFormat('vi-VN').format(val) + 'đ'
+  if (!val) return '0 VNĐ'
+  return new Intl.NumberFormat('vi-VN').format(val) + ' VNĐ'
 }
 
 function formatDate(str: string) {
@@ -286,7 +284,7 @@ async function exportExcel() {
             {{ loadingSummary ? '...' : formatVND(summary?.quarterRevenue) }}
           </div>
           <div class="rev-metric-footer">
-            <span class="text-slate-400 text-xs">Doanh thu lũy kế quý</span>
+            <span class="text-slate-400 text-xs">Tổng doanh thu từ đầu quý đến nay</span>
           </div>
           <div class="rev-metric-sub">&nbsp;</div>
           <div class="rev-metric-accent" style="background: #10b981"></div>
@@ -299,7 +297,7 @@ async function exportExcel() {
             {{ loadingSummary ? '...' : formatVND(summary?.yearRevenue) }}
           </div>
           <div class="rev-metric-footer">
-            <span class="text-slate-400 text-xs">Doanh thu lũy kế năm</span>
+            <span class="text-slate-400 text-xs">Tổng doanh thu từ đầu năm đến nay</span>
           </div>
           <div class="rev-metric-sub">&nbsp;</div>
           <div class="rev-metric-accent" style="background: #f59e0b"></div>
@@ -338,12 +336,12 @@ async function exportExcel() {
           <table class="w-full">
             <thead>
               <tr>
-                <th class="rev-th text-left w-32">Ngày</th>
-                <th v-if="isAdmin && !selectedBranchId" class="rev-th text-left">Chi nhánh</th>
+                <th class="rev-th text-left w-[15%]">Ngày</th>
+                <th v-if="isAdmin && !selectedBranchId" class="rev-th text-left w-[15%]">Chi nhánh</th>
                 <th class="rev-th text-left">Khách hàng</th>
-                <th class="rev-th text-center w-32">Số mặt hàng</th>
-                <th class="rev-th text-right w-48">Tổng tiền</th>
-                <th class="rev-th text-center w-36">TT thanh toán</th>
+                <th class="rev-th text-left w-[15%]">Số mặt hàng</th>
+                <th class="rev-th text-left w-[20%]">Tổng tiền</th>
+                <th class="rev-th text-center w-[15%]">TT thanh toán</th>
               </tr>
             </thead>
             <tbody>
@@ -363,10 +361,10 @@ async function exportExcel() {
                   {{ getBranchName(r.sourceBranchId) }}
                 </td>
                 <td class="rev-td text-left text-sm text-slate-700">{{ r.customerName || '—' }}</td>
-                <td class="rev-td text-center text-xs text-slate-500">
+                <td class="rev-td text-left text-xs text-slate-500">
                   {{ (r.details || []).length }} sp
                 </td>
-                <td class="rev-td text-right font-semibold text-slate-800 text-sm">
+                <td class="rev-td text-left font-semibold text-slate-800 text-sm">
                   {{ formatVNDFull(receiptTotal(r)) }}
                 </td>
                 <td class="rev-td text-center">

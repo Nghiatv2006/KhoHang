@@ -23,7 +23,7 @@ public interface ProductService {
      * @param maxPrice Giá cao nhất
      * @return Danh sách DTO hiển thị cho người dùng
      */
-    List<ProductResponse> getAllProducts(String keyword, Integer categoryId, BigDecimal minPrice, BigDecimal maxPrice);
+    org.springframework.data.domain.Page<ProductResponse> getAllProducts(String keyword, Integer categoryId, BigDecimal minPrice, BigDecimal maxPrice, int page);
 
     /**
      * Lấy chi tiết một sản phẩm theo ID.
