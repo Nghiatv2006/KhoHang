@@ -223,6 +223,11 @@ CREATE INDEX idx_audit_logs_created_at ON audit_logs (created_at DESC);
 CREATE INDEX idx_password_reset_otps_username ON password_reset_otps (username);
 CREATE INDEX idx_password_reset_otps_email ON password_reset_otps (email);
 
+-- Tạo khóa chống trùng lặp tên sản phẩm trong cùng danh mục (áp dụng cho các sản phẩm chưa xóa)
+CREATE UNIQUE INDEX uk_product_name_category 
+ON products (LOWER(name), category_id) 
+WHERE is_deleted = false;
+
 -- Bảng Sao lưu dữ liệu (Backups)
 CREATE TABLE backups (
     id SERIAL PRIMARY KEY,
