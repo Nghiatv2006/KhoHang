@@ -59,6 +59,10 @@ public class InventoryController {
         return ResponseEntity.ok(res);
     }
 
+    @GetMapping("/global")
+    public ResponseEntity<List<InventoryResponse>> getGlobalInventories() {
+        return ResponseEntity.ok(inventoryService.getGlobalInventories());
+    }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteInventory(

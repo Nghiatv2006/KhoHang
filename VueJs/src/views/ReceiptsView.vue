@@ -670,7 +670,7 @@ watch(() => directImportForm.value.batchCode, (newBatch) => {
 watch(() => createForm.value.sourceBranchId, async (newVal) => {
   if (newVal) {
     try {
-      const res = await api.get('/api/inventories')
+      const res = await api.get('/api/inventories/global')
       if (res.ok) {
         const allInventories = await res.json()
         globalInventories.value = allInventories
@@ -698,6 +698,16 @@ watch(() => createForm.value.sourceBranchId, async (newVal) => {
     }
   } else {
     sourceInventories.value = []
+    // When IMPORT from headBranch (sourceBranchId is empty), still need to load
+    // global inventories so getBatchesForProduct can filter by headBranch
+    if (createForm.value.type === 'IMPORT' && globalInventories.value.length === 0) {
+      try {
+        const res = await api.get('/api/inventories/global')
+        if (res.ok) {
+          globalInventories.value = await res.json()
+        }
+      } catch(e) {}
+    }
   }
 }, { immediate: true })
 
@@ -732,6 +742,16 @@ const availableProducts = computed(() => {
     }
     
     return result
+  }
+  // IMPORT from headBranch (sourceBranchId is empty): only show products with inventory at headBranch
+  if (t === 'IMPORT') {
+    const headBranchId = headBranch.value?.id
+    const inStockIds = new Set(
+      globalInventories.value
+        .filter(inv => inv.branchId === headBranchId && inv.quantity > 0)
+        .map(inv => inv.productId)
+    )
+    return products.value.filter(p => inStockIds.has(p.id))
   }
   return products.value
 })
@@ -768,7 +788,7 @@ function onProductChange(row: DetailRow) {
 
 function getBatchesForProduct(productId: number | string | null) {
   if (!productId) return []
-  if (createForm.value.type === 'ADJUST_IN' || (createForm.value.type === 'IMPORT' && !createForm.value.sourceBranchId)) {
+  if (createForm.value.type === 'ADJUST_IN') {
     const uniqueBatches = new Map()
     globalInventories.value.filter(inv => inv.productId === Number(productId)).forEach(inv => {
       if (!uniqueBatches.has(inv.batchCode)) {
@@ -778,6 +798,23 @@ function getBatchesForProduct(productId: number | string | null) {
         existing.quantity += inv.quantity
       }
     })
+    return Array.from(uniqueBatches.values())
+  }
+  // IMPORT without sourceBranchId means source is headBranch (Kho Tổng)
+  // Only show batches from headBranch, not from all branches
+  if (createForm.value.type === 'IMPORT' && !createForm.value.sourceBranchId) {
+    const headBranchId = headBranch.value?.id
+    const uniqueBatches = new Map()
+    globalInventories.value
+      .filter(inv => inv.productId === Number(productId) && inv.branchId === headBranchId)
+      .forEach(inv => {
+        if (!uniqueBatches.has(inv.batchCode)) {
+          uniqueBatches.set(inv.batchCode, { ...inv })
+        } else {
+          const existing = uniqueBatches.get(inv.batchCode)
+          existing.quantity += inv.quantity
+        }
+      })
     return Array.from(uniqueBatches.values())
   }
   let batches = sourceInventories.value

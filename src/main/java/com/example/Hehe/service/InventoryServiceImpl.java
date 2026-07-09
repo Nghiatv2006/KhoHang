@@ -366,4 +366,12 @@ public class InventoryServiceImpl implements InventoryService {
 
         inventoryRepository.delete(inventory);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<InventoryResponse> getGlobalInventories() {
+        return inventoryRepository.findAll().stream()
+                .map(InventoryResponse::new)
+                .collect(Collectors.toList());
+    }
 }
