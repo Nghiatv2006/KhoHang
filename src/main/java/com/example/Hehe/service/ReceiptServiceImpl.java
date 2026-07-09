@@ -356,7 +356,8 @@ public class ReceiptServiceImpl implements ReceiptService {
         Receipt r = receiptRepository.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
         if (r.getStatus() == ReceiptStatus.CANCELLED) throw new RuntimeException("Receipt is already cancelled.");
         if (r.getStatus() == ReceiptStatus.PENDING_SHORTFALL_ADMIN) throw new RuntimeException("Phiếu đã chuyển lên Admin duyệt thiếu hụt thì không thể hủy.");
-        
+        if (r.getStatus() == ReceiptStatus.COMPLETED) throw new RuntimeException("Không được phép hủy phiếu đã hoàn thành.");
+
         if (r.getStatus() == ReceiptStatus.DRAFT) {
             if (!currentUser.getId().equals(r.getCreatedBy().getId())) {
                 throw new RuntimeException("Chỉ người lập phiếu mới được quyền xóa/hủy phiếu nháp.");
