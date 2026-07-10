@@ -1350,69 +1350,40 @@ function typeClass(r: any) {
   return map[r?.type] || 'bg-gray-100 text-gray-600'
 }
 function statusClass(r: any) {
-  const s = r?.status;
-  if (r?.type === 'EXPORT' && s === 'COMPLETED' && r?.paymentStatus !== 'PAID') {
-    return 'bg-orange-100 text-orange-700 border border-orange-300';
-  }
-  if (r?.type === 'TRANSFER' && s === 'PENDING_ADMIN') {
-    if (r.sourceBranchId === user.value?.branchId) {
-      return 'bg-green-600 text-white shadow-sm';
-    }
-    return 'bg-orange-500 text-white shadow-sm';
-  }
-  if ((s === 'PENDING_ADMIN' || s === 'PENDING_STOCKTAKE') && r?.type === 'TRANSFER') {
-    return 'bg-orange-500 text-white shadow-sm';
-  }
-  // Hóa đơn (EXPORT) chưa thanh toán → màu đỏ thay vì xanh
-  if (s === 'COMPLETED' && r?.type === 'EXPORT' && (r.paymentStatus === 'UNPAID' || r.paymentStatus === 'Chưa thanh toán' || r.paymentStatus === 'UNPAID')) {
-    return 'bg-red-500 text-white shadow-sm';
-  }
-  const map: Record<string, string> = {
-    DRAFT: 'bg-yellow-500 text-white shadow-sm',
-    PENDING_STAFF_CONFIRM: 'bg-amber-400 text-white shadow-sm',
-    PENDING_ADMIN: 'bg-blue-500 text-white shadow-sm',
-    PENDING_STOCKTAKE: 'bg-purple-500 text-white shadow-sm',
-    PENDING_SHORTFALL_MANAGER: 'bg-orange-500 text-white shadow-sm',
-    PENDING_SHORTFALL_ADMIN: 'bg-rose-500 text-white shadow-sm',
-    PENDING_COMPENSATION: 'bg-indigo-500 text-white shadow-sm',
-    COMPLETED: 'bg-green-600 text-white shadow-sm',
-    CANCELLED: 'bg-red-500 text-white shadow-sm',
-    RETURN: 'bg-amber-600 text-white shadow-sm'
-  }
-  return map[s] || 'bg-slate-500 text-white shadow-sm'
+  return 'sky-status-badge';
 }
 
 function statusLabel(r: any) {
   if (r?.type === 'EXPORT' && r?.status === 'COMPLETED' && r?.paymentStatus !== 'PAID') {
-    return '💸 Chưa thanh toán';
+    return 'Chưa thanh toán';
   }
   const s = r?.status;
   if (s === 'DRAFT') return 'Chờ duyệt';
   if (s === 'PENDING_STAFF_CONFIRM') return 'Chờ Staff xác nhận';
   if (s === 'PENDING_ADMIN') {
     if (r?.type === 'TRANSFER') {
-      return '⏳ Chờ Manager Nguồn';
+      return 'Chờ Manager Nguồn';
     }
     if (r?.type === 'DISPOSAL') {
-      return '🔥 Chờ Quản lý duyệt';
+      return 'Chờ Quản lý duyệt';
     }
-    return '🛡️ Chờ Admin';
+    return 'Chờ Admin';
   }
   if (s === 'PENDING_STOCKTAKE') {
     if (r?.type === 'TRANSFER' && r.sourceBranchId === user.value?.branchId) {
-      return '📦 Đang chuyển (Chờ đích KK)';
+      return 'Đang chuyển (Chờ đích KK)';
     }
-    if (r?.type === 'DISPOSAL') return '🛡️ Chờ Admin duyệt cuối';
-    return '📦 Chờ kiểm kê';
+    if (r?.type === 'DISPOSAL') return 'Chờ Admin duyệt cuối';
+    return 'Chờ kiểm kê';
   }
-  if (s === 'PENDING_SHORTFALL_MANAGER') return '⚠️ Thiếu hụt (Chờ Manager)';
+  if (s === 'PENDING_SHORTFALL_MANAGER') return 'Thiếu hụt (Chờ Manager)';
   if (s === 'PENDING_SHORTFALL_ADMIN') {
-    if (r?.type === 'TRANSFER') return '🚨 Thiếu hụt (Chờ Manager Nguồn)';
-    return '🚨 Báo thiếu hụt';
+    if (r?.type === 'TRANSFER') return 'Thiếu hụt (Chờ Manager Nguồn)';
+    return 'Báo thiếu hụt';
   }
-  if (s === 'COMPLETED') return '✅ Đã duyệt';
-  if (s === 'CANCELLED') return '❌ Đã hủy';
-  if (s === 'RETURN') return '🔄 Trả hàng';
+  if (s === 'COMPLETED') return 'Đã duyệt';
+  if (s === 'CANCELLED') return 'Đã hủy';
+  if (s === 'RETURN') return 'Trả hàng';
   return s;
 }
 function paymentStatusLabel(p: string) {
@@ -1735,6 +1706,60 @@ const editModalTitle = computed(() => {
 
 </script>
 
+<style scoped>
+/* SKY THEME STATUS BADGE (Đảm bảo hoạt động độc lập không phụ thuộc Tailwind config) */
+.sky-status-badge {
+  background-color: #3b82f6; /* bg-blue-500 */
+  color: white;
+  border-color: #60a5fa; /* border-blue-400 */
+  box-shadow: 0 0 12px rgba(59,130,246,0.4);
+  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sky-status-badge .sun-icon,
+.sky-status-badge .moon-icon {
+  display: block;
+  transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); /* Bouncy effect */
+}
+
+/* Light Mode: Sun is UP, Moon is DOWN */
+.sky-status-badge .sun-icon {
+  opacity: 1;
+  transform: translateY(0) rotate(45deg) scale(1);
+}
+.sky-status-badge .moon-icon {
+  opacity: 0;
+  transform: translateY(20px) rotate(0deg) scale(0.5);
+}
+
+/* Hover effect in Light Mode */
+.sky-status-badge:hover .sun-icon {
+  transform: translateY(0) rotate(90deg) scale(1.15);
+}
+
+/* Dark Mode: Sun is DOWN, Moon is UP */
+html.dark-mode .sky-status-badge {
+  background-color: #0f172a; /* bg-slate-900 */
+  color: #bfdbfe; /* text-blue-200 */
+  border-color: #334155; /* border-slate-700 */
+  box-shadow: 0 0 12px rgba(15,23,42,0.8);
+}
+
+html.dark-mode .sky-status-badge .sun-icon {
+  opacity: 0;
+  transform: translateY(20px) rotate(90deg) scale(0.5);
+}
+html.dark-mode .sky-status-badge .moon-icon {
+  opacity: 1;
+  transform: translateY(0) rotate(-12deg) scale(1);
+}
+
+/* Hover effect in Dark Mode */
+html.dark-mode .sky-status-badge:hover .moon-icon {
+  transform: translateY(0) rotate(0deg) scale(1.15);
+}
+</style>
+
 <template>
   <div class="space-y-6 max-w-[1400px] mx-auto font-['Inter',sans-serif]">
 
@@ -1953,9 +1978,11 @@ const editModalTitle = computed(() => {
               </td>
               <td class="px-6 py-5">
                 <div class="flex flex-col gap-1">
-                  <span :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-bold', statusClass(r)]">
-                    {{ statusLabel(r) }}
-                  </span>
+                  <div :class="['sky-status-badge relative overflow-hidden inline-flex items-center px-3 py-1.5 rounded-xl border text-[11px] uppercase tracking-wider font-bold shadow-sm group', statusClass(r)]">
+                    <i class="fas fa-sun sun-icon absolute -right-1 -top-1 text-yellow-300 text-xl drop-shadow-[0_0_8px_rgba(253,224,71,0.8)]"></i>
+                    <i class="fas fa-moon moon-icon absolute -right-1 -bottom-1 text-yellow-300 text-xl drop-shadow-[0_0_8px_rgba(253,224,71,0.8)]"></i>
+                    <span class="relative z-10">{{ statusLabel(r) }}</span>
+                  </div>
                   <span v-if="r.paymentStatus === 'RECEIVED'" :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold mt-1', paymentStatusClass(r.paymentStatus)]">
                     📦 Đã nhận hàng
                   </span>
@@ -2136,9 +2163,11 @@ const editModalTitle = computed(() => {
               <div>
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Trạng thái</div>
                 <div class="flex flex-col items-start gap-1">
-                  <span :class="['inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold', statusClass(selectedReceipt)]">
-                    {{ statusLabel(selectedReceipt) }}
-                  </span>
+                  <div :class="['sky-status-badge relative overflow-hidden inline-flex items-center px-3 py-1.5 rounded-xl border text-[11px] uppercase tracking-wider font-bold shadow-sm group', statusClass(selectedReceipt)]">
+                    <i class="fas fa-sun sun-icon absolute -right-1 -top-1 text-yellow-300 text-xl drop-shadow-[0_0_8px_rgba(253,224,71,0.8)]"></i>
+                    <i class="fas fa-moon moon-icon absolute -right-1 -bottom-1 text-yellow-300 text-xl drop-shadow-[0_0_8px_rgba(253,224,71,0.8)]"></i>
+                    <span class="relative z-10">{{ statusLabel(selectedReceipt) }}</span>
+                  </div>
                   <span v-if="selectedReceipt.paymentStatus === 'RECEIVED'" :class="['inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold', paymentStatusClass(selectedReceipt.paymentStatus)]">
                     📦 Đã nhận hàng
                   </span>
