@@ -33,6 +33,8 @@ public class ReceiptResponse {
     private String disposalReason;
     private String disposalMethod;
     private String attachmentUrl;
+    /** true nếu Manager đã gửi chỉnh sửa xuống và Staff chưa xác nhận */
+    private Boolean hasPendingManagerEdit;
 
     public ReceiptResponse(Receipt r) {
         this.id = r.getId();
@@ -122,4 +124,6 @@ public class ReceiptResponse {
     public String getDisposalReason() { return disposalReason; }
     public String getDisposalMethod() { return disposalMethod; }
     public String getAttachmentUrl() { return attachmentUrl; }
+    public Boolean getHasPendingManagerEdit() { return hasPendingManagerEdit; }
+    public void setHasPendingManagerEdit(Boolean hasPendingManagerEdit) { this.hasPendingManagerEdit = hasPendingManagerEdit; }
 }

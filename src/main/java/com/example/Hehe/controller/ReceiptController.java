@@ -1,5 +1,7 @@
 package com.example.Hehe.controller;
 
+import com.example.Hehe.dto.EditReceiptRequest;
+import com.example.Hehe.dto.ReceiptEditLogResponse;
 import com.example.Hehe.dto.ReceiptResponse;
 import com.example.Hehe.dto.ReceiptSaveRequest;
 import com.example.Hehe.model.User;
@@ -41,8 +43,8 @@ public class ReceiptController {
     }
 
     @PostMapping("/{id}/cancel")
-    public ResponseEntity<ReceiptResponse> cancelReceipt(@PathVariable Integer id, @AuthenticationPrincipal User currentUser) {
-        return ResponseEntity.ok(receiptService.cancelReceipt(id, currentUser));
+    public ResponseEntity<ReceiptResponse> cancelReceipt(@PathVariable Integer id, @RequestParam(required = false) String reason, @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(receiptService.cancelReceipt(id, reason, currentUser));
     }
 
     @PostMapping("/{id}/approve")
@@ -70,6 +72,7 @@ public class ReceiptController {
         boolean isApproved = payload.getOrDefault("isApproved", false);
         return ResponseEntity.ok(receiptService.approveShortfall(id, isApproved, user));
     }
+
     @PostMapping("/{id}/compensate-shortfall")
     public ResponseEntity<ReceiptResponse> compensateShortfall(@PathVariable Integer id, @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(receiptService.compensateShortfall(id, user));
@@ -79,4 +82,41 @@ public class ReceiptController {
     public ResponseEntity<List<ReceiptResponse>> getCompletedBranchReceipts(@AuthenticationPrincipal User currentUser) {
         return ResponseEntity.ok(receiptService.getCompletedBranchReceipts(currentUser));
     }
+
+    // ─── Tính năng chỉnh sửa phiếu ──────────────────────────────────────────
+
+    /** Staff tự chỉnh sửa phiếu (chỉ khi status = DRAFT) */
+    @PutMapping("/{id}/edit-staff")
+    public ResponseEntity<ReceiptResponse> editReceiptByStaff(
+            @PathVariable Integer id,
+            @RequestBody EditReceiptRequest request,
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(receiptService.editReceiptByStaff(id, request, currentUser));
+    }
+
+    /** Manager chỉnh sửa phiếu + gửi xuống Staff (DRAFT) hoặc ghi cho Admin (PENDING_ADMIN) */
+    @PutMapping("/{id}/edit-manager")
+    public ResponseEntity<ReceiptResponse> editReceiptByManager(
+            @PathVariable Integer id,
+            @RequestBody EditReceiptRequest request,
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(receiptService.editReceiptByManager(id, request, currentUser));
+    }
+
+    /** Staff xác nhận thay đổi của Manager (khi status = PENDING_STAFF_CONFIRM) */
+    @PostMapping("/{id}/acknowledge-edit")
+    public ResponseEntity<ReceiptResponse> staffAcknowledgeEdit(
+            @PathVariable Integer id,
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(receiptService.staffAcknowledgeEdit(id, currentUser));
+    }
+
+    /** Lấy lịch sử chỉnh sửa của phiếu */
+    @GetMapping("/{id}/edit-history")
+    public ResponseEntity<List<ReceiptEditLogResponse>> getEditHistory(
+            @PathVariable Integer id,
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(receiptService.getEditHistory(id, currentUser));
+    }
 }
+
