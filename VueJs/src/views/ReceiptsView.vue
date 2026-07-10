@@ -116,20 +116,16 @@ function canCancelReceipt(r: any) {
   if (isAdmin.value) return true;
   if (!isManager.value) return false;
   
-  if (r.type === 'ADJUST_OUT') {
-      return r.sourceBranchId === user.value?.branchId;
+  // Manager can only cancel receipts if they are the "requesting branch" (the one who initiated it).
+  // The responding branch manager cannot cancel it when it's DRAFT or PENDING_ADMIN.
+  let requestingBranchId = null;
+  if (['IMPORT', 'TRANSFER'].includes(r.type)) {
+      requestingBranchId = r.destBranchId;
+  } else {
+      requestingBranchId = r.sourceBranchId;
   }
   
-  const isCrossBranchImport = r.type === 'IMPORT' && r.sourceBranchId !== r.destBranchId;
-  if (isCrossBranchImport) {
-      return r.sourceBranchId === user.value?.branchId || r.destBranchId === user.value?.branchId;
-  }
-  
-  if (r.type === 'TRANSFER') {
-      return r.sourceBranchId === user.value?.branchId || r.destBranchId === user.value?.branchId;
-  }
-  
-  return true; 
+  return requestingBranchId === user.value?.branchId; 
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -205,9 +201,45 @@ watch(filterTimeRange, (val) => {
 // Receipts đã lọc theo receiptType prop (luôn lọc trước)
 const typeFilteredReceipts = computed(() => {
   let list = receipts.value
-  // Lọc Hóa đơn (EXPORT): Chỉ được xem Hóa đơn của chi nhánh mình
-  // Lọc Nhập kho (IMPORT): Chỉ hiển thị cho chi nhánh đích, không hiển thị cho chi nhánh nguồn (Hà Nội) để tránh nhầm lẫn
+
+  // Hard filter to ensure visibility rules on frontend
   list = list.filter(r => {
+    // 1. Staff visibility rule: Staff can only see their own receipts, OR incoming receipts that are ready for processing
+    if (user.value?.role === 'STAFF') {
+      if (r.createdById !== user.value?.id) {
+        const isIncoming = (r.type === 'IMPORT' || r.type === 'TRANSFER') && 
+                           r.destBranchId === user.value?.branchId && 
+                           ['PENDING_STOCKTAKE', 'COMPLETED', 'PENDING_SHORTFALL_MANAGER', 'PENDING_SHORTFALL_ADMIN'].includes(r.status);
+        if (!isIncoming) return false;
+      }
+    }
+
+    // 2. Draft visibility rule: Drafts and Pending Staff Confirm should ONLY be visible to the creator's branch.
+    // For example, an IMPORT draft created by HCM (dest=HCM, source=Hanoi) should NOT be seen by Manager Hanoi yet.
+    if (r.status === 'DRAFT' || r.status === 'PENDING_STAFF_CONFIRM') {
+      let creatorBranchId = null;
+      if (['IMPORT', 'TRANSFER'].includes(r.type)) {
+        creatorBranchId = r.destBranchId;
+      } else {
+        creatorBranchId = r.sourceBranchId;
+      }
+      if (creatorBranchId !== user.value?.branchId) return false;
+    }
+
+    // 3. Admin cross-branch transfer rule
+    if (r.type === 'TRANSFER') {
+      if (isAdmin.value && r.sourceBranchId !== 1 && r.destBranchId !== 1) return false;
+    }
+
+    // 4. Manager visibility rule regarding Admin's receipts:
+    // Managers should NOT see operations performed by Admin at the Head Warehouse (Kho Tổng),
+    // UNLESS it's a transfer/import explicitly destined for the Manager's branch.
+    if (user.value?.role === 'MANAGER' && r.createdByRole === 'ADMIN') {
+      const isIncoming = (r.type === 'TRANSFER' || r.type === 'IMPORT') && r.destBranchId === user.value?.branchId;
+      if (!isIncoming) return false;
+    }
+
+    // 5. EXPORT/IMPORT filters from HEAD
     if (r.type === 'EXPORT') {
       return r.sourceBranchId === user.value?.branchId
     }
@@ -217,6 +249,7 @@ const typeFilteredReceipts = computed(() => {
       }
       return r.destBranchId === user.value?.branchId
     }
+
     return true
   })
 
@@ -482,6 +515,9 @@ const createForm = ref<{
   paymentStatus: string
   description: string
   details: DetailRow[]
+  disposalReason?: string
+  disposalMethod?: string
+  attachmentUrl?: string
 }>({
   type: 'IMPORT',
   sourceBranchId: user.value?.branchId || headBranch.value?.id || '',
@@ -491,7 +527,10 @@ const createForm = ref<{
   customerPhone: '',
   paymentStatus: 'UNPAID',
   description: '',
-  details: []
+  details: [],
+  disposalReason: '',
+  disposalMethod: '',
+  attachmentUrl: ''
 })
 
 const showCustomerDropdown = ref(false)
@@ -756,6 +795,16 @@ const availableProducts = computed(() => {
     )
     return products.value.filter(p => inStockIds.has(p.id))
   }
+  // IMPORT from headBranch (sourceBranchId is empty): only show products with inventory at headBranch
+  if (t === 'IMPORT') {
+    const headBranchId = headBranch.value?.id
+    const inStockIds = new Set(
+      globalInventories.value
+        .filter(inv => inv.branchId === headBranchId && inv.quantity > 0)
+        .map(inv => inv.productId)
+    )
+    return products.value.filter(p => inStockIds.has(p.id))
+  }
   return products.value
 })
 
@@ -821,7 +870,14 @@ function getBatchesForProduct(productId: number | string | null) {
     return Array.from(uniqueBatches.values())
   }
   let batches = sourceInventories.value
-    .filter(inv => inv.productId === Number(productId) && inv.quantity > 0)
+    .filter(inv => {
+      if (inv.productId !== Number(productId) || inv.quantity <= 0) return false;
+      if (createForm.value.type === 'DISPOSAL' && createForm.value.disposalReason === 'Hàng hết hạn sử dụng') {
+        const todayStr = new Date().toISOString().substring(0, 10);
+        if (!inv.hasExpiry || !inv.expirationDate || inv.expirationDate.substring(0, 10) >= todayStr) return false;
+      }
+      return true;
+    })
 
   if (createForm.value.type === 'ADJUST_OUT') {
     const today = new Date().getTime()
@@ -835,9 +891,9 @@ function getBatchesForProduct(productId: number | string | null) {
 
   return batches.map(inv => {
       const pendingQty = receipts.value
-        .filter(r => r.status === 'DRAFT' && r.sourceBranchId === createForm.value.sourceBranchId && 
-                (['EXPORT', 'TRANSFER', 'ADJUST_OUT'].includes(r.type) || 
-                 (r.type === 'IMPORT' && r.sourceBranchId !== r.destBranchId)))
+        .filter(r => r.status === 'DRAFT' && Number(r.sourceBranchId) === Number(createForm.value.sourceBranchId) && 
+                (['EXPORT', 'TRANSFER', 'ADJUST_OUT', 'DISPOSAL'].includes(r.type) || 
+                 (r.type === 'IMPORT' && Number(r.sourceBranchId) !== Number(r.destBranchId))))
         .flatMap(r => r.details || [])
         .filter(d => Number(d.productId) === Number(productId) && d.batchCode === inv.batchCode)
         .reduce((sum, d) => sum + Number(d.quantity), 0);
@@ -864,26 +920,38 @@ const selectedProductHasExpiry = (row: DetailRow) => {
 function getMaxQuantity(row: DetailRow) {
   if (!row.productId) return null
   if (createForm.value.type === 'ADJUST_IN') return null
-  if (!createForm.value.sourceBranchId) return null
-  if (createForm.value.type === 'IMPORT' && createForm.value.sourceBranchId === createForm.value.destBranchId) return null
-  
+
+  // Xác định chi nhánh nguồn thực tế (nếu IMPORT mà không có sourceBranchId, tức là từ Kho Tổng)
+  let effectiveSourceId = createForm.value.sourceBranchId
+  let useGlobal = false
+  if (createForm.value.type === 'IMPORT' && !effectiveSourceId) {
+    effectiveSourceId = headBranch.value?.id
+    useGlobal = true
+  }
+
+  if (!effectiveSourceId) return null
+  if (createForm.value.type === 'IMPORT' && Number(effectiveSourceId) === Number(createForm.value.destBranchId)) return null
+
   if (!row.isNewBatch && !row.batchCode) return null;
+
+  const sourceBranchIdNum = Number(effectiveSourceId)
+  const invList = useGlobal ? globalInventories.value : sourceInventories.value
 
   let totalQty = 0;
   if (row.batchCode && !row.isNewBatch) {
-    const inv = sourceInventories.value.find(x => x.productId === Number(row.productId) && x.batchCode === row.batchCode)
+    const inv = invList.find(x => x.productId === Number(row.productId) && x.batchCode === row.batchCode && Number(x.branchId) === sourceBranchIdNum)
     totalQty = inv ? inv.quantity : 0;
   } else {
-    totalQty = sourceInventories.value
-      .filter(x => x.productId === Number(row.productId))
+    totalQty = invList
+      .filter(x => x.productId === Number(row.productId) && Number(x.branchId) === sourceBranchIdNum)
       .reduce((sum, inv) => sum + inv.quantity, 0)
   }
 
-  // Trừ đi số lượng đang nằm trong các phiếu nháp chờ xuất/điều chuyển
+  // Trừ đi số lượng đang nằm trong các phiếu nháp
   const pendingQty = receipts.value
-    .filter(r => r.status === 'DRAFT' && r.sourceBranchId === createForm.value.sourceBranchId && 
-            (['EXPORT', 'TRANSFER', 'ADJUST_OUT'].includes(r.type) || 
-             (r.type === 'IMPORT' && r.sourceBranchId !== r.destBranchId)))
+    .filter(r => r.status === 'DRAFT' && Number(r.sourceBranchId) === sourceBranchIdNum &&
+            (['EXPORT', 'TRANSFER', 'ADJUST_OUT', 'DISPOSAL'].includes(r.type) ||
+             (r.type === 'IMPORT' && Number(r.sourceBranchId) !== Number(r.destBranchId))))
     .flatMap(r => r.details || [])
     .filter(d => Number(d.productId) === Number(row.productId) && (!row.batchCode || d.batchCode === row.batchCode))
     .reduce((sum, d) => sum + Number(d.quantity), 0)
@@ -907,12 +975,13 @@ function constrainQuantity(d: DetailRow) {
   if (d.quantity === null || d.quantity === undefined || (d.quantity as any) === '') return;
   if (createForm.value.type === 'ADJUST_IN' || (createForm.value.type === 'IMPORT' && createForm.value.sourceBranchId === createForm.value.destBranchId)) return;
   const max = getMaxQuantity(d)
+  const qty = Number(d.quantity)
   if (max !== null) {
     if (max === 0) {
       d.quantity = 0
       return
     }
-    if (d.quantity > max) d.quantity = max
+    if (qty > max) d.quantity = max
   }
 }
 
@@ -1055,12 +1124,31 @@ async function approveReceipt(receipt: any) {
 // ──────────────────────────────────────────────────────────────
 // CANCEL
 // ──────────────────────────────────────────────────────────────
-async function cancelReceipt(receipt: any) {
-  if (!confirm(`Xác nhận HỦY phiếu ${receipt.code}?`)) return
+const showCancelModal = ref(false)
+const cancelReason = ref('')
+const receiptToCancel = ref<any>(null)
+
+function confirmCancelReceipt(receipt: any) {
+  receiptToCancel.value = receipt
+  cancelReason.value = ''
+  showCancelModal.value = true
+}
+
+async function executeCancelReceipt() {
+  if (!receiptToCancel.value) return
+  if (!cancelReason.value.trim()) {
+    toast.error('Vui lòng nhập lý do hủy phiếu.')
+    return
+  }
+  
+  const receipt = receiptToCancel.value
   try {
-    const res = await api.post(`/api/receipts/${receipt.id}/cancel`, {})
+    const res = await api.post(`/api/receipts/${receipt.id}/cancel?reason=${encodeURIComponent(cancelReason.value.trim())}`, {})
     if (res.ok) {
       toast.success(`Phiếu ${receipt.code} đã được hủy.`)
+      showCancelModal.value = false
+      receiptToCancel.value = null
+      cancelReason.value = ''
       showDetail.value = false
       await loadData()
     } else {
@@ -1350,21 +1438,24 @@ function statusClass(r: any) {
     return 'bg-red-100 text-red-600 border border-red-300';
   }
   const map: Record<string, string> = {
-    DRAFT: 'bg-yellow-100 text-yellow-700 border border-yellow-300',
-    PENDING_ADMIN: 'bg-blue-100 text-blue-700 border border-blue-300',
-    PENDING_STOCKTAKE: 'bg-purple-100 text-purple-700 border border-purple-300',
-    PENDING_SHORTFALL_MANAGER: 'bg-orange-100 text-orange-700 border border-orange-300',
-    PENDING_SHORTFALL_ADMIN: 'bg-rose-100 text-rose-700 border border-rose-300',
-    PENDING_COMPENSATION: 'bg-indigo-100 text-indigo-700 border border-indigo-300',
-    COMPLETED: 'bg-green-100 text-green-700 border border-green-300',
-    CANCELLED: 'bg-red-100 text-red-600 border border-red-300'
+    DRAFT: 'bg-yellow-500 text-white shadow-sm',
+    PENDING_STAFF_CONFIRM: 'bg-amber-400 text-white shadow-sm',
+    PENDING_ADMIN: 'bg-blue-500 text-white shadow-sm',
+    PENDING_STOCKTAKE: 'bg-purple-500 text-white shadow-sm',
+    PENDING_SHORTFALL_MANAGER: 'bg-orange-500 text-white shadow-sm',
+    PENDING_SHORTFALL_ADMIN: 'bg-rose-500 text-white shadow-sm',
+    PENDING_COMPENSATION: 'bg-indigo-500 text-white shadow-sm',
+    COMPLETED: 'bg-green-600 text-white shadow-sm',
+    CANCELLED: 'bg-red-500 text-white shadow-sm',
+    RETURN: 'bg-amber-600 text-white shadow-sm'
   }
   return map[s] || 'bg-gray-100 text-gray-600'
 }
 
 function statusLabel(r: any) {
   const s = r?.status;
-  if (s === 'DRAFT') return '⏳ Chờ duyệt';
+  if (s === 'DRAFT') return 'Chờ duyệt';
+  if (s === 'PENDING_STAFF_CONFIRM') return 'Chờ Staff xác nhận';
   if (s === 'PENDING_ADMIN') {
     if (r?.type === 'TRANSFER') {
       if (r.sourceBranchId === user.value?.branchId) return '✅ Đã duyệt';
@@ -1474,6 +1565,278 @@ async function exportExcel() {
   }
 }
 
+// ──────────────────────────────────────────────────────────────
+// EDIT RECEIPT — State & Functions
+// ──────────────────────────────────────────────────────────────
+
+// Kiểm tra Staff có thể tự sửa không (chỉ DRAFT, chủ phiếu)
+function canStaffEdit(r: any) {
+  if (!r) return false
+  return user.value?.role === 'STAFF'
+    && r.createdById === user.value?.id
+    && r.status === 'DRAFT'
+}
+
+// Kiểm tra Manager có thể sửa không (DRAFT hoặc PENDING_ADMIN, cùng chi nhánh lập)
+function canManagerEdit(r: any) {
+  if (!r) return false
+  if (user.value?.role !== 'MANAGER') return false
+  if (r.status !== 'DRAFT' && r.status !== 'PENDING_ADMIN') return false
+
+  // Manager chỉ được phép sửa phiếu khi chi nhánh của họ là nơi "khởi tạo" (yêu cầu) phiếu đó.
+  // Không được phép sửa phiếu do chi nhánh khác gửi tới (khi chưa được Admin duyệt).
+  let requestingBranchId = null;
+  if (['IMPORT', 'TRANSFER'].includes(r.type)) {
+      requestingBranchId = r.destBranchId;
+  } else {
+      requestingBranchId = r.sourceBranchId;
+  }
+  
+  return requestingBranchId === user.value?.branchId
+}
+
+// Kiểm tra Staff có thể xác nhận thay đổi của Manager không
+function canStaffAcknowledge(r: any) {
+  if (!r) return false
+  return user.value?.role === 'STAFF'
+    && r.createdById === user.value?.id
+    && r.status === 'PENDING_STAFF_CONFIRM'
+}
+
+// State cho Edit Modal
+const showEditModal = ref(false)
+const editMode = ref<'staff' | 'manager'>('staff')
+const submittingEdit = ref(false)
+const editForm = ref<{
+  description: string
+  editReason: string
+  details: { 
+    detailId: number; 
+    productId: number;
+    batchCode: string;
+    productName: string; 
+    quantity: number; 
+    originalQty: number;
+    maxQty: number | null;
+  }[]
+}>({
+  description: '',
+  editReason: '',
+  details: []
+})
+
+// State cho Edit History panel
+const showEditHistory = ref(false)
+const hasSeenEditHistory = ref(false)
+const editHistoryList = ref<any[]>([])
+
+
+function toggleEditHistory() {
+  showEditHistory.value = !showEditHistory.value
+  if (showEditHistory.value) {
+    hasSeenEditHistory.value = true
+  }
+}
+
+// State cho Acknowledge
+const submittingAcknowledge = ref(false)
+
+function constrainEditQuantity(d: any) {
+  if (d.quantity === null || d.quantity === undefined || String(d.quantity) === '') return;
+  const qty = Number(d.quantity)
+  if (d.maxQty !== null) {
+    if (d.maxQty === 0) {
+      d.quantity = 0
+      return
+    }
+    if (qty > d.maxQty) d.quantity = d.maxQty
+  }
+}
+
+function onEditQuantityBlur(d: any) {
+  if (!d.quantity || d.quantity < 1) {
+    d.quantity = 1;
+  }
+  if (d.maxQty !== null && d.maxQty === 0) {
+    d.quantity = 0;
+  }
+}
+
+async function openEditModal(mode: 'staff' | 'manager') {
+  if (!selectedReceipt.value) return
+  
+  editMode.value = mode
+  editForm.value = {
+    description: selectedReceipt.value.description || '',
+    editReason: '',
+    details: (selectedReceipt.value.details || []).map((d: any) => ({
+      detailId: d.id,
+      productId: Number(d.productId),
+      batchCode: d.batchCode,
+      productName: d.productName || `SP #${d.productId}`,
+      quantity: d.quantity,
+      originalQty: d.quantity,
+      maxQty: null as number | null
+    }))
+  }
+  showEditModal.value = true
+
+  // Tải mới inventory toàn cục nếu có thay đổi
+  try {
+    const res = await api.get('/api/inventories/global')
+    if (res.ok) {
+      globalInventories.value = await res.json()
+    }
+  } catch(e) {}
+
+  const r = selectedReceipt.value
+  let effectiveSourceId = r.sourceBranchId
+  if (r.type === 'IMPORT' && !effectiveSourceId) {
+    effectiveSourceId = headBranch.value?.id
+  }
+
+  editForm.value.details.forEach(d => {
+    if (r.type === 'ADJUST_IN') {
+      d.maxQty = null
+      return
+    }
+    if (!effectiveSourceId) {
+      d.maxQty = null
+      return
+    }
+    if (r.type === 'IMPORT' && Number(effectiveSourceId) === Number(r.destBranchId)) {
+      d.maxQty = null
+      return
+    }
+
+    const sourceBranchIdNum = Number(effectiveSourceId)
+    const inv = globalInventories.value.find((x: any) => 
+      x.productId === d.productId && 
+      x.batchCode === d.batchCode && 
+      x.branchId === sourceBranchIdNum
+    )
+    const totalQty = inv ? inv.quantity : 0
+
+    const pendingQty = receipts.value
+      .filter(otherR => otherR.id !== r.id && otherR.status === 'DRAFT' && Number(otherR.sourceBranchId) === sourceBranchIdNum &&
+              (['EXPORT', 'TRANSFER', 'ADJUST_OUT', 'DISPOSAL'].includes(otherR.type) ||
+               (otherR.type === 'IMPORT' && Number(otherR.sourceBranchId) !== Number(otherR.destBranchId))))
+      .flatMap(otherR => otherR.details || [])
+      .filter(otherD => Number(otherD.productId) === d.productId && otherD.batchCode === d.batchCode)
+      .reduce((sum, otherD) => sum + Number(otherD.quantity), 0)
+
+    d.maxQty = Math.max(0, totalQty - pendingQty)
+  })
+}
+
+async function submitEditReceipt() {
+  if (!editForm.value.editReason.trim()) {
+    toast.error('Vui lòng nhập lý do chỉnh sửa.')
+    return
+  }
+  if (!selectedReceipt.value) return
+
+  const payload = {
+    description: editForm.value.description,
+    editReason: editForm.value.editReason.trim(),
+    details: editForm.value.details.map(d => ({ detailId: d.detailId, quantity: d.quantity }))
+  }
+
+  const endpoint = editMode.value === 'staff'
+    ? `/api/receipts/${selectedReceipt.value.id}/edit-staff`
+    : `/api/receipts/${selectedReceipt.value.id}/edit-manager`
+
+  submittingEdit.value = true
+  try {
+    const res = await api.put(endpoint, payload)
+    if (res.ok) {
+      const updated = await res.json()
+      // Cập nhật selectedReceipt
+      selectedReceipt.value = updated
+      // Cập nhật trong danh sách
+      const idx = receipts.value.findIndex(r => r.id === updated.id)
+      if (idx !== -1) receipts.value[idx] = updated
+      showEditModal.value = false
+      if (editMode.value === 'manager' && updated.status === 'PENDING_STAFF_CONFIRM') {
+        toast.success('Đã gửi chỉnh sửa xuống Staff xác nhận.')
+      } else {
+        toast.success('Đã lưu chỉnh sửa thành công.')
+      }
+    } else {
+      const err = await res.json().catch(() => ({}))
+      toast.error(err.message || 'Lỗi khi lưu chỉnh sửa.')
+    }
+  } catch (e: any) {
+    toast.error('Lỗi: ' + e.message)
+  } finally {
+    submittingEdit.value = false
+  }
+}
+
+async function staffAcknowledgeEdit() {
+  if (!selectedReceipt.value) return
+  submittingAcknowledge.value = true
+  try {
+    const res = await api.post(`/api/receipts/${selectedReceipt.value.id}/acknowledge-edit`, {})
+    if (res.ok) {
+      const updated = await res.json()
+      selectedReceipt.value = updated
+      const idx = receipts.value.findIndex(r => r.id === updated.id)
+      if (idx !== -1) receipts.value[idx] = updated
+      toast.success('Đã xác nhận thay đổi. Phiếu đã về trạng thái Chờ duyệt.')
+    } else {
+      const err = await res.json().catch(() => ({}))
+      toast.error(err.message || 'Lỗi khi xác nhận.')
+    }
+  } catch (e: any) {
+    toast.error('Lỗi: ' + e.message)
+  } finally {
+    submittingAcknowledge.value = false
+  }
+}
+
+// Tự động tải và lọc lịch sử khi mở detail
+watch(selectedReceipt, async () => {
+  editHistoryList.value = []
+  showEditHistory.value = false
+  hasSeenEditHistory.value = false
+  if (selectedReceipt.value) {
+    try {
+      const res = await api.get(`/api/receipts/${selectedReceipt.value.id}/edit-history`)
+      if (res.ok) {
+        let logs = await res.json()
+        // Admin không được xem lịch sử trao đổi nội bộ của chi nhánh con
+        if (isAdmin.value) {
+          logs = logs.filter((log: any) => log.direction === 'MANAGER_TO_ADMIN')
+        }
+        editHistoryList.value = logs
+        // Tự động mở panel lịch sử nếu có (để báo hiệu cho Admin/Manager biết phiếu đã bị sửa)
+        if (logs.length > 0) {
+          showEditHistory.value = true
+          hasSeenEditHistory.value = true
+        }
+      }
+    } catch(e) {
+      console.error('Lỗi tải lịch sử:', e)
+    }
+  }
+})
+
+function directionLabel(dir: string) {
+  const map: Record<string, string> = {
+    STAFF_EDIT: 'Nhân viên tự sửa',
+    MANAGER_TO_STAFF: 'Manager gửi xuống Staff',
+    MANAGER_TO_ADMIN: 'Manager ghi cho Admin'
+  }
+  return map[dir] || dir
+}
+
+const editModalTitle = computed(() => {
+  if (editMode.value === 'staff') return 'Chỉnh sửa phiếu'
+  if (selectedReceipt.value?.status === 'DRAFT') return 'Sửa & Gửi xuống Staff'
+  return 'Chỉnh sửa (Ghi chú cho Admin)'
+})
+
 </script>
 
 <template>
@@ -1506,7 +1869,7 @@ async function exportExcel() {
           <i class="fas fa-box-open"></i> Thêm sản phẩm
         </button>
         <button
-          v-if="!isAdmin && !(receiptType === 'ADJUST_OUT' && isManager)"
+          v-if="user?.role === 'STAFF'"
           @click="openCreateModal"
           class="h-[42px] bg-[#4361ee] hover:bg-[#3a0ca3] text-white px-5 rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-2"
         >
@@ -1759,7 +2122,7 @@ async function exportExcel() {
                     <i class="fas fa-boxes text-xs"></i>
                   </button>
                   <button v-if="canCancelReceipt(r)"
-                    @click.stop="cancelReceipt(r)"
+                    @click.stop="confirmCancelReceipt(r)"
                     class="w-8 h-8 flex items-center justify-center rounded-lg bg-red-50 hover:bg-red-500 hover:text-white text-red-500 transition-all"
                     title="Hủy phiếu">
                     <i class="fas fa-times text-xs"></i>
@@ -1857,6 +2220,22 @@ async function exportExcel() {
           </div>
 
           <div class="overflow-y-auto flex-1 p-6 space-y-5 custom-scrollbar">
+            <!-- ── BANNER LÝ DO HỦY ─────────────────────────────── -->
+            <div v-if="selectedReceipt.description && selectedReceipt.description.includes('[Lý do hủy]')" class="bg-red-50 border border-red-200 rounded-2xl p-4 flex gap-4 shadow-sm relative overflow-hidden group">
+              <div class="absolute inset-0 bg-gradient-to-r from-red-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div class="w-10 h-10 rounded-full bg-red-100 border border-red-200 flex items-center justify-center shrink-0">
+                <i class="fas fa-ban text-red-600 text-lg"></i>
+              </div>
+              <div class="flex-1">
+                <div class="text-sm font-bold text-red-700 uppercase tracking-wide mb-1 flex items-center gap-2">
+                  Lý do hủy phiếu
+                </div>
+                <div class="text-sm text-red-600 font-medium whitespace-pre-line">
+                  {{ selectedReceipt.description.split('\n').find((l: string) => l.startsWith('[Lý do hủy]'))?.replace('[Lý do hủy]', '').trim() }}
+                </div>
+              </div>
+            </div>
+
             <!-- Meta info -->
             <div class="grid grid-cols-2 gap-4 text-sm">
               <div>
@@ -1908,9 +2287,9 @@ async function exportExcel() {
                   {{ paymentStatusLabel(selectedReceipt.paymentStatus) }}
                 </span>
               </div>
-              <div v-if="selectedReceipt.description">
+              <div v-if="selectedReceipt.description && selectedReceipt.description.split('\n').filter((l: string) => !l.startsWith('[Lý do hủy]')).join('\n').trim()">
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Ghi chú</div>
-                <div class="text-[#364a63] text-xs">{{ selectedReceipt.description }}</div>
+                <div class="text-[#364a63] text-xs whitespace-pre-line">{{ selectedReceipt.description.split('\n').filter((l: string) => !l.startsWith('[Lý do hủy]')).join('\n').trim() }}</div>
               </div>
             </div>
 
@@ -1973,6 +2352,102 @@ async function exportExcel() {
               </div>
             </div>
 
+            <!-- ── Banner cảnh báo: Chờ Staff xác nhận ────────────────── -->
+            <div v-if="selectedReceipt.status === 'PENDING_STAFF_CONFIRM' && canStaffAcknowledge(selectedReceipt)"
+              class="mt-6 p-4 bg-amber-50 border border-amber-300 rounded-2xl flex items-start gap-3">
+              <i class="fas fa-exclamation-triangle text-amber-500 mt-0.5 text-lg flex-shrink-0"></i>
+              <div class="flex-1">
+                <div class="font-bold text-amber-800 text-sm">Manager đã điều chỉnh phiếu này</div>
+                <div class="text-amber-700 text-xs mt-0.5">Vui lòng xem lịch sử chỉnh sửa bên dưới và xác nhận để gửi lại lên Manager.</div>
+              </div>
+            </div>
+
+            <!-- ── Khu vực chỉnh sửa phiếu ────────────────────────────── -->
+            <div class="mt-6 pt-5 border-t flex flex-wrap items-center gap-3">
+              <!-- Nút Sửa phiếu (Staff) -->
+              <button v-if="canStaffEdit(selectedReceipt)"
+                @click="openEditModal('staff')"
+                class="h-9 px-4 bg-[#eef2ff] hover:bg-[#4361ee] hover:text-white text-[#4361ee] border border-[#4361ee]/30 rounded-xl text-xs font-bold transition-all flex items-center gap-2">
+                <i class="fas fa-pen"></i> Sửa phiếu
+              </button>
+              <!-- Nút Sửa + Gửi xuống (Manager khi DRAFT) -->
+              <button v-if="canManagerEdit(selectedReceipt) && selectedReceipt.status === 'DRAFT'"
+                @click="openEditModal('manager')"
+                class="h-9 px-4 bg-orange-50 hover:bg-orange-500 hover:text-white text-orange-600 border border-orange-300 rounded-xl text-xs font-bold transition-all flex items-center gap-2">
+                <i class="fas fa-pen-to-square"></i> Sửa & Gửi Staff
+              </button>
+              <!-- Nút Sửa (Manager khi PENDING_ADMIN — ghi lý do cho Admin) -->
+              <button v-if="canManagerEdit(selectedReceipt) && selectedReceipt.status === 'PENDING_ADMIN'"
+                @click="openEditModal('manager')"
+                class="h-9 px-4 bg-blue-50 hover:bg-blue-500 hover:text-white text-blue-600 border border-blue-300 rounded-xl text-xs font-bold transition-all flex items-center gap-2">
+                <i class="fas fa-pen-to-square"></i> {{ selectedReceipt?.type === 'TRANSFER' ? 'Sửa (Ghi chú cho Chi nhánh nguồn)' : 'Sửa (Ghi chú cho Admin)' }}
+              </button>
+              <!-- Nút Xác nhận thay đổi (Staff) -->
+              <button v-if="canStaffAcknowledge(selectedReceipt)"
+                @click="staffAcknowledgeEdit()" :disabled="submittingAcknowledge"
+                class="h-9 px-4 bg-amber-400 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm">
+                <i class="fas fa-check" v-if="!submittingAcknowledge"></i>
+                <i class="fas fa-spinner fa-spin" v-else></i>
+                Xác nhận thay đổi
+              </button>
+              <!-- Nút Lịch sử chỉnh sửa -->
+              <button v-if="editHistoryList.length > 0" @click.prevent="toggleEditHistory" type="button"
+                class="h-9 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ml-auto border border-slate-200 relative">
+                <i class="fas fa-history text-xs"></i>
+                Lịch sử sửa ({{ editHistoryList.length }})
+                <i class="fas fa-chevron-down text-[10px] transition-transform" :class="showEditHistory ? 'rotate-180' : ''"></i>
+                <span v-if="!showEditHistory && !hasSeenEditHistory" class="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500 border-2 border-white"></span>
+                </span>
+              </button>
+            </div>
+
+            <!-- ── Panel lịch sử chỉnh sửa ─────────────────────────────── -->
+            <Transition name="slide-down">
+              <div v-if="showEditHistory" class="mt-2 rounded-2xl border border-slate-200 overflow-hidden">
+                <div class="bg-slate-50 px-4 py-2.5 flex items-center gap-2 border-b border-slate-200">
+                  <i class="fas fa-history text-slate-400 text-xs"></i>
+                  <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Lịch sử chỉnh sửa</span>
+                </div>
+                <div v-if="editHistoryList.length === 0" class="px-4 py-5 text-center text-xs text-slate-400">
+                  Chưa có lịch sử chỉnh sửa nào.
+                </div>
+                <div v-else class="divide-y divide-slate-100">
+                  <div v-for="log in editHistoryList" :key="log.id" class="px-4 py-3">
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap mb-1">
+                          <span class="text-xs font-bold text-slate-700">{{ log.editorName }}</span>
+                          <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                            :class="log.editorRole === 'STAFF' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'">
+                            {{ log.editorRole === 'STAFF' ? 'Nhân viên' : 'Quản lý' }}
+                          </span>
+                          <span class="text-[10px] text-slate-400">{{ directionLabel(log.direction) }}</span>
+                        </div>
+                        <div class="text-xs text-slate-600 mb-1">
+                          <span class="font-semibold text-slate-500">Lý do:</span> {{ log.editReason }}
+                        </div>
+                        <div v-if="log.changes" class="text-xs text-slate-500">
+                          <span class="font-semibold">Thay đổi:</span> {{ log.changes }}
+                        </div>
+                        <div v-if="log.acknowledgedAt" class="mt-1 text-[10px] text-green-600 flex items-center gap-1">
+                          <i class="fas fa-check-circle"></i>
+                          {{ log.acknowledgedByName }} đã xác nhận lúc {{ formatDateTime(log.acknowledgedAt) }}
+                        </div>
+                        <div v-else-if="log.direction === 'MANAGER_TO_STAFF'" class="mt-1 text-[10px] text-amber-500 flex items-center gap-1">
+                          <i class="fas fa-clock"></i> Chờ Staff xác nhận
+                        </div>
+                      </div>
+                      <div class="text-[10px] text-slate-400 whitespace-nowrap flex-shrink-0">
+                        {{ formatDateTime(log.createdAt) }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Transition>
+
             <!-- Approve & Cancel actions -->
             <div v-if="canApproveReceipt(selectedReceipt)" class="mt-8 pt-5 border-t flex flex-wrap gap-4">
               <button @click="approveReceipt(selectedReceipt)" :disabled="approvingId === selectedReceipt.id"
@@ -1981,13 +2456,13 @@ async function exportExcel() {
                 <i class="fas fa-spinner fa-spin" v-else></i> 
                 {{ approveReceiptText(selectedReceipt) }}
               </button>
-              <button @click="cancelReceipt(selectedReceipt)" v-if="canCancelReceipt(selectedReceipt)"
+              <button @click="confirmCancelReceipt(selectedReceipt)" v-if="canCancelReceipt(selectedReceipt)"
                 class="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
                 <i class="fas fa-ban"></i> Hủy phiếu
               </button>
             </div>
             <div v-else-if="canCancelReceipt(selectedReceipt)" class="mt-8 pt-5 border-t flex gap-4">
-              <button @click="cancelReceipt(selectedReceipt)"
+              <button @click="confirmCancelReceipt(selectedReceipt)"
                 class="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
                 <i class="fas fa-ban"></i> Hủy phiếu
               </button>
@@ -2246,8 +2721,12 @@ async function exportExcel() {
                         <div :class="(createForm.type === 'IMPORT' || createForm.type === 'TRANSFER') ? 'grid grid-cols-1' : 'grid grid-cols-3 gap-5'">
                           <div>
                             <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Số lượng <span class="text-red-500">*</span></label>
-                            <div class="flex items-center h-10 bg-white border border-[#e2e8f0] rounded-xl overflow-hidden focus-within:border-[#4361ee] focus-within:ring-2 focus-within:ring-[#4361ee]/20">
-                              <input v-model.number="d.quantity" type="number" min="1" @input="constrainQuantity(d)" @blur="onQuantityBlur(d)" @keydown="(e) => { if(['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault() }"
+                            <div class="flex items-center h-10 bg-white border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-[#4361ee]/20 transition-colors"
+                              :class="getMaxQuantity(d) !== null && d.quantity > getMaxQuantity(d)! ? 'border-red-400 focus-within:border-red-400' : 'border-[#e2e8f0] focus-within:border-[#4361ee]'">
+                              <input v-model.number="d.quantity" type="number" min="1"
+                                :max="getMaxQuantity(d) !== null ? getMaxQuantity(d)! : undefined"
+                                @input="constrainQuantity(d)" @blur="onQuantityBlur(d)"
+                                @keydown="(e) => { if(['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault() }"
                                 :disabled="!d.productId || (!d.isNewBatch && !d.batchCode)"
                                 class="w-full h-full px-3 text-sm font-bold outline-none disabled:bg-gray-100 disabled:text-gray-400 bg-transparent" />
                               <div v-if="((createForm.type === 'IMPORT' && createForm.sourceBranchId === createForm.destBranchId) || createForm.type === 'ADJUST_IN') && getGlobalQuantity(d) !== null" 
@@ -2628,6 +3107,119 @@ async function exportExcel() {
       </div>
     </AppModal>
 
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- EDIT RECEIPT MODAL -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <AppModal :show="showEditModal" @close="showEditModal = false" :title="editModalTitle">
+      <div class="space-y-6 p-4 sm:p-5">
+        <!-- Lý do chỉnh sửa -->
+        <div>
+          <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Lý do chỉnh sửa <span class="text-red-500">*</span></label>
+          <textarea v-model="editForm.editReason" rows="2"
+            placeholder="Nhập lý do chỉnh sửa (bắt buộc)..."
+            class="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl text-sm focus:ring-0 focus:border-[#4361ee] dark:focus:border-blue-500 outline-none resize-none transition-colors leading-relaxed"
+          ></textarea>
+        </div>
+
+        <!-- Ghi chú phiếu -->
+        <div>
+          <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Ghi chú phiếu</label>
+          <textarea v-model="editForm.description" rows="2"
+            placeholder="Ghi chú phiếu (tuỳ chọn)..."
+            class="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl text-sm focus:ring-0 focus:border-[#4361ee] dark:focus:border-blue-500 outline-none resize-none transition-colors leading-relaxed"
+          ></textarea>
+        </div>
+
+        <!-- Danh sách sản phẩm -->
+        <div>
+          <label class="block text-xs font-bold text-[#8094ae] uppercase mb-2">Cập nhật số lượng</label>
+          <div class="rounded-xl border-2 border-slate-200 dark:border-slate-700 overflow-hidden">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-50 dark:bg-slate-800/50">
+                <tr>
+                  <th class="px-5 py-3 text-left text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Sản phẩm</th>
+                  <th class="px-5 py-3 text-center text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-28">Số lượng cũ</th>
+                  <th class="px-5 py-3 text-center text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-36">Số lượng mới</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50">
+                <tr v-for="(d, idx) in editForm.details" :key="idx">
+                  <td class="px-5 py-3.5 text-sm text-slate-700 dark:text-slate-300 font-semibold">{{ d.productName }}</td>
+                  <td class="px-5 py-3.5 text-center font-medium text-slate-500 dark:text-slate-400">{{ d.originalQty }}</td>
+                  <td class="px-5 py-3.5">
+                    <div class="flex items-center h-10 bg-white dark:bg-slate-900 border-2 rounded-lg overflow-hidden focus-within:border-[#4361ee] dark:focus-within:border-blue-500 transition-colors"
+                      :class="d.maxQty !== null && d.quantity > d.maxQty ? 'border-red-400 focus-within:border-red-400' : (d.quantity !== d.originalQty ? 'border-amber-400 focus-within:border-amber-400 dark:border-amber-500 dark:bg-amber-900/20 bg-amber-50' : 'border-slate-200 dark:border-slate-700')">
+                      <input v-model.number="d.quantity" type="number" min="1"
+                        :max="d.maxQty !== null ? d.maxQty : undefined"
+                        @input="constrainEditQuantity(d)" @blur="onEditQuantityBlur(d)"
+                        @keydown="(e) => { if(['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault() }"
+                        class="w-full h-full px-3 text-center text-sm font-bold text-slate-900 dark:text-white outline-none bg-transparent" />
+                      <div v-if="d.maxQty !== null" 
+                           class="px-2 h-full flex items-center bg-slate-50 dark:bg-slate-800 border-l-2 border-inherit text-[10px] font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                        / {{ d.maxQty }}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Thông báo kự năng cho Manager -->
+        <div v-if="editMode === 'manager' && selectedReceipt?.status === 'DRAFT'"
+          class="p-3 bg-orange-50 border border-orange-200 rounded-xl text-xs text-orange-700 flex items-start gap-2">
+          <i class="fas fa-info-circle mt-0.5 flex-shrink-0"></i>
+          <span>Sau khi lưu, phiếu sḝ cđổi sang trạng thái <strong>Chờ Staff xác nhận</strong>. Staff sẽ nhận thông báo và phải xác nhận trước khi gửi lại lên bạn.</span>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex justify-end gap-3 pt-2">
+          <button @click="showEditModal = false"
+            class="h-10 px-5 border border-[#e2e8f0] rounded-xl text-sm font-semibold text-[#8094ae] hover:bg-[#f8f9fa] transition-all">
+            Hủy
+          </button>
+          <button @click="submitEditReceipt()" :disabled="submittingEdit"
+            class="h-10 px-6 bg-[#4361ee] hover:bg-[#3a0ca3] text-white rounded-xl text-sm font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2 disabled:opacity-60">
+            <i class="fas fa-save" v-if="!submittingEdit"></i>
+            <i class="fas fa-spinner fa-spin" v-else></i>
+            {{ editMode === 'manager' && selectedReceipt?.status === 'DRAFT' ? 'Lưu & Gửi xuống Staff' : 'Lưu thay đổi' }}
+          </button>
+        </div>
+      </div>
+    </AppModal>
+
+    <!-- ── Modal Hủy Phiếu ─────────────────────────────── -->
+    <Transition name="fade">
+      <div v-if="showCancelModal" class="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4" @click.stop>
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-700" @click.stop>
+          <div class="bg-red-50 dark:bg-red-900/20 px-6 py-4 border-b border-red-100 dark:border-red-900/30 flex items-center justify-between">
+            <h3 class="text-base font-bold text-red-700 dark:text-red-400 flex items-center gap-2">
+              <i class="fas fa-exclamation-triangle"></i>
+              Hủy phiếu {{ receiptToCancel?.code }}
+            </h3>
+            <button @click="showCancelModal = false" class="text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="p-6">
+            <p class="text-sm text-slate-600 dark:text-slate-300 mb-4">Hành động này không thể hoàn tác. Vui lòng ghi rõ lý do hủy phiếu bên dưới để lưu vết hệ thống:</p>
+            <textarea v-model="cancelReason" rows="3"
+              class="w-full p-3 text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-all"
+              placeholder="Nhập lý do hủy phiếu..."></textarea>
+          </div>
+          <div class="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700 flex items-center justify-end gap-3">
+            <button @click="showCancelModal = false" class="px-5 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 bg-slate-100 dark:bg-slate-800/80 rounded-xl transition-colors">
+              Đóng
+            </button>
+            <button @click="executeCancelReceipt" class="px-5 py-2.5 text-sm font-bold text-white bg-red-500 hover:bg-red-600 rounded-xl shadow-sm shadow-red-500/20 transition-all flex items-center gap-2">
+              <i class="fas fa-trash"></i> Xác nhận hủy
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
   </div>
 </template>
 
@@ -2660,6 +3252,19 @@ async function exportExcel() {
 .theme-dark-decor {
   opacity: 0;
   transform: translateY(20px);
+}
+/* Slide-down animation for edit history panel */
+.slide-down-enter-active, .slide-down-leave-active {
+  transition: all 0.25s ease;
+  overflow: hidden;
+}
+.slide-down-enter-from, .slide-down-leave-to {
+  opacity: 0;
+  max-height: 0;
+}
+.slide-down-enter-to, .slide-down-leave-from {
+  opacity: 1;
+  max-height: 600px;
 }
 </style>
 
