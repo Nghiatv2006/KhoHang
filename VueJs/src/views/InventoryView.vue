@@ -108,7 +108,10 @@ async function loadData() {
     ])
 
     if (invRes.ok) inventories.value = await invRes.json()
-    if (prodRes.ok) products.value = await prodRes.json()
+    if (prodRes.ok) {
+      const pData = await prodRes.json()
+      products.value = pData.content || pData
+    }
     if (catRes.ok) categories.value = await catRes.json()
     if (branchRes.ok) {
       branches.value = await branchRes.json()

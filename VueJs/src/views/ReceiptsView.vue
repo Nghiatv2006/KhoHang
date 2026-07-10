@@ -328,7 +328,10 @@ async function loadData() {
       api.get('/api/categories')
     ])
     if (rRes.ok) receipts.value = await rRes.json()
-    if (pRes.ok) products.value = await pRes.json()
+    if (pRes.ok) {
+      const pData = await pRes.json()
+      products.value = pData.content || pData
+    }
     if (bRes.ok) branches.value = await bRes.json()
     if (cRes.ok) customers.value = await cRes.json()
     if (catRes.ok) categories.value = await catRes.json()
