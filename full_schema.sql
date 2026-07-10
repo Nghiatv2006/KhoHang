@@ -258,11 +258,51 @@ CREATE TABLE backups (
 CREATE INDEX idx_backups_branch_id ON backups (branch_id);
 
 -- Migration command to apply update on existing database
-ALTER TYPE receipt_status ADD VALUE 'RETURN';
-ALTER TYPE receipt_type ADD VALUE 'DISPOSAL';
-ALTER TABLE receipts ADD COLUMN disposal_reason VARCHAR(255);
-ALTER TABLE receipts ADD COLUMN disposal_method VARCHAR(255);
-ALTER TABLE receipts ADD COLUMN attachment_url VARCHAR(500);
+DO $$
+BEGIN
+    -- 1. ALTER TYPE receipt_status ADD VALUE 'RETURN'
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_enum
+        WHERE enumlabel = 'RETURN'
+          AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'receipt_status')
+    ) THEN
+        ALTER TYPE receipt_status ADD VALUE 'RETURN';
+    END IF;
+
+    -- 2. ALTER TYPE receipt_type ADD VALUE 'DISPOSAL'
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_enum
+        WHERE enumlabel = 'DISPOSAL'
+          AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'receipt_type')
+    ) THEN
+        ALTER TYPE receipt_type ADD VALUE 'DISPOSAL';
+    END IF;
+
+    -- 3. ALTER TABLE receipts ADD COLUMN disposal_reason
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'receipts' AND column_name = 'disposal_reason'
+    ) THEN
+        ALTER TABLE receipts ADD COLUMN disposal_reason VARCHAR(255);
+    END IF;
+
+    -- 4. ALTER TABLE receipts ADD COLUMN disposal_method
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'receipts' AND column_name = 'disposal_method'
+    ) THEN
+        ALTER TABLE receipts ADD COLUMN disposal_method VARCHAR(255);
+    END IF;
+
+    -- 5. ALTER TABLE receipts ADD COLUMN attachment_url
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'receipts' AND column_name = 'attachment_url'
+    ) THEN
+        ALTER TABLE receipts ADD COLUMN attachment_url VARCHAR(500);
+    END IF;
+END$$;
+
 UPDATE receipts SET type = 'DISPOSAL' WHERE type = 'ADJUST_OUT' AND id IN (SELECT id FROM receipts WHERE type = 'ADJUST_OUT');
 
 -- Migration command to add receipt_edit_logs and PENDING_STAFF_CONFIRM enum
