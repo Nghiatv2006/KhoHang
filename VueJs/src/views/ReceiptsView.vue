@@ -1422,13 +1422,14 @@ function typeLabel(t: string) {
 }
 function typeClass(t: string) {
   const map: Record<string, string> = {
-    IMPORT: 'bg-blue-100 text-blue-700',
-    EXPORT: 'bg-purple-100 text-purple-700',
-    TRANSFER: 'bg-orange-100 text-orange-700',
-    ADJUST_IN: 'bg-emerald-100 text-emerald-700',
-    ADJUST_OUT: 'bg-rose-100 text-rose-700'
+    IMPORT: 'bg-blue-50 text-blue-700 border border-blue-200',
+    EXPORT: 'bg-purple-50 text-purple-700 border border-purple-200',
+    TRANSFER: 'bg-amber-50 text-amber-700 border border-amber-200',
+    ADJUST_IN: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    ADJUST_OUT: 'bg-rose-50 text-rose-700 border border-rose-200',
+    DISPOSAL: 'bg-red-50 text-red-700 border border-red-200'
   }
-  return map[t] || 'bg-gray-100 text-gray-600'
+  return map[t] || 'bg-slate-50 text-slate-600 border border-slate-200'
 }
 function statusClass(_r?: any) {
   return 'sky-status-badge';
@@ -1843,6 +1844,8 @@ const editModalTitle = computed(() => {
   border-color: #60a5fa; /* border-blue-400 */
   box-shadow: 0 0 12px rgba(59,130,246,0.4);
   transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 130px;
+  justify-content: center;
 }
 
 .sky-status-badge .sun-icon,
@@ -2079,10 +2082,10 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
             <tr class="bg-[#f8f9fa] text-[#8094ae] text-xs uppercase tracking-wider">
               <th class="px-5 py-3 text-left font-bold">Mã phiếu</th>
               <th v-if="!receiptType" class="px-5 py-3 text-left font-bold">Loại</th>
-              <th class="px-5 py-3 text-left font-bold">Trạng thái</th>
+              <th class="px-5 py-3 text-center font-bold">Trạng thái</th>
               <th class="px-5 py-3 text-left font-bold">Chênh lệch</th>
               <th class="px-5 py-3 text-left font-bold">Chi nhánh nguồn</th>
-              <th class="px-5 py-3 text-left font-bold">Đích / Khách hàng</th>
+              <th class="px-5 py-3 text-left font-bold">{{ route.path === '/invoices' ? 'Khách hàng' : 'Chi nhánh đích' }}</th>
               <th class="px-5 py-3 text-left font-bold">Người lập</th>
               <th class="px-5 py-3 text-left font-bold">Ngày tạo</th>
               <th class="px-5 py-3 text-center font-bold">Thao tác</th>
@@ -2104,7 +2107,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                 </span>
               </td>
               <td class="px-5 py-4">
-                <div class="flex flex-col gap-1">
+                <div class="flex flex-col items-center gap-1">
                   <div :class="['sky-status-badge relative overflow-hidden inline-flex items-center px-3 py-1.5 rounded-xl border text-[11px] uppercase tracking-wider font-bold shadow-sm group', statusClass(r)]">
                     <i class="fas fa-sun sun-icon absolute -right-1 -top-1 text-yellow-300 text-xl drop-shadow-[0_0_8px_rgba(253,224,71,0.8)]"></i>
                     <i class="fas fa-moon moon-icon absolute -right-1 -bottom-1 text-yellow-300 text-xl drop-shadow-[0_0_8px_rgba(253,224,71,0.8)]"></i>
@@ -2126,7 +2129,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                 </div>
                 <div v-else-if="r.status === 'COMPLETED' || r.status === 'PENDING_COMPENSATION' || r.paymentStatus === 'RECEIVED'" class="text-xs text-emerald-600 font-medium">
                   <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 w-fit">
-                    ✓ Khớp
+                    Khớp
                   </span>
                 </div>
                 <div v-else class="text-xs text-slate-400">—</div>
