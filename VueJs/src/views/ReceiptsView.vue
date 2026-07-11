@@ -57,7 +57,7 @@ function canApproveReceipt(r: any) {
       if (r.type === 'EXPORT' && isAdmin.value && r.sourceBranchId !== 1) return false;
       if (isAdmin.value) return true;
       if (isManager.value) {
-          if (r.type === 'IMPORT' || r.type === 'ADJUST_IN') {
+          if (r.type === 'IMPORT' || r.type === 'ADJUST_IN' || r.type === 'TRANSFER') {
               if (r.destBranchId === user.value?.branchId) return true;
           } else {
               if (r.sourceBranchId === user.value?.branchId) return true;
@@ -80,8 +80,7 @@ function canApproveReceipt(r: any) {
           return false;
       }
       if (r.type === 'TRANSFER') {
-          if (isAdmin.value) return true;
-          if (isManager.value && r.destBranchId === user.value?.branchId) return true;
+          if (isManager.value && r.sourceBranchId === user.value?.branchId) return true;
           return false;
       }
   }
@@ -102,7 +101,7 @@ function approveReceiptText(r: any) {
         return "Chấp nhận nhập kho";
     }
     if (r.type === 'TRANSFER' && r.status === 'DRAFT') {
-        return "Duyệt (Gửi Manager chi nhánh đích)";
+        return "Duyệt (Gửi Manager chi nhánh nguồn)";
     }
     if (r.type === 'TRANSFER' && r.status === 'PENDING_ADMIN') {
         return "Duyệt điều chuyển";
@@ -620,8 +619,9 @@ function onTypeChange() {
     createForm.value.sourceBranchId = user.value?.branchId || headBranch.value?.id || ''
     createForm.value.destBranchId = ''
   } else if (t === 'TRANSFER') {
-    createForm.value.sourceBranchId = user.value?.branchId || headBranch.value?.id || ''
-    createForm.value.destBranchId = ''
+    // Điều chuyển mới: Chi nhánh đích (cần hàng) = chi nhánh hiện tại, nguồn = người dùng chọn
+    createForm.value.sourceBranchId = ''
+    createForm.value.destBranchId = user.value?.branchId || ''
   } else {
     createForm.value.sourceBranchId = user.value?.branchId || headBranch.value?.id || ''
     createForm.value.destBranchId = ''
@@ -805,6 +805,10 @@ const availableProducts = computed(() => {
         .map(inv => inv.productId)
     )
     return products.value.filter(p => inStockIds.has(p.id))
+  }
+  // TRANSFER chưa chọn chi nhánh nguồn -> không hiển thị sản phẩm nào
+  if (t === 'TRANSFER' && !createForm.value.sourceBranchId) {
+    return []
   }
   return products.value
 })
@@ -1415,14 +1419,14 @@ function typeLabel(t: string) {
 }
 function typeClass(t: string) {
   const map: Record<string, string> = {
-    IMPORT: 'bg-blue-50 text-blue-700 border border-blue-200',
-    EXPORT: 'bg-purple-50 text-purple-700 border border-purple-200',
-    TRANSFER: 'bg-amber-50 text-amber-700 border border-amber-200',
-    ADJUST_IN: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-    ADJUST_OUT: 'bg-rose-50 text-rose-700 border border-rose-200',
-    DISPOSAL: 'bg-red-50 text-red-700 border border-red-200'
+    IMPORT: 'bg-blue-100 text-blue-800 border border-blue-300 dark:bg-blue-900/50 dark:text-blue-300 dark:border-blue-800',
+    EXPORT: 'bg-purple-100 text-purple-800 border border-purple-300 dark:bg-purple-900/50 dark:text-purple-300 dark:border-purple-800',
+    TRANSFER: 'bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/50 dark:text-amber-300 dark:border-amber-800',
+    ADJUST_IN: 'bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-900/50 dark:text-emerald-300 dark:border-emerald-800',
+    ADJUST_OUT: 'bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-900/50 dark:text-rose-300 dark:border-rose-800',
+    DISPOSAL: 'bg-red-100 text-red-800 border border-red-300 dark:bg-red-900/50 dark:text-red-300 dark:border-red-800'
   }
-  return map[t] || 'bg-slate-50 text-slate-600 border border-slate-200'
+  return map[t] || 'bg-slate-100 text-slate-800 border border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
 }
 function statusClass(_r?: any) {
   return 'sky-status-badge';
@@ -1485,12 +1489,12 @@ function paymentStatusLabel(p: string) {
 }
 function paymentStatusClass(p: string) {
   const map: Record<string, string> = {
-    UNPAID: 'bg-amber-50 text-amber-600',
-    PAID: 'bg-green-50 text-green-600',
-    IN_TRANSIT: 'bg-sky-50 text-sky-600',
-    RECEIVED: 'bg-teal-50 text-teal-700'
+    UNPAID: 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/50 dark:text-amber-300 dark:border-amber-800',
+    PAID: 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/50 dark:text-emerald-300 dark:border-emerald-800',
+    IN_TRANSIT: 'bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-900/50 dark:text-sky-300 dark:border-sky-800',
+    RECEIVED: 'bg-teal-100 text-teal-800 border-teal-300 dark:bg-teal-900/50 dark:text-teal-300 dark:border-teal-800'
   }
-  return map[p] || ''
+  return map[p] || 'bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
 }
 
 // Can the current user confirm transfer for this receipt? (Deprecated, use confirmStocktake instead)
@@ -1829,22 +1833,20 @@ const editModalTitle = computed(() => {
 
 </script>
 
-<style scoped>
-/* SKY THEME STATUS BADGE (Đảm bảo hoạt động độc lập không phụ thuộc Tailwind config) */
+<style>
+/* ────────────────────────────────────────────────────────────── */
+/* SKY STATUS BADGE (Sun/Moon Easter Egg)                         */
+/* ────────────────────────────────────────────────────────────── */
 .sky-status-badge {
-  background-color: #3b82f6; /* bg-blue-500 */
-  color: white;
-  border-color: #60a5fa; /* border-blue-400 */
-  box-shadow: 0 0 12px rgba(59,130,246,0.4);
-  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-  min-width: 130px;
-  justify-content: center;
+  background-color: #f1f5f9; /* default light sky */
+  color: #475569;
+  border-color: #cbd5e1;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sky-status-badge .sun-icon,
 .sky-status-badge .moon-icon {
-  display: block;
-  transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); /* Bouncy effect */
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* Light Mode: Sun is UP, Moon is DOWN */
@@ -2101,7 +2103,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
               </td>
               <td class="px-5 py-4">
                 <div class="flex flex-col items-center gap-1">
-                  <div :class="['sky-status-badge relative overflow-hidden inline-flex items-center px-3 py-1.5 rounded-xl border text-[11px] uppercase tracking-wider font-bold shadow-sm group', statusClass(r)]">
+                  <div :class="['sky-status-badge relative overflow-hidden inline-flex items-center justify-center min-w-[130px] px-3 py-1.5 rounded-xl border text-[11px] uppercase tracking-wider font-bold shadow-sm group', statusClass(r)]">
                     <i class="fas fa-sun sun-icon absolute -right-1 -top-1 text-yellow-300 text-xl drop-shadow-[0_0_8px_rgba(253,224,71,0.8)]"></i>
                     <i class="fas fa-moon moon-icon absolute -right-1 -bottom-1 text-yellow-300 text-xl drop-shadow-[0_0_8px_rgba(253,224,71,0.8)]"></i>
                     <span class="relative z-10">{{ statusLabel(r) }}</span>
@@ -2289,7 +2291,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
               <div>
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Trạng thái</div>
                 <div class="flex flex-col items-start gap-1">
-                  <div :class="['sky-status-badge relative overflow-hidden inline-flex items-center px-3 py-1.5 rounded-xl border text-[11px] uppercase tracking-wider font-bold shadow-sm group', statusClass(selectedReceipt)]">
+                  <div :class="['sky-status-badge relative overflow-hidden inline-flex items-center justify-center min-w-[130px] px-3 py-1.5 rounded-xl border text-[11px] uppercase tracking-wider font-bold shadow-sm group', statusClass(selectedReceipt)]">
                     <i class="fas fa-sun sun-icon absolute -right-1 -top-1 text-yellow-300 text-xl drop-shadow-[0_0_8px_rgba(253,224,71,0.8)]"></i>
                     <i class="fas fa-moon moon-icon absolute -right-1 -bottom-1 text-yellow-300 text-xl drop-shadow-[0_0_8px_rgba(253,224,71,0.8)]"></i>
                     <span class="relative z-10">{{ statusLabel(selectedReceipt) }}</span>
@@ -2636,28 +2638,35 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Loại phiếu <span class="text-red-500">*</span></label>
                   <select v-model="createForm.type" @change="onTypeChange"
                     class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
-                    <option value="IMPORT">📥 Nhập kho</option>
-                    <option value="EXPORT">📤 Xuất bán</option>
-                    <option value="TRANSFER">🔄 Điều chuyển</option>
+                    <option value="IMPORT">Nhập kho</option>
+                    <option value="EXPORT">Xuất bán</option>
+                    <option value="TRANSFER">Điều chuyển</option>
                   </select>
-                </div>
-                <div v-else>
-                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Loại phiếu</label>
-                  <input type="text" disabled
-                    :value="receiptType === 'IMPORT' ? '📥 Nhập kho' : receiptType === 'EXPORT' ? '📤 Hóa đơn' : receiptType === 'ADJUST_OUT' ? '🗑️ Tiêu hủy' : '🔄 Điều chuyển'"
-                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm bg-[#f1f5f9] text-[#8094ae] cursor-not-allowed" />
                 </div>
                 <div v-if="createForm.type === 'IMPORT'">
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh nguồn</label>
                   <select v-model="createForm.sourceBranchId" disabled
                     class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-[#f1f5f9] disabled:text-[#8094ae] cursor-not-allowed">
-                    <!-- Chi nhánh gốc (Hà Nội): nguồn = bên ngoài hệ thống -->
                     <option v-if="isHeadBranch" value="">-- Bên ngoài hệ thống --</option>
-                    <!-- Chi nhánh con: nguồn = chi nhánh Hà Nội -->
                     <option v-if="!isHeadBranch && headBranch" :value="headBranch.id">{{ headBranch.name }}</option>
                   </select>
                 </div>
-                <div v-if="createForm.type === 'IMPORT' || createForm.type === 'TRANSFER' || createForm.type === 'ADJUST_IN'">
+                <div v-if="createForm.type === 'TRANSFER'">
+                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh đích</label>
+                  <select v-model="createForm.destBranchId" disabled
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm bg-[#f1f5f9] text-[#8094ae] cursor-not-allowed">
+                    <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
+                  </select>
+                </div>
+                <div v-if="createForm.type === 'TRANSFER'">
+                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh nguồn <span class="text-red-500">*</span></label>
+                  <select v-model="createForm.sourceBranchId"
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
+                    <option value="">-- Chọn chi nhánh --</option>
+                    <option v-for="b in branches.filter(x => !x.isHead && x.id !== (user?.branchId || 0))" :key="b.id" :value="b.id">{{ b.name }}</option>
+                  </select>
+                </div>
+                <div v-if="createForm.type === 'IMPORT' || createForm.type === 'ADJUST_IN'">
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh đích</label>
                   <select v-model="createForm.destBranchId" :disabled="createForm.type === 'IMPORT'"
                     class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-[#f1f5f9] disabled:text-[#8094ae]">

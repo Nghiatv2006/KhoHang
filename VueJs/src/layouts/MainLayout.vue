@@ -107,13 +107,16 @@ async function loadBadgeCounts() {
       return false;
     }).length
 
-    // Điều chuyển
+    // Điều chuyển (luồng mới: đích lập phiếu xin hàng)
     badgeTransfer.value = receipts.filter(r => {
       if (r.type !== 'TRANSFER') return false;
       const isSource = myBranchId && Number(r.sourceBranchId) === Number(myBranchId);
       const isDest = myBranchId && Number(r.destBranchId) === Number(myBranchId);
-      if (r.status === 'DRAFT') return (isManager && isSource) || isAdmin;
-      if (r.status === 'PENDING_ADMIN') return (isManager && isDest) || isAdmin;
+      // Manager đích duyệt phiếu nháp của Staff đích
+      if (r.status === 'DRAFT') return isManager && isDest;
+      // Manager nguồn duyệt xuất kho
+      if (r.status === 'PENDING_ADMIN') return isManager && isSource;
+      // Staff đích kiểm kê nhận hàng
       if (r.status === 'PENDING_STOCKTAKE') return isStaff && isDest;
       return false;
     }).length
@@ -144,10 +147,15 @@ let badgeTimer: ReturnType<typeof setInterval>
 const mainNavItems = computed(() => {
   const items: { label: string; to: string; icon: string; badge?: number }[] = [
     { label: 'Tổng quan', to: '/dashboard', icon: 'fas fa-chart-pie' },
-    { label: 'Nhập kho', to: '/imports', icon: 'fas fa-download', badge: badgeImport.value },
-    { label: 'Hóa đơn', to: '/invoices', icon: 'fas fa-file-invoice-dollar', badge: badgeInvoice.value },
-    { label: 'Điều chuyển', to: '/transfers', icon: 'fas fa-exchange-alt', badge: badgeTransfer.value }
+    { label: 'Nhập kho', to: '/imports', icon: 'fas fa-download', badge: badgeImport.value }
   ]
+  
+  const isHeadBranch = user.value?.branchName?.includes('Hà Nội') || user.value?.branch?.isHead === true;
+  if (!isHeadBranch) {
+    items.push({ label: 'Hóa đơn', to: '/invoices', icon: 'fas fa-file-invoice-dollar', badge: badgeInvoice.value })
+    items.push({ label: 'Điều chuyển', to: '/transfers', icon: 'fas fa-exchange-alt', badge: badgeTransfer.value })
+  }
+  
   items.push({ label: 'Tiêu hủy', to: '/disposals', icon: 'fas fa-trash-alt', badge: badgeDisposal.value })
   if (hasCrudPermission.value) {
     items.push({ label: 'Sản phẩm', to: '/products', icon: 'fas fa-box-open' })

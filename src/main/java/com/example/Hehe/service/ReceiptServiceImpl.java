@@ -309,12 +309,24 @@ public class ReceiptServiceImpl implements ReceiptService {
         if (request.getType() == ReceiptType.TRANSFER && request.getSourceBranchId().equals(request.getDestBranchId())) {
              throw new RuntimeException("Kho xuất và nhận phải khác nhau.");
         }
+        // Ràng buộc: Chi nhánh tổng không được tham gia điều chuyển
+        if (request.getType() == ReceiptType.TRANSFER) {
+            Branch srcBranch = branchRepository.findById(request.getSourceBranchId()).orElse(null);
+            Branch dstBranch = branchRepository.findById(request.getDestBranchId()).orElse(null);
+            if (srcBranch != null && Boolean.TRUE.equals(srcBranch.getIsHead())) {
+                throw new RuntimeException("Chi nhánh tổng không thể tham gia điều chuyển. Hãy dùng chức năng Nhập kho.");
+            }
+            if (dstBranch != null && Boolean.TRUE.equals(dstBranch.getIsHead())) {
+                throw new RuntimeException("Chi nhánh tổng không thể tham gia điều chuyển. Hãy dùng chức năng Nhập kho.");
+            }
+        }
 
         if (request.getDetails() == null || request.getDetails().isEmpty()) {
             throw new RuntimeException("Receipt must have details.");
         }
 
-        if (request.getType() == ReceiptType.EXPORT || request.getType() == ReceiptType.TRANSFER || request.getType() == ReceiptType.ADJUST_OUT || request.getType() == ReceiptType.DISPOSAL || (request.getType() == ReceiptType.IMPORT && request.getSourceBranchId() != null && !request.getSourceBranchId().equals(request.getDestBranchId()))) {
+        // Bỏ TRANSFER khỏi kiểm tra tồn kho lúc tạo phiếu (sẽ kiểm tra khi Manager nguồn duyệt)
+        if (request.getType() == ReceiptType.EXPORT || request.getType() == ReceiptType.ADJUST_OUT || request.getType() == ReceiptType.DISPOSAL || (request.getType() == ReceiptType.IMPORT && request.getSourceBranchId() != null && !request.getSourceBranchId().equals(request.getDestBranchId()))) {
             for (ReceiptDetailSaveRequest dReq : request.getDetails()) {
                 List<Inventory> invs = inventoryRepository.findByBranchIdAndProductId(request.getSourceBranchId(), dReq.getProductId());
                 int totalQty = invs.stream().mapToInt(Inventory::getQuantity).sum();
@@ -768,7 +780,15 @@ public class ReceiptServiceImpl implements ReceiptService {
                             }
                         }
                     } else if (r.getType() == ReceiptType.TRANSFER) {
-                        // Manager nguồn duyệt xuất kho -> trừ tồn kho
+                        // Manager nguồn duyệt xuất kho -> kiểm tra tồn kho trước khi trừ
+                        for (ReceiptDetail d : r.getDetails()) {
+                            List<Inventory> invs = inventoryRepository.findByBranchIdAndProductId(r.getSourceBranch().getId(), d.getProduct().getId());
+                            int totalQty = invs.stream().mapToInt(Inventory::getQuantity).sum();
+                            if (totalQty < d.getQuantity()) {
+                                throw new RuntimeException("Sản phẩm " + d.getProduct().getName() + " chỉ còn " + totalQty + " trong kho, không đủ để điều chuyển " + d.getQuantity() + " đơn vị.");
+                            }
+                        }
+                        // Trừ tồn kho nguồn
                         for (ReceiptDetail d : r.getDetails()) {
                             addInventory(r.getSourceBranch(), d, -d.getQuantity());
                         }
