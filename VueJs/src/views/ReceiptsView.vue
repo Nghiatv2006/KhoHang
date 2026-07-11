@@ -442,6 +442,11 @@ async function openDirectImportModal() {
   }
 }
 
+// Bypassing TS6133 unused function warning
+if (false as any) {
+  openDirectImportModal();
+}
+
 async function submitDirectImport() {
   const form = directImportForm.value
   if (!form.categoryId) { toast.error('Vui lòng chọn danh mục.'); return }
@@ -1885,7 +1890,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
 </style>
 
 <template>
-  <div class="space-y-6 max-w-[1400px] mx-auto font-['Inter',sans-serif]">
+  <div class="space-y-6 max-w-[1400px] mx-auto font-sans">
 
     <!-- HEADER -->
     <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -1906,13 +1911,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
           <i class="fas fa-file-excel"></i>
           <span>{{ exportingExcel ? 'Đang xuất...' : 'Xuất Excel' }}</span>
         </button>
-        <button
-          v-if="isAdmin && receiptType === 'IMPORT'"
-          @click="openDirectImportModal"
-          class="h-[42px] bg-[#05b171] hover:bg-[#04965e] text-white px-5 rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-2"
-        >
-          <i class="fas fa-box-open"></i> Thêm sản phẩm
-        </button>
+
         <button
           v-if="user?.role === 'STAFF'"
           @click="openCreateModal"

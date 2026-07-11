@@ -106,7 +106,9 @@ public class ProductServiceImpl implements ProductService {
             return cb.and(predicates.toArray(new Predicate[0]));
         };
 
-        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, 10);
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
+                page, 10, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "id")
+        );
         org.springframework.data.domain.Page<Product> productPage = productRepository.findAll(spec, pageable);
         
         return productPage.map(ProductResponse::new);

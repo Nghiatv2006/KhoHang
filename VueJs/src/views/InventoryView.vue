@@ -147,11 +147,11 @@ const computedInventories = computed(() => {
   const today = new Date()
   return inventories.value.map(inv => {
     const prod = products.value.find(p => p.id === inv.productId)
-    const price = prod ? Number(prod.price) : 0
-    const importPrice = prod ? Number(prod.importPrice) : 0
-    const unit = prod ? prod.unit : 'Chiếc'
-    const categoryId = prod ? prod.categoryId : null
-    const categoryName = prod ? prod.categoryName : 'Mặc định'
+    const price = prod ? Number(prod.price) : (inv.price ? Number(inv.price) : 0)
+    const importPrice = prod ? Number(prod.importPrice) : (inv.importPrice ? Number(inv.importPrice) : 0)
+    const unit = prod ? prod.unit : (inv.unit || 'Chiếc')
+    const categoryId = prod ? prod.categoryId : (inv.categoryId || null)
+    const categoryName = prod ? prod.categoryName : (inv.categoryName || 'Mặc định')
     const br = branches.value.find(b => b.id === inv.branchId)
     const threshold = br ? br.lowStockThreshold : activeThreshold.value
 

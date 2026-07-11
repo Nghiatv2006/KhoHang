@@ -49,7 +49,14 @@ public class ReportServiceImpl implements ReportService {
         Branch branch = branchRepository.findById(targetBranchId)
                 .orElseThrow(() -> new IllegalArgumentException("Branch not found"));
 
-        List<Inventory> inventories = inventoryRepository.findByBranchId(targetBranchId);
+        List<Inventory> inventories = inventoryRepository.findByBranchId(targetBranchId).stream()
+                .filter(inv -> {
+                    if (inv.getProduct() != null && Boolean.TRUE.equals(inv.getProduct().getIsDeleted())) {
+                        return inv.getQuantity() > 0;
+                    }
+                    return true;
+                })
+                .collect(Collectors.toList());
 
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Báo Cáo Tồn Kho");

@@ -12,8 +12,11 @@ public class InventoryResponse {
     private String productName;
     private String productSku;
     private java.math.BigDecimal price;
+    private java.math.BigDecimal importPrice;
     private String unit;
     private Integer quantity;
+    private Integer categoryId;
+    private String categoryName;
     private LocalDate manufacturingDate;
     private LocalDate expirationDate;
     private LocalDateTime lastUpdated;
@@ -41,7 +44,12 @@ public class InventoryResponse {
             this.productName = inventory.getProduct().getName();
             this.productSku = inventory.getProduct().getSku();
             this.price = inventory.getProduct().getPrice();
+            this.importPrice = inventory.getProduct().getImportPrice();
             this.unit = inventory.getProduct().getUnit();
+            if (inventory.getProduct().getCategory() != null) {
+                this.categoryId = inventory.getProduct().getCategory().getId();
+                this.categoryName = inventory.getProduct().getCategory().getName();
+            }
         }
     }
 
@@ -52,8 +60,11 @@ public class InventoryResponse {
     public String getProductName() { return productName; }
     public String getProductSku() { return productSku; }
     public java.math.BigDecimal getPrice() { return price; }
+    public java.math.BigDecimal getImportPrice() { return importPrice; }
     public String getUnit() { return unit; }
     public Integer getQuantity() { return quantity; }
+    public Integer getCategoryId() { return categoryId; }
+    public String getCategoryName() { return categoryName; }
     public LocalDate getManufacturingDate() { return manufacturingDate; }
     public LocalDate getExpirationDate() { return expirationDate; }
     public LocalDateTime getLastUpdated() { return lastUpdated; }

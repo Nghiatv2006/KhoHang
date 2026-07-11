@@ -83,6 +83,12 @@ public class InventoryServiceImpl implements InventoryService {
         }
 
         return inventories.stream()
+                .filter(inv -> {
+                    if (inv.getProduct() != null && Boolean.TRUE.equals(inv.getProduct().getIsDeleted())) {
+                        return inv.getQuantity() > 0;
+                    }
+                    return true;
+                })
                 .map(InventoryResponse::new)
                 .collect(Collectors.toList());
     }
@@ -381,6 +387,12 @@ public class InventoryServiceImpl implements InventoryService {
     @Transactional(readOnly = true)
     public List<InventoryResponse> getGlobalInventories() {
         return inventoryRepository.findAll().stream()
+                .filter(inv -> {
+                    if (inv.getProduct() != null && Boolean.TRUE.equals(inv.getProduct().getIsDeleted())) {
+                        return inv.getQuantity() > 0;
+                    }
+                    return true;
+                })
                 .map(InventoryResponse::new)
                 .collect(Collectors.toList());
     }
