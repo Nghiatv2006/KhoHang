@@ -4,14 +4,14 @@
 -- ==============================================================================
 
 -- DROP TABLE & TYPE (Dùng để reset nhanh database)
-DROP TABLE IF EXISTS backups, audit_logs, stocktake_details, stocktakes, receipt_details, receipts, inventories, products, users, customers, categories, branches, password_reset_otps CASCADE;
+DROP TABLE IF EXISTS backups, audit_logs, receipt_edit_logs, stocktake_details, stocktakes, receipt_details, receipts, inventories, products, users, customers, categories, branches, password_reset_otps CASCADE;
 DROP TYPE IF EXISTS user_role, user_status, receipt_type, receipt_status, stocktake_status CASCADE;
 
 -- 1. ENUM TYPES
 CREATE TYPE user_role AS ENUM ('ADMIN', 'MANAGER', 'STAFF');
 CREATE TYPE user_status AS ENUM ('ACTIVE', 'LOCKED');
 CREATE TYPE receipt_type AS ENUM ('IMPORT', 'EXPORT', 'TRANSFER', 'ADJUST_IN', 'ADJUST_OUT', 'DISPOSAL');
-CREATE TYPE receipt_status AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED', 'PENDING_ADMIN', 'PENDING_STOCKTAKE', 'PENDING_SHORTFALL_MANAGER', 'PENDING_SHORTFALL_ADMIN', 'RETURN');
+CREATE TYPE receipt_status AS ENUM ('DRAFT', 'PENDING_STAFF_CONFIRM', 'COMPLETED', 'CANCELLED', 'PENDING_ADMIN', 'PENDING_STOCKTAKE', 'PENDING_SHORTFALL_MANAGER', 'PENDING_SHORTFALL_ADMIN', 'RETURN');
 CREATE TYPE stocktake_status AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED');
 
 -- Bảng Chi nhánh (Branches)
@@ -160,6 +160,20 @@ CREATE TABLE receipt_details (
     CONSTRAINT chk_receipt_detail_dates CHECK (exp_date >= mfg_date)
 );
 
+-- Bảng Nhật ký chỉnh sửa phiếu kho (Receipt Edit Logs)
+CREATE TABLE receipt_edit_logs (
+    id BIGSERIAL PRIMARY KEY,
+    receipt_id INT NOT NULL REFERENCES receipts(id) ON DELETE CASCADE,
+    editor_id INT REFERENCES users(id) ON DELETE SET NULL,
+    editor_role VARCHAR(20),        -- 'STAFF' hoặc 'MANAGER'
+    direction VARCHAR(30),        -- 'STAFF_EDIT', 'MANAGER_TO_STAFF', 'MANAGER_TO_ADMIN'
+    edit_reason TEXT NOT NULL,      -- Lý do chỉnh sửa (bắt buộc)
+    changes TEXT,               -- Mô tả thay đổi: "SP X: 10→15, SP Y: 5→3"
+    acknowledged_by INT REFERENCES users(id) ON DELETE SET NULL,
+    acknowledged_at TIMESTAMP,         -- null = chưa xác nhận
+    created_at TIMESTAMP NOT NULL DEFAULT now()
+);
+
 -- Bảng Phiên kiểm kê (Stocktakes)
 CREATE TABLE stocktakes (
     id SERIAL PRIMARY KEY,
@@ -213,6 +227,7 @@ CREATE INDEX idx_receipts_type_status ON receipts (type, status);
 CREATE INDEX idx_stocktakes_branch ON stocktakes (branch_id);
 CREATE INDEX idx_customers_status ON customers (status);
 CREATE INDEX idx_receipts_payment_status ON receipts (payment_status);
+CREATE INDEX idx_receipt_edit_logs_receipt_id ON receipt_edit_logs (receipt_id);
 -- Indexes cho Audit Logs (quan trọng cho hiệu năng khi bảng có nhiều dòng)
 CREATE INDEX idx_audit_logs_branch_id  ON audit_logs (branch_id);
 CREATE INDEX idx_audit_logs_user_id    ON audit_logs (user_id);
@@ -243,10 +258,78 @@ CREATE TABLE backups (
 CREATE INDEX idx_backups_branch_id ON backups (branch_id);
 
 -- Migration command to apply update on existing database
-ALTER TYPE receipt_status ADD VALUE 'RETURN';
-ALTER TYPE receipt_type ADD VALUE 'DISPOSAL';
-ALTER TABLE receipts ADD COLUMN disposal_reason VARCHAR(255);
-ALTER TABLE receipts ADD COLUMN disposal_method VARCHAR(255);
-ALTER TABLE receipts ADD COLUMN attachment_url VARCHAR(500);
+DO $$
+BEGIN
+    -- 1. ALTER TYPE receipt_status ADD VALUE 'RETURN'
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_enum
+        WHERE enumlabel = 'RETURN'
+          AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'receipt_status')
+    ) THEN
+        ALTER TYPE receipt_status ADD VALUE 'RETURN';
+    END IF;
+
+    -- 2. ALTER TYPE receipt_type ADD VALUE 'DISPOSAL'
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_enum
+        WHERE enumlabel = 'DISPOSAL'
+          AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'receipt_type')
+    ) THEN
+        ALTER TYPE receipt_type ADD VALUE 'DISPOSAL';
+    END IF;
+
+    -- 3. ALTER TABLE receipts ADD COLUMN disposal_reason
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'receipts' AND column_name = 'disposal_reason'
+    ) THEN
+        ALTER TABLE receipts ADD COLUMN disposal_reason VARCHAR(255);
+    END IF;
+
+    -- 4. ALTER TABLE receipts ADD COLUMN disposal_method
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'receipts' AND column_name = 'disposal_method'
+    ) THEN
+        ALTER TABLE receipts ADD COLUMN disposal_method VARCHAR(255);
+    END IF;
+
+    -- 5. ALTER TABLE receipts ADD COLUMN attachment_url
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'receipts' AND column_name = 'attachment_url'
+    ) THEN
+        ALTER TABLE receipts ADD COLUMN attachment_url VARCHAR(500);
+    END IF;
+END$$;
+
 UPDATE receipts SET type = 'DISPOSAL' WHERE type = 'ADJUST_OUT' AND id IN (SELECT id FROM receipts WHERE type = 'ADJUST_OUT');
+
+-- Migration command to add receipt_edit_logs and PENDING_STAFF_CONFIRM enum
+CREATE TABLE IF NOT EXISTS receipt_edit_logs (
+    id               BIGSERIAL PRIMARY KEY,
+    receipt_id       INTEGER NOT NULL REFERENCES receipts(id) ON DELETE CASCADE,
+    editor_id        INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    editor_role      VARCHAR(20),        -- 'STAFF' hoặc 'MANAGER'
+    direction        VARCHAR(30),        -- 'STAFF_EDIT', 'MANAGER_TO_STAFF', 'MANAGER_TO_ADMIN'
+    edit_reason      TEXT NOT NULL,      -- Lý do chỉnh sửa (bắt buộc)
+    changes          TEXT,               -- Mô tả thay đổi: "SP X: 10→15, SP Y: 5→3"
+    acknowledged_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    acknowledged_at  TIMESTAMP,         -- null = chưa xác nhận
+    created_at       TIMESTAMP NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_receipt_edit_logs_receipt_id
+    ON receipt_edit_logs(receipt_id);
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_enum
+        WHERE enumlabel = 'PENDING_STAFF_CONFIRM'
+          AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'receipt_status')
+    ) THEN
+        ALTER TYPE receipt_status ADD VALUE 'PENDING_STAFF_CONFIRM' AFTER 'DRAFT';
+    END IF;
+END$$;
 

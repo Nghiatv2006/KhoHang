@@ -37,7 +37,42 @@ public class UploadController {
             String fileExtension = "";
             int dotIndex = originalFilename.lastIndexOf('.');
             if(dotIndex > 0) {
-                fileExtension = originalFilename.substring(dotIndex);
+                fileExtension = originalFilename.substring(dotIndex).toLowerCase();
+            }
+
+            // Kiểm tra Content-Type
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                response.put("error", "Chỉ chấp nhận file hình ảnh!");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            // Kiểm tra file extension
+            if (!fileExtension.equals(".jpg") && !fileExtension.equals(".jpeg") && 
+                !fileExtension.equals(".png") && !fileExtension.equals(".gif") && 
+                !fileExtension.equals(".webp") && !fileExtension.equals(".svg")) {
+                response.put("error", "Chỉ chấp nhận định dạng ảnh (jpg, jpeg, png, gif, webp, svg)!");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            // Kiểm tra nội dung thực tế của file ảnh
+            if (!fileExtension.equals(".svg")) {
+                try (java.io.InputStream is = file.getInputStream()) {
+                    java.awt.image.BufferedImage bi = javax.imageio.ImageIO.read(is);
+                    if (bi == null) {
+                        response.put("error", "Nội dung file không phải là hình ảnh hợp lệ (File bị giả mạo hoặc lỗi)!");
+                        return ResponseEntity.badRequest().body(response);
+                    }
+                }
+            } else {
+                try (java.io.InputStream is = file.getInputStream()) {
+                    byte[] bytes = is.readNBytes(1000);
+                    String content = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+                    if (!content.contains("<svg") && !content.contains("svg")) {
+                        response.put("error", "Nội dung SVG không hợp lệ!");
+                        return ResponseEntity.badRequest().body(response);
+                    }
+                }
             }
             
             String newFilename = UUID.randomUUID().toString() + fileExtension;

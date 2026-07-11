@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { api } from '../api'
 import { useToast } from '../utils/toast'
 import AppModal from '../components/AppModal.vue'
@@ -21,20 +21,11 @@ const pLoading = ref(true)
 const pSearch = ref('')
 const pCategoryId = ref<number | ''>('')
 
-const filteredProducts = computed(() => {
-  let list = products.value
-  if (pSearch.value.trim()) {
-    const kw = pSearch.value.toLowerCase()
-    list = list.filter(p =>
-      p.name?.toLowerCase().includes(kw) ||
-      p.sku?.toLowerCase().includes(kw)
-    )
-  }
-  if (pCategoryId.value !== '') {
-    list = list.filter(p => p.categoryId === pCategoryId.value)
-  }
-  return list
-})
+const currentPage = ref(0)
+const totalPages = ref(1)
+const totalElements = ref(0)
+
+const filteredProducts = computed(() => products.value)
 
 // Product Modal
 const showProductModal = ref(false)
@@ -54,6 +45,21 @@ async function handleImageUpload(event: Event) {
   if (!target.files || target.files.length === 0) return
   
   const file = target.files[0]
+  
+  if (!file.type.startsWith('image/')) {
+    toast.error('Chỉ chấp nhận file hình ảnh!')
+    target.value = ''
+    return
+  }
+
+  const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg']
+  const extension = file.name.split('.').pop()?.toLowerCase() || ''
+  if (!allowedExtensions.includes(extension)) {
+    toast.error('Chỉ chấp nhận định dạng ảnh (jpg, jpeg, png, gif, webp, svg)!')
+    target.value = ''
+    return
+  }
+
   const formData = new FormData()
   formData.append('file', file)
   
@@ -120,7 +126,7 @@ async function saveProduct() {
     if (res.ok) {
       toast.success(editingProduct.value ? 'Cập nhật sản phẩm thành công!' : 'Thêm sản phẩm thành công!')
       showProductModal.value = false
-      await loadProducts()
+      await loadProducts(editingProduct.value ? currentPage.value : 0)
     } else {
       toast.error((data as any).message || 'Có lỗi xảy ra.')
     }
@@ -138,7 +144,7 @@ async function doDeleteProduct() {
     const res = await api.delete(`/api/products/${deletingProduct.value.id}`)
     let data = {}
     try { data = await res.json() } catch {}
-    if (res.ok) { toast.success('Xóa sản phẩm thành công!'); await loadProducts() }
+    if (res.ok) { toast.success('Xóa sản phẩm thành công!'); await loadProducts(currentPage.value) }
     else toast.error((data as any).message || 'Không thể xóa sản phẩm.')
   } catch { toast.error('Có lỗi xảy ra.') }
   finally { showDeleteProduct.value = false }
@@ -196,7 +202,7 @@ async function confirmExcelImport() {
     if (res.ok) {
       importResult.value = data
       toast.success('Nhập và cập nhật sản phẩm thành công!')
-      await loadProducts()
+      await loadProducts(0)
     } else {
       toast.error(data.message || 'Lỗi khi lưu dữ liệu Excel')
     }
@@ -218,11 +224,11 @@ function cancelExcelImport() {
 const cLoading = ref(false)
 const cSearch = ref('')
 
-const filteredCategories = computed(() => {
-  if (!cSearch.value.trim()) return categories.value
-  const kw = cSearch.value.toLowerCase()
-  return categories.value.filter(c => c.name?.toLowerCase().includes(kw))
-})
+const cCurrentPage = ref(0)
+const cTotalPages = ref(1)
+const cTotalElements = ref(0)
+
+const filteredCategories = computed(() => categories.value)
 
 const showCatModal = ref(false)
 const editingCat = ref<any>(null)
@@ -248,7 +254,7 @@ async function saveCat() {
     if (res.ok) {
       toast.success(editingCat.value ? 'Cập nhật danh mục thành công!' : 'Thêm danh mục thành công!')
       showCatModal.value = false
-      await loadCategories()
+      await loadCategories(editingCat.value ? cCurrentPage.value : 0)
     } else toast.error((data as any).message || 'Có lỗi xảy ra.')
   } catch { toast.error('Không thể kết nối máy chủ.') }
   finally { catSaving.value = false }
@@ -259,36 +265,50 @@ async function doDeleteCat() {
     const res = await api.delete(`/api/categories/${deletingCat.value.id}`)
     let data = {}
     try { data = await res.json() } catch {}
-    if (res.ok) { toast.success('Xóa danh mục thành công!'); await loadCategories() }
+    if (res.ok) { toast.success('Xóa danh mục thành công!'); await loadCategories(cCurrentPage.value) }
     else toast.error((data as any).message || 'Không thể xóa danh mục.')
   } catch { toast.error('Có lỗi xảy ra.') }
   finally { showDeleteCat.value = false }
 }
 
 // ─── Load data ───────────────────────────────────────────────────────────────
-async function loadProducts() {
+async function loadProducts(page = 0) {
   pLoading.value = true
+  currentPage.value = page
   try {
-    const res = await api.get('/api/products')
+    const res = await api.get(`/api/products?page=${page}&keyword=${pSearch.value.trim()}&categoryId=${pCategoryId.value}`)
     if (res.ok) {
       const data = await res.json()
       products.value = data.content || data
+      totalPages.value = data.totalPages || 1
+      totalElements.value = data.totalElements || products.value.length
     }
   } catch {} finally { pLoading.value = false }
 }
-async function loadCategories() {
+async function loadCategories(page = 0) {
   cLoading.value = true
+  cCurrentPage.value = page
   try {
-    const res = await api.get('/api/categories')
+    const res = await api.get(`/api/categories?page=${page}&keyword=${cSearch.value.trim()}`)
     if (res.ok) {
       const data = await res.json()
       categories.value = data.content || data
+      cTotalPages.value = data.totalPages || 1
+      cTotalElements.value = data.totalElements || categories.value.length
     }
   } catch {} finally { cLoading.value = false }
 }
 
 onMounted(async () => {
   await Promise.all([loadProducts(), loadCategories()])
+})
+
+watch([pSearch, pCategoryId], () => {
+  loadProducts(0)
+})
+
+watch(cSearch, () => {
+  loadCategories(0)
 })
 
 function formatCurrency(val: any) {
@@ -455,8 +475,30 @@ function formatCurrency(val: any) {
           
 
           
-          <div v-if="!pLoading && filteredProducts.length > 0" class="px-6 py-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-100 dark:border-slate-700/50 text-xs font-bold text-slate-500 dark:text-slate-400 transition-colors">
-            Tổng cộng: {{ filteredProducts.length }} sản phẩm
+          <!-- Pagination -->
+          <div v-if="!pLoading && filteredProducts.length > 0" class="flex items-center justify-between px-6 py-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-100 dark:border-slate-700/50 text-xs font-bold text-slate-500 dark:text-slate-400 transition-colors">
+            <div>
+              Hiển thị {{ filteredProducts.length }} / {{ totalElements }} sản phẩm
+            </div>
+            <div v-if="totalPages > 1" class="flex items-center gap-2">
+              <button 
+                :disabled="currentPage === 0"
+                @click="loadProducts(currentPage - 1)"
+                class="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 text-xs font-bold transition-all hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <i class="fas fa-chevron-left mr-1"></i> Trước
+              </button>
+              <span class="text-xs font-bold text-slate-600 dark:text-slate-300">
+                Trang {{ currentPage + 1 }} / {{ totalPages }}
+              </span>
+              <button 
+                :disabled="currentPage >= totalPages - 1"
+                @click="loadProducts(currentPage + 1)"
+                class="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 text-xs font-bold transition-all hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Sau <i class="fas fa-chevron-right ml-1"></i>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -540,8 +582,30 @@ function formatCurrency(val: any) {
             </table>
           </div>
           
-          <div v-if="!cLoading && filteredCategories.length > 0" class="px-6 py-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-100 dark:border-slate-700/50 text-xs font-bold text-slate-500 dark:text-slate-400 transition-colors">
-            Tổng cộng: {{ filteredCategories.length }} danh mục
+          <!-- Pagination -->
+          <div v-if="!cLoading && filteredCategories.length > 0" class="flex items-center justify-between px-6 py-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-100 dark:border-slate-700/50 text-xs font-bold text-slate-500 dark:text-slate-400 transition-colors">
+            <div>
+              Hiển thị {{ filteredCategories.length }} / {{ cTotalElements }} danh mục
+            </div>
+            <div v-if="cTotalPages > 1" class="flex items-center gap-2">
+              <button 
+                :disabled="cCurrentPage === 0"
+                @click="loadCategories(cCurrentPage - 1)"
+                class="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 text-xs font-bold transition-all hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <i class="fas fa-chevron-left mr-1"></i> Trước
+              </button>
+              <span class="text-xs font-bold text-slate-600 dark:text-slate-300">
+                Trang {{ cCurrentPage + 1 }} / {{ cTotalPages }}
+              </span>
+              <button 
+                :disabled="cCurrentPage >= cTotalPages - 1"
+                @click="loadCategories(cCurrentPage + 1)"
+                class="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 text-xs font-bold transition-all hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Sau <i class="fas fa-chevron-right ml-1"></i>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -663,7 +727,7 @@ function formatCurrency(val: any) {
           </div>
           
           <!-- Footer -->
-          <div class="p-6 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50/80 dark:bg-slate-900/50 backdrop-blur-md flex gap-3">
+          <div class="p-6 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-slate-900 flex gap-3">
             <button class="flex-1 h-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-bold transition-colors shadow-sm" @click="showProductModal = false">Hủy bỏ</button>
             <button class="flex-[2] h-12 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-xl text-sm font-bold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2" :disabled="pSaving" @click="saveProduct()">
               <i v-if="pSaving" class="fas fa-spinner fa-spin"></i>
@@ -742,7 +806,7 @@ function formatCurrency(val: any) {
           </div>
           
           <!-- Footer -->
-          <div class="p-6 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50/80 dark:bg-slate-900/50 backdrop-blur-md flex gap-3">
+          <div class="p-6 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-slate-900 flex gap-3">
             <button class="flex-1 h-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-bold transition-colors shadow-sm" @click="showCatModal = false">Hủy bỏ</button>
             <button class="flex-[2] h-12 bg-sky-500 hover:bg-sky-600 dark:bg-sky-600 dark:hover:bg-sky-500 text-white rounded-xl text-sm font-bold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2" :disabled="catSaving" @click="saveCat">
               <i v-if="catSaving" class="fas fa-spinner fa-spin"></i>

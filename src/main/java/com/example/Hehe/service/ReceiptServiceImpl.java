@@ -1,5 +1,7 @@
 package com.example.Hehe.service;
 
+import com.example.Hehe.dto.EditReceiptRequest;
+import com.example.Hehe.dto.ReceiptEditLogResponse;
 import com.example.Hehe.dto.ReceiptResponse;
 import com.example.Hehe.dto.ReceiptSaveRequest;
 import com.example.Hehe.dto.ReceiptDetailSaveRequest;
@@ -8,6 +10,8 @@ import com.example.Hehe.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -21,19 +25,22 @@ public class ReceiptServiceImpl implements ReceiptService {
     private final InventoryRepository inventoryRepository;
     private final CustomerRepository customerRepository;
     private final AuditLogService auditLogService;
+    private final ReceiptEditLogRepository receiptEditLogRepository;
 
     public ReceiptServiceImpl(ReceiptRepository receiptRepository,
                               ProductRepository productRepository,
                               BranchRepository branchRepository,
                               InventoryRepository inventoryRepository,
                               CustomerRepository customerRepository,
-                              AuditLogService auditLogService) {
+                              AuditLogService auditLogService,
+                              ReceiptEditLogRepository receiptEditLogRepository) {
         this.receiptRepository = receiptRepository;
         this.productRepository = productRepository;
         this.branchRepository = branchRepository;
         this.inventoryRepository = inventoryRepository;
         this.customerRepository = customerRepository;
         this.auditLogService = auditLogService;
+        this.receiptEditLogRepository = receiptEditLogRepository;
     }
 
     @Override
@@ -352,7 +359,7 @@ public class ReceiptServiceImpl implements ReceiptService {
 
     @Transactional
     @Override
-    public ReceiptResponse cancelReceipt(Integer id, User currentUser) {
+    public ReceiptResponse cancelReceipt(Integer id, String reason, User currentUser) {
         Receipt r = receiptRepository.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
         if (r.getStatus() == ReceiptStatus.CANCELLED) throw new RuntimeException("Receipt is already cancelled.");
         if (r.getStatus() == ReceiptStatus.PENDING_SHORTFALL_ADMIN) throw new RuntimeException("Phiếu đã chuyển lên Admin duyệt thiếu hụt thì không thể hủy.");
@@ -360,7 +367,20 @@ public class ReceiptServiceImpl implements ReceiptService {
 
         if (r.getStatus() == ReceiptStatus.DRAFT) {
             if (!currentUser.getId().equals(r.getCreatedBy().getId())) {
-                throw new RuntimeException("Chỉ người lập phiếu mới được quyền xóa/hủy phiếu nháp.");
+                boolean isManagerOfBranch = false;
+                if (currentUser.getRole() == UserRole.MANAGER && currentUser.getBranch() != null) {
+                    if (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.ADJUST_IN) {
+                        isManagerOfBranch = r.getDestBranch() != null && r.getDestBranch().getId().equals(currentUser.getBranch().getId());
+                    } else if (r.getType() == ReceiptType.TRANSFER) {
+                        isManagerOfBranch = (r.getSourceBranch() != null && r.getSourceBranch().getId().equals(currentUser.getBranch().getId())) ||
+                                            (r.getDestBranch() != null && r.getDestBranch().getId().equals(currentUser.getBranch().getId()));
+                    } else {
+                        isManagerOfBranch = r.getSourceBranch() != null && r.getSourceBranch().getId().equals(currentUser.getBranch().getId());
+                    }
+                }
+                if (!isManagerOfBranch) {
+                    throw new RuntimeException("Chỉ người lập phiếu hoặc Quản lý chi nhánh mới được quyền xóa/hủy phiếu nháp.");
+                }
             }
         } else {
             if (currentUser.getRole() == UserRole.STAFF) {
@@ -407,6 +427,9 @@ public class ReceiptServiceImpl implements ReceiptService {
             wasDeducted = true;
         }
 
+        if (reason != null && !reason.trim().isEmpty()) {
+            r.setDescription((r.getDescription() == null ? "" : r.getDescription() + "\n") + "[Lý do hủy] " + reason.trim());
+        }
         r.setStatus(ReceiptStatus.CANCELLED);
         if (wasCompleted) {
             for (ReceiptDetail d : r.getDetails()) {
@@ -1066,6 +1089,7 @@ public class ReceiptServiceImpl implements ReceiptService {
         return new ReceiptResponse(r);
     }
 
+
     @Transactional
     @Override
     public ReceiptResponse confirmTransfer(Integer id, java.util.Map<String, Object> payload, User currentUser) {
@@ -1175,5 +1199,226 @@ public class ReceiptServiceImpl implements ReceiptService {
             case RETURN: return "Trả hàng";
             default: return status.name();
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  EDIT RECEIPT — Staff tự sửa
+    // ═══════════════════════════════════════════════════════════════════════
+
+    @Override
+    @Transactional
+    public ReceiptResponse editReceiptByStaff(Integer id, EditReceiptRequest request, User currentUser) {
+        Receipt r = receiptRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy phiếu."));
+
+        // Kiểm tra quyền
+        if (currentUser.getRole() != UserRole.STAFF) {
+            throw new RuntimeException("Chỉ Nhân viên mới được dùng chức năng này.");
+        }
+        if (r.getCreatedBy() == null || !r.getCreatedBy().getId().equals(currentUser.getId())) {
+            throw new RuntimeException("Bạn không phải người lập phiếu này.");
+        }
+        if (r.getStatus() != ReceiptStatus.DRAFT) {
+            throw new RuntimeException("Chỉ có thể chỉnh sửa phiếu khi phiếu đang ở trạng thái Nháp (chưa được Manager duyệt).");
+        }
+
+        // Kiểm tra lý do
+        if (request.getEditReason() == null || request.getEditReason().trim().isEmpty()) {
+            throw new RuntimeException("Vui lòng nhập lý do chỉnh sửa.");
+        }
+
+        // Cập nhật description
+        if (request.getDescription() != null) {
+            r.setDescription(request.getDescription());
+        }
+
+        // Cập nhật số lượng và build cập nhật changes
+        List<String> changeList = new ArrayList<>();
+        if (request.getDetails() != null) {
+            for (EditReceiptRequest.EditDetailItem item : request.getDetails()) {
+                r.getDetails().stream()
+                    .filter(d -> d.getId().equals(item.getDetailId()))
+                    .findFirst()
+                    .ifPresent(d -> {
+                        int oldQty = d.getQuantity();
+                        int newQty = item.getQuantity();
+                        if (newQty <= 0) throw new RuntimeException("Số lượng phải lớn hơn 0.");
+                        if (oldQty != newQty) {
+                            changeList.add((d.getProduct() != null ? d.getProduct().getName() : "SP") + ": " + oldQty + "→" + newQty);
+                            d.setQuantity(newQty);
+                        }
+                    });
+            }
+        }
+
+        receiptRepository.save(r);
+
+        // Ghi lịch sử chỉnh sửa
+        ReceiptEditLog log = new ReceiptEditLog();
+        log.setReceipt(r);
+        log.setEditor(currentUser);
+        log.setEditorRole("STAFF");
+        log.setDirection("STAFF_EDIT");
+        log.setEditReason(request.getEditReason().trim());
+        log.setChanges(changeList.isEmpty() ? "Chỉ cập nhật ghi chú" : String.join(", ", changeList));
+        receiptEditLogRepository.save(log);
+
+        auditLogService.logAction(currentUser, "UPDATE", "receipts",
+                String.valueOf(r.getId()), "Nhân viên chỉnh sửa phiếu " + r.getCode() + ": " + log.getChanges());
+
+        ReceiptResponse resp = new ReceiptResponse(r);
+        resp.setHasPendingManagerEdit(false);
+        return resp;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  EDIT RECEIPT — Manager sửa và gửi xuống Staff / ghi cho Admin
+    // ═══════════════════════════════════════════════════════════════════════
+
+    @Override
+    @Transactional
+    public ReceiptResponse editReceiptByManager(Integer id, EditReceiptRequest request, User currentUser) {
+        Receipt r = receiptRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy phiếu."));
+
+        // Kiểm tra quyền
+        if (currentUser.getRole() != UserRole.MANAGER) {
+            throw new RuntimeException("Chỉ Quản lý mới được dùng chức năng này.");
+        }
+
+        Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
+        if (myBranchId == null) throw new RuntimeException("Bạn chưa thuộc chi nhánh nào.");
+
+        boolean relatedBranch = (r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId))
+                             || (r.getSourceBranch() != null && r.getSourceBranch().getId().equals(myBranchId));
+        if (!relatedBranch) {
+            throw new RuntimeException("Bạn không có quyền chỉnh sửa phiếu của chi nhánh khác.");
+        }
+
+        if (r.getStatus() != ReceiptStatus.DRAFT && r.getStatus() != ReceiptStatus.PENDING_ADMIN) {
+            throw new RuntimeException("Chỉ có thể chỉnh sửa phiếu khi phiếu đang ở trạng thái Nháp hoặc Chờ Admin duyệt.");
+        }
+
+        if (request.getEditReason() == null || request.getEditReason().trim().isEmpty()) {
+            throw new RuntimeException("Vui lòng nhập lý do chỉnh sửa.");
+        }
+
+        // Cập nhật description
+        if (request.getDescription() != null) {
+            r.setDescription(request.getDescription());
+        }
+
+        // Cập nhật số lượng và build changes
+        List<String> changeList = new ArrayList<>();
+        if (request.getDetails() != null) {
+            for (EditReceiptRequest.EditDetailItem item : request.getDetails()) {
+                r.getDetails().stream()
+                    .filter(d -> d.getId().equals(item.getDetailId()))
+                    .findFirst()
+                    .ifPresent(d -> {
+                        int oldQty = d.getQuantity();
+                        int newQty = item.getQuantity();
+                        if (newQty <= 0) throw new RuntimeException("Số lượng phải lớn hơn 0.");
+                        if (oldQty != newQty) {
+                            changeList.add((d.getProduct() != null ? d.getProduct().getName() : "SP") + ": " + oldQty + "→" + newQty);
+                            d.setQuantity(newQty);
+                        }
+                    });
+            }
+        }
+
+        String direction;
+        if (r.getStatus() == ReceiptStatus.DRAFT) {
+            // Manager sửa khi phiếu ở DRAFT → gửi xuống Staff xác nhận
+            direction = "MANAGER_TO_STAFF";
+            r.setStatus(ReceiptStatus.PENDING_STAFF_CONFIRM);
+        } else {
+            // Manager sửa khi phiếu ở PENDING_ADMIN → ghi lý do cho Admin xem
+            direction = "MANAGER_TO_ADMIN";
+            // Giữ nguyên status PENDING_ADMIN
+        }
+
+        receiptRepository.save(r);
+
+        // Ghi lịch sử
+        ReceiptEditLog log = new ReceiptEditLog();
+        log.setReceipt(r);
+        log.setEditor(currentUser);
+        log.setEditorRole("MANAGER");
+        log.setDirection(direction);
+        log.setEditReason(request.getEditReason().trim());
+        log.setChanges(changeList.isEmpty() ? "Chỉ cập nhật ghi chú" : String.join(", ", changeList));
+        receiptEditLogRepository.save(log);
+
+        auditLogService.logAction(currentUser, "UPDATE", "receipts",
+                String.valueOf(r.getId()), "Quản lý chỉnh sửa phiếu " + r.getCode() + " (" + direction + "): " + log.getChanges());
+
+        ReceiptResponse resp = new ReceiptResponse(r);
+        resp.setHasPendingManagerEdit(direction.equals("MANAGER_TO_STAFF"));
+        return resp;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  Staff xác nhận thay đổi của Manager
+    // ═══════════════════════════════════════════════════════════════════════
+
+    @Override
+    @Transactional
+    public ReceiptResponse staffAcknowledgeEdit(Integer id, User currentUser) {
+        Receipt r = receiptRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy phiếu."));
+
+        if (currentUser.getRole() != UserRole.STAFF) {
+            throw new RuntimeException("Chỉ Nhân viên mới được xác nhận thay đổi.");
+        }
+        if (r.getCreatedBy() == null || !r.getCreatedBy().getId().equals(currentUser.getId())) {
+            throw new RuntimeException("Bạn không phải người lập phiếu này.");
+        }
+        if (r.getStatus() != ReceiptStatus.PENDING_STAFF_CONFIRM) {
+            throw new RuntimeException("Phiếu không ở trạng thái chờ xác nhận.");
+        }
+
+        // Đánh dấu log đã được xác nhận
+        receiptEditLogRepository
+            .findTopByReceiptIdAndDirectionAndAcknowledgedAtIsNull(r.getId(), "MANAGER_TO_STAFF")
+            .ifPresent(log -> {
+                log.setAcknowledgedBy(currentUser);
+                log.setAcknowledgedAt(LocalDateTime.now());
+                receiptEditLogRepository.save(log);
+            });
+
+        // Chuyển về DRAFT để gửi lại lên Manager
+        r.setStatus(ReceiptStatus.DRAFT);
+        receiptRepository.save(r);
+
+        auditLogService.logAction(currentUser, "UPDATE", "receipts",
+                String.valueOf(r.getId()), "Nhân viên xác nhận chỉnh sửa của Quản lý cho phiếu " + r.getCode());
+
+        ReceiptResponse resp = new ReceiptResponse(r);
+        resp.setHasPendingManagerEdit(false);
+        return resp;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  Lấy lịch sử chỉnh sửa (Admin chỉ thấy khi phiếu >= PENDING_ADMIN)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ReceiptEditLogResponse> getEditHistory(Integer id, User currentUser) {
+        Receipt r = receiptRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy phiếu."));
+
+        // Admin chỉ xem được lịch sử khi phiếu đã lên PENDING_ADMIN hoặc cao hơn
+        if (currentUser.getRole() == UserRole.ADMIN) {
+            if (r.getStatus() == ReceiptStatus.DRAFT || r.getStatus() == ReceiptStatus.PENDING_STAFF_CONFIRM) {
+                return List.of(); // Trả rỗng, Admin không thấy
+            }
+        }
+
+        return receiptEditLogRepository.findByReceiptIdOrderByCreatedAtDesc(r.getId())
+                .stream()
+                .map(ReceiptEditLogResponse::new)
+                .collect(Collectors.toList());
     }
 }

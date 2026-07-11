@@ -2,6 +2,7 @@ package com.example.Hehe.model;
 
 public enum ReceiptStatus {
     DRAFT,
+    PENDING_STAFF_CONFIRM,
     PENDING_ADMIN,
     PENDING_STOCKTAKE,
     PENDING_SHORTFALL_MANAGER,

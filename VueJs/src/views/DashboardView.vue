@@ -80,7 +80,10 @@ onMounted(async () => {
       api.get('/api/reports/dashboard/branch-sales')
     ])
     
-    if (pRes.status === 'fulfilled' && pRes.value.ok) products.value = await pRes.value.json()
+    if (pRes.status === 'fulfilled' && pRes.value.ok) {
+      const pData = await pRes.value.json()
+      products.value = pData.content || pData
+    }
     else errorMsg.value += 'Lỗi API Sản phẩm. '
     
     if (cRes.status === 'fulfilled' && cRes.value.ok) categories.value = await cRes.value.json()

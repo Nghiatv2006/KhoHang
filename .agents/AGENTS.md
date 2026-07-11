@@ -41,6 +41,7 @@ git diff <đường-dẫn-file>
 * **Luôn lập đề xuất/kế hoạch trước khi Merge:** Khi nhận được yêu cầu gộp nhánh (merge), đặc biệt là các nhánh có nguy cơ gây xung đột (conflict) hoặc thay đổi cấu trúc mã nguồn, AI phải liệt kê các file bị ảnh hưởng, phân tích các xung đột tiềm tàng và đề xuất phương án giải quyết cụ thể trước khi chạy lệnh merge chính thức.
 * **Đợi xác nhận từ người dùng:** Tuyệt đối không tự ý thực hiện commit merge, sửa file xung đột hoặc push code lên các nhánh chung mà chưa được người dùng duyệt qua và đồng ý với phương án đề xuất.
 * **Bắt buộc kiểm tra biên dịch (Build) trước khi staging hoặc commit:** Sau khi sửa code hoặc giải quyết xung đột, **trước khi** chạy lệnh `git add` hoặc `git commit`, AI bắt buộc phải chạy lệnh build thử cả Backend và Frontend (ví dụ: `./gradlew build` hoặc `npm run build`) để đề phòng lỗi cú pháp/biên dịch làm hỏng nhánh chung khi push lên.
+* **Không tự ý sáng tạo hoặc viết lại logic mới khi giải quyết xung đột (Conflict Resolution):** Khi giải quyết conflict, chỉ được phép chọn giữ nguyên code của nhánh nguồn (HEAD), nhánh gộp (incoming branch), hoặc kết hợp chính xác code của cả hai bên để đảm bảo tính năng hoạt động đúng thiết kế. Tuyệt đối không tự ý thay đổi cơ chế hoạt động, đổi tên biến/tham số không cần thiết, hoặc viết lại code/class mới hoàn toàn lệch khỏi ý đồ thiết kế ban đầu của các nhà phát triển.
 
 
 # Quy tắc thiết kế Giao diện (UI/UX Premium Standards)

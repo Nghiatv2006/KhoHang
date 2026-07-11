@@ -52,7 +52,9 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     public org.springframework.data.domain.Page<CategoryResponse> getAllCategories(String keyword, int page) {
-        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, 10);
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
+                page, 10, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "id")
+        );
         org.springframework.data.domain.Page<Category> categoryPage;
         // Nếu có keyword truyền lên, thực hiện tìm kiếm theo tên không phân biệt hoa thường
         if (keyword != null && !keyword.trim().isEmpty()) {
