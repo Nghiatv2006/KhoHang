@@ -75,9 +75,22 @@ public class ReportController {
     @GetMapping("/revenue/excel")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<byte[]> exportRevenueExcel(
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String period,
+            @RequestParam(required = false) Integer branchId,
             @AuthenticationPrincipal User currentUser) {
 
-        byte[] excelBytes = reportService.exportRevenueReport(currentUser);
+        java.time.LocalDate startDt = null;
+        java.time.LocalDate endDt = null;
+        if (startDate != null && !startDate.isEmpty()) {
+            startDt = java.time.LocalDate.parse(startDate);
+        }
+        if (endDate != null && !endDate.isEmpty()) {
+            endDt = java.time.LocalDate.parse(endDate);
+        }
+
+        byte[] excelBytes = reportService.exportRevenueReport(currentUser, branchId, startDt, endDt, period);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));

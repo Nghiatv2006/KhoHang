@@ -10,7 +10,7 @@ public interface ReportService {
     java.util.Map<String, Object> getInventoryAgeAnalysis(User currentUser);
     java.util.List<java.util.Map<String, Object>> getStocktakeDiscrepancyHistory(User currentUser);
     java.util.Map<String, Object> getDebtAgingAnalysis(User currentUser);
-    byte[] exportRevenueReport(User currentUser);
+    byte[] exportRevenueReport(User currentUser, Integer branchId, java.time.LocalDate startDate, java.time.LocalDate endDate, String period);
     
     java.util.Map<Integer, java.util.List<java.math.BigDecimal>> getBranchSalesTrend30Days();
 
