@@ -793,18 +793,11 @@ const availableProducts = computed(() => {
     
     return result
   }
-  // IMPORT from headBranch (sourceBranchId is empty): only show products with inventory at headBranch
   if (t === 'IMPORT') {
-    const headBranchId = headBranch.value?.id
-    const inStockIds = new Set(
-      globalInventories.value
-        .filter(inv => inv.branchId === headBranchId && inv.quantity > 0)
-        .map(inv => inv.productId)
-    )
-    return products.value.filter(p => inStockIds.has(p.id))
-  }
-  // IMPORT from headBranch (sourceBranchId is empty): only show products with inventory at headBranch
-  if (t === 'IMPORT') {
+    if (createForm.value.destBranchId === headBranch.value?.id) {
+      return products.value; // Kho tổng nhập từ nhà cung cấp -> hiển thị tất cả
+    }
+    // Chi nhánh con nhập từ kho tổng -> chỉ hiển thị các sản phẩm có tồn kho ở kho tổng
     const headBranchId = headBranch.value?.id
     const inStockIds = new Set(
       globalInventories.value
@@ -2085,7 +2078,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
               <th class="px-5 py-3 text-center font-bold">Trạng thái</th>
               <th class="px-5 py-3 text-left font-bold">Chênh lệch</th>
               <th class="px-5 py-3 text-left font-bold">Chi nhánh nguồn</th>
-              <th class="px-5 py-3 text-left font-bold">{{ route.path === '/invoices' ? 'Khách hàng' : 'Chi nhánh đích' }}</th>
+              <th class="px-5 py-3 text-left font-bold">{{ $route.path === '/invoices' ? 'Khách hàng' : 'Chi nhánh đích' }}</th>
               <th class="px-5 py-3 text-left font-bold">Người lập</th>
               <th class="px-5 py-3 text-left font-bold">Ngày tạo</th>
               <th class="px-5 py-3 text-center font-bold">Thao tác</th>
