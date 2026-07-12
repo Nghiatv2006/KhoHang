@@ -769,47 +769,13 @@ const availableProducts = computed(() => {
   if (createForm.value.sourceBranchId) {
     let validInventories = sourceInventories.value.filter(inv => inv.quantity > 0)
     
-    // Ràng buộc cho phiếu tiêu hủy: Chỉ hàng sắp hết hạn (<= 14 ngày) hoặc đã hết hạn
-    if (t === 'ADJUST_OUT') {
-      const today = new Date().getTime()
-      const fourteenDaysFromNow = today + 14 * 24 * 60 * 60 * 1000
-      validInventories = validInventories.filter(inv => {
-        if (!inv.expirationDate || inv.expirationDate === '1970-01-01' || inv.expirationDate === '2099-12-31') return false
-        const expTime = new Date(inv.expirationDate).getTime()
-        return expTime <= fourteenDaysFromNow
-      })
+    if (t === 'DISPOSAL' && createForm.value.disposalReason === 'Hàng hết hạn sử dụng') {
+      const todayStr = new Date().toISOString().substring(0, 10)
+      validInventories = validInventories.filter(inv => inv.hasExpiry && inv.expirationDate && inv.expirationDate.substring(0, 10) < todayStr)
     }
 
-    const inStockIds = new Set(validInventories.map(inv => inv.productId))
-    let result = products.value.filter(p => inStockIds.has(p.id))
-    
-    // Ràng buộc phiếu tiêu hủy: Chỉ chọn hàng Sữa hoặc Hữu cơ
-    if (t === 'ADJUST_OUT') {
-      result = result.filter(p => {
-        const catName = categories.value.find(c => c.id === p.categoryId)?.name?.toLowerCase() || ''
-        return catName.includes('sữa') || catName.includes('hữu cơ')
-      })
-    }
-    
-    return result
-  }
-  // IMPORT from headBranch (sourceBranchId is empty): only show products with inventory at headBranch
-  if (t === 'IMPORT') {
-    const headBranchId = headBranch.value?.id
     const inStockIds = new Set(
-      globalInventories.value
-        .filter(inv => inv.branchId === headBranchId && inv.quantity > 0)
-        .map(inv => inv.productId)
-    )
-    return products.value.filter(p => inStockIds.has(p.id))
-  }
-  // IMPORT from headBranch (sourceBranchId is empty): only show products with inventory at headBranch
-  if (t === 'IMPORT') {
-    const headBranchId = headBranch.value?.id
-    const inStockIds = new Set(
-      globalInventories.value
-        .filter(inv => inv.branchId === headBranchId && inv.quantity > 0)
-        .map(inv => inv.productId)
+      validInventories.map(inv => inv.productId)
     )
     return products.value.filter(p => inStockIds.has(p.id))
   }
@@ -887,20 +853,10 @@ function getBatchesForProduct(productId: number | string | null) {
       return true;
     })
 
-  if (createForm.value.type === 'ADJUST_OUT') {
-    const today = new Date().getTime()
-    const fourteenDaysFromNow = today + 14 * 24 * 60 * 60 * 1000
-    batches = batches.filter(inv => {
-      if (!inv.expirationDate || inv.expirationDate === '1970-01-01' || inv.expirationDate === '2099-12-31') return false
-      const expTime = new Date(inv.expirationDate).getTime()
-      return expTime <= fourteenDaysFromNow
-    })
-  }
-
   return batches.map(inv => {
       const pendingQty = receipts.value
         .filter(r => r.status === 'DRAFT' && Number(r.sourceBranchId) === Number(createForm.value.sourceBranchId) && 
-                (['EXPORT', 'TRANSFER', 'ADJUST_OUT', 'DISPOSAL'].includes(r.type) || 
+                (['EXPORT', 'TRANSFER', 'DISPOSAL'].includes(r.type) || 
                  (r.type === 'IMPORT' && Number(r.sourceBranchId) !== Number(r.destBranchId))))
         .flatMap(r => r.details || [])
         .filter(d => Number(d.productId) === Number(productId) && d.batchCode === inv.batchCode)
@@ -2354,8 +2310,8 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                       <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)">SL Gửi</th>
                       <th class="px-4 py-2.5 text-right font-bold text-teal-600" v-if="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)">SL Nhận</th>
                       <th class="px-4 py-2.5 text-right font-bold" v-else>SL</th>
-                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Đơn giá</th>
-                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Thành tiền</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type === 'EXPORT'">Đơn giá</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type === 'EXPORT'">Thành tiền</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-[#f1f5f9]">
@@ -2373,11 +2329,11 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                         </span>
                       </td>
                       <td class="px-4 py-3 text-right font-bold" v-else>{{ d.quantity }}</td>
-                      <td class="px-4 py-3 text-right" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">{{ formatVND(d.price) }}</td>
-<td class="px-4 py-3 text-right font-bold text-[#4361ee]" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">{{ formatVND(d.quantity * d.price) }}</td>
+                      <td class="px-4 py-3 text-right" v-if="selectedReceipt.type === 'EXPORT'">{{ formatVND(d.price) }}</td>
+<td class="px-4 py-3 text-right font-bold text-[#4361ee]" v-if="selectedReceipt.type === 'EXPORT'">{{ formatVND(d.quantity * d.price) }}</td>
                     </tr>
                   </tbody>
-                  <tfoot v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">
+                  <tfoot v-if="selectedReceipt.type === 'EXPORT'">
                     <tr class="bg-[#f8f9fa]">
                       <td :colspan="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null) ? 6 : 5" class="px-4 py-2.5 text-right font-bold text-[#8094ae] text-xs uppercase">Tổng cộng</td>
                       <td class="px-4 py-2.5 text-right font-extrabold text-[#4361ee]">
@@ -2788,13 +2744,13 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                             </div>
                           </div>
                           
-                          <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
+                          <div v-if="createForm.type === 'EXPORT'">
                             <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Đơn giá</label>
                             <input v-model.number="d.price" type="number" min="0" readonly
                               class="w-full h-10 px-3 border border-[#e2e8f0] bg-gray-100 rounded-xl text-sm font-bold outline-none cursor-not-allowed text-[#8094ae]" />
                           </div>
                           
-                          <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
+                          <div v-if="createForm.type === 'EXPORT'">
                             <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Thành tiền</label>
                             <div class="w-full h-10 px-3 border border-transparent flex items-center text-sm font-bold text-[#4361ee] bg-[#eef2ff] rounded-xl overflow-x-auto whitespace-nowrap hide-scrollbar">
                               {{ formatVND(d.quantity * (d.price || 0)) }}
