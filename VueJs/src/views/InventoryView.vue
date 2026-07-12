@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { api } from '../api'
 import { useToast } from '../utils/toast'
 import AppModal from '../components/AppModal.vue'
@@ -65,6 +65,7 @@ const configuringBranchId = ref<number | null>(null)
 // Right Panel Details
 const showDetailPanel = ref(false)
 const selectedInv = ref<any>(null)
+const isSpaceEasterEgg = ref(false)
 
 // Add Stock Modal state
 
@@ -107,8 +108,14 @@ async function loadData() {
     ])
 
     if (invRes.ok) inventories.value = await invRes.json()
-    if (prodRes.ok) products.value = await prodRes.json()
-    if (catRes.ok) categories.value = await catRes.json()
+    if (prodRes.ok) {
+      const pData = await prodRes.json()
+      products.value = pData.content || pData
+    }
+    if (catRes.ok) {
+      const catData = await catRes.json()
+      categories.value = catData.content || catData
+    }
     if (branchRes.ok) {
       branches.value = await branchRes.json()
       initTab()
@@ -143,11 +150,11 @@ const computedInventories = computed(() => {
   const today = new Date()
   return inventories.value.map(inv => {
     const prod = products.value.find(p => p.id === inv.productId)
-    const price = prod ? Number(prod.price) : 0
-    const importPrice = prod ? Number(prod.importPrice) : 0
-    const unit = prod ? prod.unit : 'Chiếc'
-    const categoryId = prod ? prod.categoryId : null
-    const categoryName = prod ? prod.categoryName : 'Mặc định'
+    const price = prod ? Number(prod.price) : (inv.price ? Number(inv.price) : 0)
+    const importPrice = prod ? Number(prod.importPrice) : (inv.importPrice ? Number(inv.importPrice) : 0)
+    const unit = prod ? prod.unit : (inv.unit || 'Chiếc')
+    const categoryId = prod ? prod.categoryId : (inv.categoryId || null)
+    const categoryName = prod ? prod.categoryName : (inv.categoryName || 'Mặc định')
     const br = branches.value.find(b => b.id === inv.branchId)
     const threshold = br ? br.lowStockThreshold : activeThreshold.value
 
@@ -247,7 +254,40 @@ const totalExpiredCount = computed(() => {
   return activeTabInventories.value.filter(inv => inv.isExpired).length
 })
 
-onMounted(loadData)
+const isInitialLoad = ref(true)
+let initialLoadTimeout: ReturnType<typeof setTimeout> | null = null
+
+function startInitialLoadTimer() {
+  if (initialLoadTimeout) clearTimeout(initialLoadTimeout)
+  initialLoadTimeout = setTimeout(() => {
+    isInitialLoad.value = false
+  }, 1000)
+}
+
+watch(loading, (newVal) => {
+  if (!newVal) {
+    startInitialLoadTimer()
+  }
+})
+
+watch([activeTab, selectedSubBranchId], () => {
+  isInitialLoad.value = true
+  startInitialLoadTimer()
+})
+
+function triggerInventoryAnimation() {
+  isInitialLoad.value = true
+  loadData()
+}
+
+onMounted(() => {
+  window.addEventListener('trigger-inventory-animation', triggerInventoryAnimation)
+  loadData()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('trigger-inventory-animation', triggerInventoryAnimation)
+})
 
 // Open Configure Threshold
 function openConfigModal() {
@@ -305,39 +345,11 @@ async function saveThreshold() {
 
 // Open Right Panel Details
 function openDetails(inv: any) {
+  isSpaceEasterEgg.value = Math.random() < 0.004
   selectedInv.value = inv
   showDetailPanel.value = true
 }
 
-async function deleteInventory() {
-  if (!selectedInv.value) return;
-  if (!confirm('Bạn có chắc chắn muốn xoá dòng tồn kho này không? Dữ liệu bị xoá sẽ không thể khôi phục.')) return;
-  
-  if (selectedInv.value.quantity > 0) {
-    if (!confirm(`Cảnh báo: Dòng tồn kho này vẫn còn số lượng tồn là ${selectedInv.value.quantity} ${selectedInv.value.unit}. Bạn có thực sự chắc chắn muốn xoá không?`)) return;
-  }
-  
-  try {
-    const res = await api.delete(`/api/inventories/${selectedInv.value.id}`);
-    if (res.ok) {
-      toast.success('Xoá tồn kho thành công!');
-      showDetailPanel.value = false;
-      await loadData();
-    } else {
-      const text = await res.text();
-      let errMessage = 'Lỗi khi xoá tồn kho';
-      if (text) {
-        try {
-          const err = JSON.parse(text);
-          errMessage = err.message || errMessage;
-        } catch(e) {}
-      }
-      toast.error(errMessage);
-    }
-  } catch (err: any) {
-    toast.error('Lỗi kết nối: ' + err.message);
-  }
-}
 
 // Get lot status
 function getLotStatus(inv: any) {
@@ -444,7 +456,7 @@ function exportExcel() {
   <div class="space-y-6 max-w-[1400px] mx-auto font-['Inter',sans-serif]">
     
     <!-- Title & Controls -->
-    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
+    <div :class="['flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6', isInitialLoad ? 'header-slide-down' : '']">
       <div>
         <h2 class="text-2xl font-bold text-[#364a63] m-0 flex items-center gap-3">
           Quản lý Tồn kho
@@ -555,11 +567,12 @@ function exportExcel() {
     </div>
 
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+    <div :key="`stats-${activeTab}-${selectedSubBranchId}`" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
       <!-- Distinct products -->
       <div 
         @click="clearFilters"
-        class="bg-white rounded-2xl p-6 border border-[#f1f5f9] hover:border-blue-300 hover:shadow-md cursor-pointer transition-all flex items-center justify-between gap-4 group relative"
+        :class="['bg-white rounded-2xl p-6 border border-[#f1f5f9] hover:border-blue-300 hover:shadow-md cursor-pointer transition-all flex items-center justify-between gap-4 group relative', isInitialLoad ? 'stat-card-3d' : '']"
+        :style="isInitialLoad ? { '--card-delay': '20ms' } : {}"
       >
         <!-- Custom Tooltip Bubble -->
         <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-blue-200 text-[#4361ee] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(67,97,238,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
@@ -577,7 +590,10 @@ function exportExcel() {
       </div>
 
       <!-- Total value -->
-      <div class="bg-white rounded-2xl p-6 border border-[#f1f5f9] shadow-sm flex items-center justify-between gap-4 group relative">
+      <div 
+        :class="['bg-white rounded-2xl p-6 border border-[#f1f5f9] shadow-sm flex items-center justify-between gap-4 group relative', isInitialLoad ? 'stat-card-3d' : '']"
+        :style="isInitialLoad ? { '--card-delay': '60ms' } : {}"
+      >
         <!-- Custom Tooltip Bubble -->
         <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-emerald-200 text-[#05b171] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(5,177,113,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
           <span class="font-mono text-sm">{{ formatVND(totalInventoryValue) }}</span>
@@ -600,8 +616,10 @@ function exportExcel() {
           'bg-white rounded-2xl p-6 border transition-all flex items-center justify-between gap-4 cursor-pointer select-none group relative', 
           onlyWarning 
             ? 'border-yellow-400 ring-2 ring-yellow-400/20 shadow-md' 
-            : 'border-[#f1f5f9] hover:border-yellow-300 hover:shadow-md'
+            : 'border-[#f1f5f9] hover:border-yellow-300 hover:shadow-md',
+          isInitialLoad ? 'stat-card-3d' : ''
         ]"
+        :style="isInitialLoad ? { '--card-delay': '100ms' } : {}"
       >
         <!-- Custom Tooltip Bubble -->
         <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-yellow-200 text-[#d9a80c] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(217,168,12,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
@@ -630,8 +648,10 @@ function exportExcel() {
           'bg-white rounded-2xl p-6 border transition-all flex items-center justify-between gap-4 cursor-pointer select-none group relative', 
           onlyExpired 
             ? 'border-[#ea4f52] ring-2 ring-[#ea4f52]/20 shadow-md' 
-            : 'border-[#f1f5f9] hover:border-red-300 hover:shadow-md'
+            : 'border-[#f1f5f9] hover:border-red-300 hover:shadow-md',
+          isInitialLoad ? 'stat-card-3d' : ''
         ]"
+        :style="isInitialLoad ? { '--card-delay': '140ms' } : {}"
       >
         <!-- Custom Tooltip Bubble -->
         <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-red-200 text-[#ea4f52] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(234,79,82,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
@@ -655,7 +675,7 @@ function exportExcel() {
     </div>
 
     <!-- INVENTORY TAB (Combined Toolbar & Table) -->
-    <div class="bg-indigo-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden">
+    <div :key="`table-${activeTab}-${selectedSubBranchId}`" :class="['bg-indigo-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden', isInitialLoad ? 'table-card-conveyor' : '']">
       
       <!-- Search & Filters Toolbar -->
       <div class="p-5 border-b border-[#f1f5f9] flex flex-col lg:flex-row items-center justify-between gap-4 bg-[#f8f9fa]/50">
@@ -730,9 +750,10 @@ function exportExcel() {
             </thead>
             <tbody>
               <tr 
-                v-for="inv in filteredInventories" 
+                v-for="(inv, index) in filteredInventories" 
                 :key="inv.id" 
-                class="border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer select-none group hover:-translate-y-[1px]"
+                :class="['border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer select-none group hover:-translate-y-[1px]', isInitialLoad ? 'inventory-row-anim' : '']"
+                :style="isInitialLoad ? { '--row-delay': `${200 + index * 15}ms` } : {}"
                 @dblclick="openDetails(inv)"
               >
               <!-- Name -->
@@ -758,7 +779,7 @@ function exportExcel() {
               </td>
 
               <!-- Lot Code -->
-              <td class="p-4 font-bold text-[#364a63] text-xs font-mono first:rounded-l-xl last:rounded-r-xl">{{ inv.batchCode }}</td>
+              <td class="p-4 font-bold text-[#364a63] text-xs font-mono first:rounded-l-xl last:rounded-r-xl"><div>{{ inv.batchCode }}</div></td>
 
               <!-- Branch / Category -->
               <td class="p-4 text-[#364a63] font-medium first:rounded-l-xl last:rounded-r-xl">
@@ -768,12 +789,12 @@ function exportExcel() {
                   </span>
                 </template>
                 <template v-else>
-                  {{ inv.branchName }}
+                  <div>{{ inv.branchName }}</div>
                 </template>
               </td>
 
               <!-- Unit -->
-              <td class="p-4 text-[#364a63] font-medium first:rounded-l-xl last:rounded-r-xl">{{ inv.unit }}</td>
+              <td class="p-4 text-[#364a63] font-medium first:rounded-l-xl last:rounded-r-xl"><div>{{ inv.unit }}</div></td>
 
               <!-- Quantity -->
               <td class="p-4 text-center first:rounded-l-xl last:rounded-r-xl">
@@ -785,7 +806,7 @@ function exportExcel() {
               </td>
 
               <!-- Total value -->
-              <td class="p-4 text-right font-extrabold text-[#364a63] first:rounded-l-xl last:rounded-r-xl">{{ formatVND(inv.totalValue) }}</td>
+              <td class="p-4 text-right font-extrabold text-[#364a63] first:rounded-l-xl last:rounded-r-xl"><div>{{ formatVND(inv.totalValue) }}</div></td>
             </tr>
           </tbody>
         </table>
@@ -856,15 +877,45 @@ function exportExcel() {
           class="fixed inset-y-0 right-0 z-[101] w-[450px] bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] flex flex-col border-l border-[#e2e8f0]"
         >
           <!-- Header -->
-          <div class="px-6 py-5 border-b border-[#f1f5f9] flex justify-between items-center bg-white">
-            <h3 class="font-bold text-[#364a63] text-lg flex items-center gap-2">
-              <i class="fas fa-info-circle text-[#4361ee]"></i>
+          <div class="theme-modal-header relative overflow-hidden flex items-center justify-between px-8 py-6 transition-colors duration-500" :class="{ 'easter-egg-space': isSpaceEasterEgg }">
+            <template v-if="isSpaceEasterEgg">
+              <!-- Space Easter Egg Decor -->
+              <div class="absolute inset-0 pointer-events-none">
+                <i class="fas fa-rocket absolute top-4 right-32 text-white/80 text-4xl animate-[bounce_3s_infinite] -rotate-45"></i>
+                <i class="fas fa-meteor absolute -top-4 right-16 text-orange-400/60 text-6xl rotate-[120deg] drop-shadow-[0_0_15px_rgba(251,146,60,0.8)]"></i>
+                <i class="fas fa-user-astronaut absolute bottom-2 right-64 text-white/60 text-3xl animate-[bounce_4s_infinite]"></i>
+                <i class="fas fa-star absolute top-2 right-48 text-white/90 text-[8px] animate-pulse"></i>
+                <i class="fas fa-star absolute bottom-4 right-20 text-white/70 text-[6px] animate-pulse" style="animation-delay: 1s"></i>
+                <i class="fas fa-satellite absolute top-8 right-80 text-white/50 text-2xl animate-[spin_20s_linear_infinite]"></i>
+              </div>
+            </template>
+            <template v-else>
+              <!-- Light Mode Decor: Sun & Clouds -->
+              <div :key="'light-inv-modal'" class="theme-light-decor absolute inset-0 pointer-events-none transition-all duration-500">
+                <i class="fas fa-sun absolute -top-12 right-8 text-yellow-300 text-[140px] opacity-10 animate-[spin_40s_linear_infinite]"></i>
+                <i class="fas fa-sun absolute top-3 right-24 text-yellow-300 text-5xl drop-shadow-[0_0_20px_rgba(253,224,71,0.8)] animate-[spin_20s_linear_infinite]"></i>
+                <i class="fas fa-cloud absolute top-8 right-44 text-white/50 text-5xl drop-shadow-sm"></i>
+                <i class="fas fa-cloud absolute top-2 right-64 text-white/40 text-3xl"></i>
+                <i class="fas fa-cloud absolute -bottom-2 right-28 text-white/30 text-7xl"></i>
+              </div>
+
+              <!-- Dark Mode Decor: Moon & Stars -->
+              <div :key="'dark-inv-modal'" class="theme-dark-decor absolute inset-0 pointer-events-none transition-all duration-500">
+                <i class="fas fa-moon absolute -top-8 right-12 text-blue-100 text-[120px] opacity-[0.03] -rotate-12"></i>
+                <i class="fas fa-moon absolute top-3 right-24 text-yellow-200 text-4xl drop-shadow-[0_0_15px_rgba(254,240,138,0.5)] -rotate-12"></i>
+                <i class="fas fa-star absolute top-4 right-48 text-white/80 text-[8px] animate-pulse"></i>
+                <i class="fas fa-star absolute top-8 right-60 text-white/60 text-[10px] animate-pulse" style="animation-delay: 1s"></i>
+                <i class="fas fa-star absolute top-3 right-72 text-white/90 text-[6px] animate-pulse" style="animation-delay: 0.5s"></i>
+                <i class="fas fa-star absolute bottom-4 right-36 text-white/50 text-[12px] animate-pulse" style="animation-delay: 1.5s"></i>
+                <i class="fas fa-star absolute bottom-2 right-56 text-white/70 text-[8px] animate-pulse"></i>
+              </div>
+            </template>
+
+            <h3 class="font-bold text-white text-lg flex items-center gap-2 relative z-10 drop-shadow-md">
+              <i class="fas fa-info-circle text-white"></i>
               Chi tiết lô tồn kho
             </h3>
-            <button 
-              @click="showDetailPanel = false" 
-              class="text-[#8094ae] hover:text-[#ea4f52] transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50"
-            >
+            <button @click="showDetailPanel = false" class="relative z-10 w-9 h-9 flex items-center justify-center rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-sm transition-all shadow-sm border border-white/10">
               <i class="fas fa-times"></i>
             </button>
           </div>
@@ -995,14 +1046,6 @@ function exportExcel() {
           <!-- Footer -->
           <div class="p-6 border-t border-[#f1f5f9] bg-[#f8fafc] flex gap-3">
             <button 
-              v-if="user?.role !== 'STAFF'"
-              class="h-11 px-4 bg-white border border-[#ea4f52] hover:bg-[#ea4f52] text-[#ea4f52] hover:text-white rounded-xl text-sm font-bold transition-all shadow-sm group" 
-              title="Xoá dòng tồn kho này"
-              @click="deleteInventory"
-            >
-              <i class="fas fa-trash"></i>
-            </button>
-            <button 
               class="flex-1 h-11 bg-white border border-[#e2e8f0] hover:bg-[#f8f9fa] text-[#364a63] rounded-xl text-sm font-bold transition-colors shadow-sm" 
               @click="showDetailPanel = false"
             >
@@ -1037,4 +1080,95 @@ function exportExcel() {
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ── 3D Isometric Box Stack Animations ── */
+@keyframes slideDownHeader {
+  0% { transform: translateY(-30px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.header-slide-down {
+  animation: slideDownHeader 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes boxStack3D {
+  0% {
+    transform: perspective(1000px) rotateX(20deg) rotateY(-15deg) translate3d(0, -60px, -150px);
+    opacity: 0;
+  }
+  100% {
+    transform: perspective(1000px) rotateX(0deg) rotateY(0deg) translate3d(0, 0, 0);
+    opacity: 1;
+  }
+}
+.stat-card-3d {
+  animation: boxStack3D 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: var(--card-delay, 0ms);
+  will-change: transform, opacity;
+}
+
+@keyframes conveyorSlide {
+  0% {
+    transform: perspective(1000px) translate3d(0, 40px, -200px) scale(0.92);
+    opacity: 0;
+  }
+  100% {
+    transform: perspective(1000px) translate3d(0, 0, 0) scale(1);
+    opacity: 1;
+  }
+}
+.table-card-conveyor {
+  animation: conveyorSlide 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 120ms;
+  will-change: transform, opacity;
+}
+
+@keyframes rowSlideUp {
+  0% {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.inventory-row-anim {
+  animation: rowSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--row-delay, 0ms);
+  will-change: transform, opacity;
+}
+
+/* Dynamic Modal Header Styles */
+.theme-modal-header {
+  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+}
+.theme-light-decor {
+  opacity: 1;
+  transform: translateY(0);
+}
+.theme-dark-decor {
+  opacity: 0;
+  transform: translateY(20px);
+}
+</style>
+
+<style>
+/* Dark Mode Overrides for Inventory Modal Header */
+html.dark-mode .theme-modal-header {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+}
+html.dark-mode .theme-modal-header.easter-egg-space {
+  background: linear-gradient(135deg, #090a0f 0%, #1b1130 50%, #0c0817 100%) !important;
+}
+html.dark-mode .theme-light-decor {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+html.dark-mode .theme-dark-decor {
+  opacity: 1;
+  transform: translateY(0);
+}
+.theme-modal-header.easter-egg-space {
+  background: linear-gradient(135deg, #090a0f 0%, #1b1130 50%, #0c0817 100%) !important;
+}
 </style>

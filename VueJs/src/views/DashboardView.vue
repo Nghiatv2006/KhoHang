@@ -83,11 +83,15 @@ onMounted(async () => {
     if (pRes.status === 'fulfilled' && pRes.value.ok) products.value = await pRes.value.json()
     else errorMsg.value += 'Lỗi API Sản phẩm. '
     
-    if (cRes.status === 'fulfilled' && cRes.value.ok) categories.value = await cRes.value.json()
-    else errorMsg.value += 'Lỗi API Danh mục. '
+    if (cRes.status === 'fulfilled' && cRes.value.ok) {
+      const cData = await cRes.value.json()
+      categories.value = cData.content || cData
+    } else errorMsg.value += 'Lỗi API Danh mục. '
     
-    if (cuRes.status === 'fulfilled' && cuRes.value.ok) customers.value = await cuRes.value.json()
-    else errorMsg.value += 'Lỗi API Khách hàng. '
+    if (cuRes.status === 'fulfilled' && cuRes.value.ok) {
+      const cuData = await cuRes.value.json()
+      customers.value = cuData.content || cuData
+    } else errorMsg.value += 'Lỗi API Khách hàng. '
 
     if (bRes.status === 'fulfilled' && bRes.value.ok) branches.value = await bRes.value.json()
     else errorMsg.value += 'Lỗi API Chi nhánh. '
