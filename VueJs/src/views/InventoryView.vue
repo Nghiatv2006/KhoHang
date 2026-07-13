@@ -685,7 +685,7 @@ function exportExcel() {
     </div>
 
     <!-- INVENTORY TAB (Combined Toolbar & Table) -->
-    <div :key="`table-${activeTab}-${selectedSubBranchId}`" :class="['bg-indigo-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden', isInitialLoad ? 'table-card-conveyor' : '']">
+    <div :key="`table-${activeTab}-${selectedSubBranchId}`" :class="['bg-white dark:bg-slate-800/40 rounded-[16px] border border-[#f1f5f9] dark:border-slate-700/50 border-t-4 border-t-[#4361ee] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden', isInitialLoad ? 'table-card-conveyor' : '']">
       
       <!-- Search & Filters Toolbar -->
       <div class="p-5 border-b border-[#f1f5f9] flex flex-col lg:flex-row items-center justify-between gap-4 bg-[#f8f9fa]/50">
