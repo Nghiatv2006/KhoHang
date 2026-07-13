@@ -13,6 +13,9 @@ public class EditReceiptRequest {
     /** Lý do chỉnh sửa — bắt buộc phải nhập */
     private String editReason;
 
+    private String customerName;
+    private String customerPhone;
+
     /** Danh sách dòng sản phẩm cần cập nhật số lượng */
     private List<EditDetailItem> details;
 
@@ -21,6 +24,12 @@ public class EditReceiptRequest {
 
     public String getEditReason() { return editReason; }
     public void setEditReason(String editReason) { this.editReason = editReason; }
+
+    public String getCustomerName() { return customerName; }
+    public void setCustomerName(String customerName) { this.customerName = customerName; }
+
+    public String getCustomerPhone() { return customerPhone; }
+    public void setCustomerPhone(String customerPhone) { this.customerPhone = customerPhone; }
 
     public List<EditDetailItem> getDetails() { return details; }
     public void setDetails(List<EditDetailItem> details) { this.details = details; }
