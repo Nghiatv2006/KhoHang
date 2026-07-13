@@ -112,7 +112,10 @@ async function loadData() {
       const pData = await prodRes.json()
       products.value = pData.content || pData
     }
-    if (catRes.ok) categories.value = await catRes.json()
+    if (catRes.ok) {
+      const cData = await catRes.json()
+      categories.value = cData.content || cData
+    }
     if (branchRes.ok) {
       branches.value = await branchRes.json()
       initTab()
