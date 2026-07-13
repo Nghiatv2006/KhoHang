@@ -12,7 +12,7 @@ public interface ReportService {
     java.util.Map<String, Object> getDebtAgingAnalysis(User currentUser);
     byte[] exportRevenueReport(User currentUser);
     
-    java.util.Map<Integer, java.util.List<java.math.BigDecimal>> getBranchSalesTrend30Days();
+    java.util.Map<Integer, java.util.List<java.math.BigDecimal>> getBranchSalesTrend30Days(User currentUser);
 
     java.util.Map<String, Object> getRevenueSummary(User currentUser, Integer branchId);
 }

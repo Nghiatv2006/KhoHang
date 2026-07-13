@@ -88,9 +88,10 @@ public class ReportController {
     }
 
     @GetMapping("/dashboard/branch-sales")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    public ResponseEntity<java.util.Map<Integer, java.util.List<java.math.BigDecimal>>> getBranchSalesTrend30Days() {
-        return ResponseEntity.ok(reportService.getBranchSalesTrend30Days());
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF')")
+    public ResponseEntity<java.util.Map<Integer, java.util.List<java.math.BigDecimal>>> getBranchSalesTrend30Days(
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(reportService.getBranchSalesTrend30Days(currentUser));
     }
 
     @GetMapping("/revenue/summary")
