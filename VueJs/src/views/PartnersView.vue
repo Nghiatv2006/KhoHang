@@ -98,6 +98,23 @@ function confirmDeleteC(c: any) { deletingC.value = c; showDeleteC.value = true 
 
 async function saveCustomer() {
   if (!cForm.name?.trim()) { toast.error('Tên khách hàng là bắt buộc.'); return }
+
+  if (cForm.email && cForm.email.trim() !== '') {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cForm.email.trim())) {
+      toast.error('Email không hợp lệ.');
+      return;
+    }
+  }
+
+  if (cForm.phone && cForm.phone.trim() !== '') {
+    const phoneRegex = /^0\d{9}$/;
+    if (!phoneRegex.test(cForm.phone.trim())) {
+      toast.error('Số điện thoại không hợp lệ (Phải bắt đầu bằng 0 và có 10 chữ số).');
+      return;
+    }
+  }
+
   cSaving.value = true
   try {
     const payload = { name: cForm.name.trim(), contactInfo: cForm.phone, email: cForm.email, taxCode: cForm.taxCode, address: cForm.address }

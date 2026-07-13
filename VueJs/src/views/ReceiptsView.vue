@@ -61,9 +61,13 @@ function canApproveReceipt(r: any) {
       if (r.type === 'EXPORT' && isAdmin.value && r.sourceBranchId !== 1) return false;
       if (isAdmin.value) return true;
       if (isManager.value) {
-          if (r.type === 'IMPORT' || r.type === 'ADJUST_IN' || r.type === 'TRANSFER') {
+          if (r.type === 'IMPORT' || r.type === 'ADJUST_IN') {
               if (r.destBranchId === user.value?.branchId) return true;
+          } else if (r.type === 'TRANSFER') {
+              // Manager chi nhánh NGUỒN duyệt phiếu DRAFT điều chuyển
+              if (r.sourceBranchId === user.value?.branchId) return true;
           } else {
+              if (r.type === 'EXPORT' && r.createdById !== user.value?.id) return false;
               if (r.sourceBranchId === user.value?.branchId) return true;
           }
       }
@@ -88,7 +92,8 @@ function canApproveReceipt(r: any) {
           return false;
       }
       if (r.type === 'TRANSFER') {
-          if (isManager.value && r.sourceBranchId === user.value?.branchId) return true;
+          // PENDING_ADMIN của TRANSFER là chờ Manager chi nhánh ĐÍCH duyệt
+          if (isManager.value && r.destBranchId === user.value?.branchId) return true;
           return false;
       }
   }
@@ -121,7 +126,7 @@ function approveReceiptText(r: any) {
         return "Chấp nhận nhập kho";
     }
     if (r.type === 'TRANSFER' && r.status === 'DRAFT') {
-        return "Duyệt (Gửi Manager chi nhánh nguồn)";
+        return "Duyệt (Gửi Manager chi nhánh đích)";
     }
     if (r.type === 'TRANSFER' && r.status === 'PENDING_ADMIN') {
         return "Duyệt điều chuyển";
@@ -132,19 +137,30 @@ function approveReceiptText(r: any) {
 function canCancelReceipt(r: any) {
   if (r.status !== 'DRAFT' && r.status !== 'PENDING_ADMIN') return false;
   if (r.type === 'EXPORT' && isAdmin.value && r.sourceBranchId !== 1) return false;
+  if (r.type === 'EXPORT' && isManager.value && r.createdById !== user.value?.id) return false;
   if (isAdmin.value) return true;
+  if (user.value?.role === 'STAFF') {
+      return r.status === 'DRAFT' && r.createdById === user.value?.id;
+  }
   if (!isManager.value) return false;
   
   // Manager can only cancel receipts if they are the "requesting branch" (the one who initiated it).
   // The responding branch manager cannot cancel it when it's DRAFT or PENDING_ADMIN.
   let requestingBranchId = null;
-  if (['IMPORT', 'TRANSFER'].includes(r.type)) {
+  if (r.type === 'IMPORT') {
       requestingBranchId = r.destBranchId;
   } else {
       requestingBranchId = r.sourceBranchId;
   }
   
-  return requestingBranchId === user.value?.branchId; 
+  if (requestingBranchId === user.value?.branchId) return true;
+  
+  // Manager đích có quyền hủy (từ chối) phiếu điều chuyển khi nó được gửi đến họ (PENDING_ADMIN)
+  if (r.type === 'TRANSFER' && r.status === 'PENDING_ADMIN') {
+      if (r.destBranchId === user.value?.branchId) return true;
+  }
+  
+  return false;
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -235,9 +251,11 @@ const typeFilteredReceipts = computed(() => {
 
     // 2. Draft visibility rule: Drafts and Pending Staff Confirm should ONLY be visible to the creator's branch.
     // For example, an IMPORT draft created by HCM (dest=HCM, source=Hanoi) should NOT be seen by Manager Hanoi yet.
+    // TRANSFER: người tạo là Staff chi nhánh NGUỒN → dùng sourceBranchId
+    // IMPORT: người tạo là Staff chi nhánh ĐÍCH → dùng destBranchId
     if (r.status === 'DRAFT' || r.status === 'PENDING_STAFF_CONFIRM') {
       let creatorBranchId = null;
-      if (['IMPORT', 'TRANSFER'].includes(r.type)) {
+      if (r.type === 'IMPORT') {
         creatorBranchId = r.destBranchId;
       } else {
         creatorBranchId = r.sourceBranchId;
@@ -660,9 +678,9 @@ function onTypeChange() {
     createForm.value.sourceBranchId = user.value?.branchId || headBranch.value?.id || ''
     createForm.value.destBranchId = ''
   } else if (t === 'TRANSFER') {
-    // Điều chuyển mới: Chi nhánh đích (cần hàng) = chi nhánh hiện tại, nguồn = người dùng chọn
-    createForm.value.sourceBranchId = ''
-    createForm.value.destBranchId = user.value?.branchId || ''
+    // Điều chuyển mới: Chi nhánh nguồn = chi nhánh hiện tại, đích = người dùng chọn
+    createForm.value.sourceBranchId = user.value?.branchId || ''
+    createForm.value.destBranchId = ''
   } else {
     createForm.value.sourceBranchId = user.value?.branchId || headBranch.value?.id || ''
     createForm.value.destBranchId = ''
@@ -853,10 +871,6 @@ const availableProducts = computed(() => {
         .map(inv => inv.productId)
     )
     return products.value.filter(p => inStockIds.has(p.id))
-  }
-  // TRANSFER chưa chọn chi nhánh nguồn -> không hiển thị sản phẩm nào
-  if (t === 'TRANSFER' && !createForm.value.sourceBranchId) {
-    return []
   }
   return products.value
 })
@@ -1412,7 +1426,11 @@ function canApproveShortfall(r: any) {
     if (isManager.value && !isAdmin.value && r.destBranchId === user.value?.branchId) return true;
   }
   if (r.status === 'PENDING_SHORTFALL_ADMIN') {
-    if (isAdmin.value) return true;
+    if (r.type === 'TRANSFER') {
+        if (isManager.value && r.sourceBranchId === user.value?.branchId) return true;
+    } else {
+        if (isAdmin.value) return true;
+    }
   }
       if (r.status === 'PENDING_STOCKTAKE') {
         if (r.type === 'DISPOSAL' && isAdmin.value) return true;
@@ -1701,6 +1719,8 @@ const showEditModal = ref(false)
 const editMode = ref<'staff' | 'manager'>('staff')
 const submittingEdit = ref(false)
 const editForm = ref<{
+  customerName?: string
+  customerPhone?: string
   description: string
   editReason: string
   details: { 
@@ -1713,6 +1733,8 @@ const editForm = ref<{
     maxQty: number | null;
   }[]
 }>({
+  customerName: '',
+  customerPhone: '',
   description: '',
   editReason: '',
   details: []
@@ -1760,6 +1782,8 @@ async function openEditModal(mode: 'staff' | 'manager') {
   
   editMode.value = mode
   editForm.value = {
+    customerName: selectedReceipt.value.customerName || '',
+    customerPhone: selectedReceipt.value.customerPhone || '',
     description: selectedReceipt.value.description || '',
     editReason: '',
     details: (selectedReceipt.value.details || []).map((d: any) => ({
@@ -1830,6 +1854,8 @@ async function submitEditReceipt() {
   if (!selectedReceipt.value) return
 
   const payload = {
+    customerName: editForm.value.customerName,
+    customerPhone: editForm.value.customerPhone,
     description: editForm.value.description,
     editReason: editForm.value.editReason.trim(),
     details: editForm.value.details.map(d => ({ detailId: d.detailId, quantity: d.quantity }))
@@ -2177,7 +2203,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
               <th class="px-5 py-3 text-left font-bold">Mã phiếu</th>
               <th v-if="!receiptType" class="px-5 py-3 text-left font-bold">Loại</th>
               <th class="px-5 py-3 text-center font-bold">Trạng thái</th>
-              <th v-if="receiptType !== 'DISPOSAL'" class="px-5 py-3 text-left font-bold">Chênh lệch</th>
+              <th v-if="receiptType !== 'DISPOSAL' && receiptType !== 'EXPORT'" class="px-5 py-3 text-left font-bold">Chênh lệch</th>
               <th class="px-5 py-3 text-left font-bold">Chi nhánh nguồn</th>
               <th class="px-5 py-3 text-left font-bold">{{ $route.path === '/invoices' ? 'Khách hàng' : 'Chi nhánh đích' }}</th>
               <th class="px-5 py-3 text-left font-bold">Người lập</th>
@@ -2212,7 +2238,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                   </span>
                 </div>
               </td>
-              <td v-if="receiptType !== 'DISPOSAL'" class="px-5 py-4">
+              <td v-if="receiptType !== 'DISPOSAL' && receiptType !== 'EXPORT'" class="px-5 py-4">
                 <div v-if="r.hasDeviation" class="flex flex-col max-w-[200px]" :title="r.deviationSummary">
                   <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-rose-50 text-rose-600 border border-rose-100 w-fit">
                     ⚠️ Lệch số lượng
@@ -2725,7 +2751,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
               <div class="text-xs font-bold opacity-90 uppercase tracking-wider mb-1">
                 {{ createForm.type === 'EXPORT' ? 'Lập hóa đơn' : createForm.type === 'TRANSFER' ? 'Lập phiếu điều chuyển' : createForm.type === 'DISPOSAL' ? 'Lập phiếu tiêu hủy' : 'Lập phiếu kho' }}
               </div>
-              <div class="font-bold text-xl">{{ createForm.type === 'TRANSFER' ? 'Tạo phiếu xin hàng (DRAFT)' : 'Tạo phiếu nháp (DRAFT)' }}</div>
+              <div class="font-bold text-xl">{{ createForm.type === 'TRANSFER' ? 'Tạo lệnh xuất hàng (DRAFT)' : 'Tạo phiếu nháp (DRAFT)' }}</div>
             </div>
             <button @click="showCreateModal = false" class="relative z-10 w-9 h-9 flex items-center justify-center rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-sm transition-all shadow-sm border border-white/10">
               <i class="fas fa-times"></i>
@@ -2755,21 +2781,13 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                   </select>
                 </div>
                 <div v-if="createForm.type === 'TRANSFER'">
-                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh đích</label>
-                  <select v-model="createForm.destBranchId" disabled
+                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh nguồn</label>
+                  <select v-model="createForm.sourceBranchId" disabled
                     class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm bg-[#f1f5f9] text-[#8094ae] cursor-not-allowed">
                     <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
                   </select>
                 </div>
-                <div v-if="createForm.type === 'TRANSFER'">
-                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh nguồn <span class="text-red-500">*</span></label>
-                  <select v-model="createForm.sourceBranchId"
-                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
-                    <option value="">-- Chọn chi nhánh --</option>
-                    <option v-for="b in branches.filter(x => !x.isHead && x.id !== (user?.branchId || 0))" :key="b.id" :value="b.id">{{ b.name }}</option>
-                  </select>
-                </div>
-                <div v-if="createForm.type === 'IMPORT' || createForm.type === 'ADJUST_IN'">
+                <div v-if="createForm.type === 'IMPORT' || createForm.type === 'TRANSFER' || createForm.type === 'ADJUST_IN'">
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh đích</label>
                   <select v-model="createForm.destBranchId" :disabled="createForm.type === 'IMPORT'"
                     class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-[#f1f5f9] disabled:text-[#8094ae]">
@@ -2891,7 +2909,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                             <input v-else v-model="d.batchCode" type="text" placeholder="Nhập mã lô mới..."
                               class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium outline-none focus:border-[#4361ee]" />
                             
-                            <button v-if="createForm.type === 'IMPORT' || createForm.type === 'ADJUST_IN'" @click="d.isNewBatch = !d.isNewBatch; d.batchCode = ''" 
+                            <button v-if="(createForm.type === 'IMPORT' && !createForm.sourceBranchId) || createForm.type === 'ADJUST_IN'" @click="d.isNewBatch = !d.isNewBatch; d.batchCode = ''" 
                                     class="px-3 h-10 border border-[#e2e8f0] rounded-xl text-xs font-bold bg-white hover:bg-gray-50 whitespace-nowrap shadow-sm transition-all text-[#364a63]">
                               <i :class="d.isNewBatch ? 'fas fa-list text-[#4361ee] mr-1' : 'fas fa-plus text-[#10b981] mr-1'"></i> {{ d.isNewBatch ? 'Chọn lô có sẵn' : 'Tạo lô mới' }}
                             </button>
@@ -3304,6 +3322,22 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
     <!-- ═══════════════════════════════════════════════════════════ -->
     <AppModal :show="showEditModal" @close="showEditModal = false" :title="editModalTitle">
       <div class="space-y-6 p-4 sm:p-5">
+        <!-- Thông tin khách hàng (Chỉ Hóa đơn) -->
+        <div v-if="selectedReceipt?.type === 'EXPORT'" class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Tên khách hàng</label>
+            <input v-model="editForm.customerName" type="text"
+              placeholder="Tên khách hàng..."
+              class="w-full px-4 h-11 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl text-sm focus:ring-0 focus:border-[#4361ee] dark:focus:border-blue-500 outline-none transition-colors" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Số điện thoại</label>
+            <input v-model="editForm.customerPhone" type="text"
+              placeholder="Số điện thoại..."
+              class="w-full px-4 h-11 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl text-sm focus:ring-0 focus:border-[#4361ee] dark:focus:border-blue-500 outline-none transition-colors" />
+          </div>
+        </div>
+
         <!-- Lý do chỉnh sửa -->
         <div>
           <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Lý do chỉnh sửa <span class="text-red-500">*</span></label>
