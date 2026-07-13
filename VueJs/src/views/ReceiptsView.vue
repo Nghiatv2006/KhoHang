@@ -38,6 +38,12 @@ const pageConfig = computed(() => {
       desc: 'Theo dõi, lập và quản lý các phiếu tiêu hủy hàng hóa',
       icon: 'fas fa-trash-alt',
       btnLabel: 'Lập phiếu tiêu hủy'
+    },
+    DISPOSAL: {
+      title: 'Quản lý Tiêu Hủy',
+      desc: 'Theo dõi, lập và phê duyệt các phiếu tiêu hủy hàng hóa',
+      icon: 'fas fa-trash-alt',
+      btnLabel: 'Lập phiếu tiêu hủy'
     }
   }
   return configs[props.receiptType || 'IMPORT'] || configs.IMPORT
@@ -169,13 +175,12 @@ const initFmt = (d: Date) => {
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
 }
-const initFirstDay = new Date(initToday.getFullYear(), initToday.getMonth(), 1)
 
-const filterType = ref(props.receiptType || '')
+const filterType = ref('')
 const filterStatus = ref('')
 const searchKeyword = ref('')
-const filterTimeRange = ref('this_month')
-const filterStartDate = ref(initFmt(initFirstDay))
+const filterTimeRange = ref('today')
+const filterStartDate = ref(initFmt(initToday))
 const filterEndDate = ref(initFmt(initToday))
 const filterDeviation = ref('')
 
@@ -196,25 +201,34 @@ watch(filterTimeRange, (val) => {
     weekAgo.setDate(weekAgo.getDate() - 7)
     filterStartDate.value = fmt(weekAgo)
     filterEndDate.value = fmt(today)
-  } else if (val === 'last_week') {
-    const twoWeeksAgo = new Date(today)
-    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
-    const oneWeekAgo = new Date(today)
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
-    filterStartDate.value = fmt(twoWeeksAgo)
-    filterEndDate.value = fmt(oneWeekAgo)
+  } else if (val === 'month') {
+    const monthAgo = new Date(today)
+    monthAgo.setDate(monthAgo.getDate() - 30)
+    filterStartDate.value = fmt(monthAgo)
+    filterEndDate.value = fmt(today)
   } else if (val === 'this_month') {
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
     filterStartDate.value = fmt(firstDay)
     filterEndDate.value = fmt(today)
-  } else if (val === 'month') {
-    const monthAgo = new Date(today)
-    monthAgo.setMonth(monthAgo.getMonth() - 1)
-    filterStartDate.value = fmt(monthAgo)
+  } else if (val === 'last_month') {
+    const firstDay = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+    const lastDay = new Date(today.getFullYear(), today.getMonth(), 0)
+    filterStartDate.value = fmt(firstDay)
+    filterEndDate.value = fmt(lastDay)
+  } else if (val === 'this_week') {
+    const firstDay = new Date(today)
+    const day = firstDay.getDay() || 7
+    firstDay.setDate(firstDay.getDate() - day + 1)
+    filterStartDate.value = fmt(firstDay)
     filterEndDate.value = fmt(today)
-  } else if (val === 'custom') {
-    filterStartDate.value = ''
-    filterEndDate.value = ''
+  } else if (val === 'last_week') {
+    const lastWeekEnd = new Date(today)
+    const day = lastWeekEnd.getDay() || 7
+    lastWeekEnd.setDate(lastWeekEnd.getDate() - day)
+    const lastWeekStart = new Date(lastWeekEnd)
+    lastWeekStart.setDate(lastWeekStart.getDate() - 6)
+    filterStartDate.value = fmt(lastWeekStart)
+    filterEndDate.value = fmt(lastWeekEnd)
   }
 })
 
@@ -567,6 +581,37 @@ const createForm = ref<{
   attachmentUrl: ''
 })
 
+const fileInput = ref<any>(null)
+const uploadingAttachment = ref(false)
+
+async function onAttachmentSelected(e: any) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  if (file.size > 20 * 1024 * 1024) {
+    toast.error('Dung lượng file tải lên không được vượt quá 20MB.')
+    if (fileInput.value) fileInput.value.value = ''
+    return
+  }
+  uploadingAttachment.value = true
+  const formData = new FormData()
+  formData.append('file', file)
+  try {
+    const res = await api.upload('/api/upload', formData)
+    if (res.ok) {
+      const data = await res.json()
+      createForm.value.attachmentUrl = data.url
+      toast.success('Tải file đính kèm thành công.')
+    } else {
+      toast.error('Lỗi khi tải file lên.')
+    }
+  } catch (err: any) {
+    toast.error('Lỗi kết nối: ' + err.message)
+  } finally {
+    uploadingAttachment.value = false
+    if (fileInput.value) fileInput.value.value = ''
+  }
+}
+
 const showCustomerDropdown = ref(false)
 
 const filteredCustomers = computed(() => {
@@ -617,6 +662,9 @@ function openCreateModal() {
     customerPhone: '',
     paymentStatus: 'UNPAID',
     description: '',
+    disposalReason: '',
+    disposalMethod: '',
+    attachmentUrl: '',
     details: [{ productId: '', batchCode: '', isNewBatch: false, manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 }]
   }
   onTypeChange()
@@ -1060,6 +1108,17 @@ async function submitCreateDraft() {
       toast.error('Vui lòng nhập lý do tiêu hủy.')
       return
     }
+    if (!f.disposalMethod) {
+      toast.error('Vui lòng chọn phương pháp tiêu hủy.')
+      return
+    }
+    if (f.attachmentUrl && f.attachmentUrl.trim() !== '') {
+      const urlPattern = /^(https?:\/\/|www\.)[^\s]+|\/[^\s]+$/i;
+      if (!urlPattern.test(f.attachmentUrl.trim())) {
+        toast.error('Biên bản tiêu hủy phải là một đường link hợp lệ hoặc được đính kèm file.')
+        return
+      }
+    }
   }
 
   const isConstrained = f.type !== 'ADJUST_IN' && !(f.type === 'IMPORT' && f.sourceBranchId === f.destBranchId)
@@ -1081,6 +1140,8 @@ async function submitCreateDraft() {
     paymentStatus: f.paymentStatus,
     description: f.description,
     disposalReason: f.type === 'DISPOSAL' ? f.description : undefined,
+    disposalMethod: f.type === 'DISPOSAL' ? f.disposalMethod : undefined,
+    attachmentUrl: f.type === 'DISPOSAL' ? f.attachmentUrl : undefined,
     details: f.details.map(d => ({
       productId: Number(d.productId),
       batchCode: d.batchCode,
@@ -2026,7 +2087,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
       <div class="p-5 border-b border-[#f1f5f9]">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" :class="receiptType ? 'lg:grid-cols-4' : 'lg:grid-cols-5'">
           <!-- Tìm kiếm đa năng -->
-          <div class="lg:col-span-2 relative">
+          <div class="relative" :class="receiptType === 'DISPOSAL' ? 'lg:col-span-3' : 'lg:col-span-2'">
             <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae] text-sm"></i>
             <input v-model="searchKeyword" type="text" placeholder="Tìm kiếm theo mã phiếu..."
               class="w-full h-11 pl-10 pr-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all" />
@@ -2053,7 +2114,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
             </select>
           </div>
           <!-- Lọc hao hụt / chênh lệch -->
-          <div>
+          <div v-if="receiptType !== 'DISPOSAL'">
             <select v-model="filterDeviation"
               class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]">
               <option value="">-- Tất cả chênh lệch --</option>
@@ -2068,28 +2129,30 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
               <select v-model="filterTimeRange" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]">
                 <option value="today">Hôm nay</option>
                 <option value="week">7 ngày qua</option>
-                <option value="last_week">Tuần trước (14 ngày qua)</option>
-                <option value="this_month">Tháng này</option>
                 <option value="month">30 ngày qua</option>
-                <option value="custom">Tùy chọn...</option>
+                <option value="this_month">Tháng này</option>
+                <option value="last_month">Tháng trước</option>
+                <option value="this_week">Tuần này</option>
+                <option value="last_week">Tuần trước</option>
+                <option value="custom">Tùy chọn</option>
               </select>
             </div>
             <!-- Từ ngày -->
             <div>
               <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-1.5">Từ ngày</label>
-              <input v-model="filterStartDate" type="date" :disabled="filterTimeRange !== 'custom'"
-                class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] disabled:opacity-50 disabled:bg-gray-100 disabled:cursor-not-allowed" />
+              <input v-model="filterStartDate" type="date" @click="filterTimeRange = 'custom'" @input="filterTimeRange = 'custom'"
+                class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
             </div>
             <!-- Đến ngày -->
             <div>
               <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-1.5">Đến ngày</label>
-              <input v-model="filterEndDate" type="date" :disabled="filterTimeRange !== 'custom'"
-                class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] disabled:opacity-50 disabled:bg-gray-100 disabled:cursor-not-allowed" />
+              <input v-model="filterEndDate" type="date" @click="filterTimeRange = 'custom'" @input="filterTimeRange = 'custom'"
+                class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
             </div>
             <!-- Nút Xóa lọc -->
             <div class="flex items-end">
-              <button v-if="filterType || filterStatus || searchKeyword || filterDeviation || filterTimeRange !== 'this_month'"
-                @click="filterType = ''; filterStatus = ''; searchKeyword = ''; filterTimeRange = 'this_month'; filterDeviation = ''"
+              <button v-if="filterType || filterStatus || searchKeyword || filterDeviation || filterTimeRange !== 'today'"
+                @click="filterType = ''; filterStatus = ''; searchKeyword = ''; filterTimeRange = 'today'; filterDeviation = ''"
                 class="w-full h-11 flex items-center justify-center gap-2 px-6 bg-white border border-[#e2e8f0] rounded-xl text-sm font-semibold text-[#8094ae] hover:text-[#364a63] hover:bg-[#f8f9fa] transition-all shadow-sm">
                 <i class="fas fa-times"></i> Xóa lọc
               </button>
@@ -2121,7 +2184,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
               <th class="px-5 py-3 text-left font-bold">Trạng thái</th>
               <th v-if="receiptType !== 'DISPOSAL'" class="px-5 py-3 text-left font-bold">Chênh lệch</th>
               <th class="px-5 py-3 text-left font-bold">Chi nhánh nguồn</th>
-              <th class="px-5 py-3 text-left font-bold">Đích / Khách hàng</th>
+              <th v-if="receiptType !== 'DISPOSAL'" class="px-5 py-3 text-left font-bold">Đích / Khách hàng</th>
               <th class="px-5 py-3 text-left font-bold">Người lập</th>
               <th class="px-5 py-3 text-left font-bold">Ngày tạo</th>
               <th class="px-5 py-3 text-center font-bold">Thao tác</th>
@@ -2173,7 +2236,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
               <td class="px-5 py-4">
                 <span class="text-[#364a63] font-medium">{{ r.sourceBranchName || '—' }}</span>
               </td>
-              <td class="px-5 py-4">
+              <td v-if="receiptType !== 'DISPOSAL'" class="px-5 py-4">
                 <span class="text-[#364a63] font-medium" v-if="r.type === 'EXPORT'">{{ getCustomerName(r) }}</span>
                 <span class="text-[#364a63] font-medium" v-else>{{ r.destBranchName || '—' }}</span>
               </td>
@@ -2378,6 +2441,18 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Ghi chú</div>
                 <div class="text-[#364a63] text-xs whitespace-pre-line">{{ selectedReceipt.description.split('\n').filter((l: string) => !l.startsWith('[Lý do hủy]')).join('\n').trim() }}</div>
               </div>
+              <div v-if="selectedReceipt.type === 'DISPOSAL' && selectedReceipt.disposalMethod">
+                <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Phương pháp tiêu hủy</div>
+                <div class="text-[#364a63] text-xs font-medium">{{ selectedReceipt.disposalMethod }}</div>
+              </div>
+              <div v-if="selectedReceipt.type === 'DISPOSAL' && selectedReceipt.attachmentUrl">
+                <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Biên bản tiêu hủy</div>
+                <div class="text-[#364a63] text-xs font-medium">
+                  <a :href="selectedReceipt.attachmentUrl" target="_blank" class="text-blue-600 hover:underline flex items-center gap-1.5 w-fit">
+                    <i class="fas fa-external-link-alt text-[10px]"></i> Xem tài liệu đính kèm
+                  </a>
+                </div>
+              </div>
             </div>
 
             <!-- Detail lines -->
@@ -2393,8 +2468,8 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                       <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)">SL Gửi</th>
                       <th class="px-4 py-2.5 text-right font-bold text-teal-600" v-if="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)">SL Nhận</th>
                       <th class="px-4 py-2.5 text-right font-bold" v-else>SL</th>
-                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Đơn giá</th>
-                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Thành tiền</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER' && selectedReceipt.type !== 'DISPOSAL'">Đơn giá</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER' && selectedReceipt.type !== 'DISPOSAL'">Thành tiền</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-[#f1f5f9]">
@@ -2412,11 +2487,11 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                         </span>
                       </td>
                       <td class="px-4 py-3 text-right font-bold" v-else>{{ d.quantity }}</td>
-                      <td class="px-4 py-3 text-right" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">{{ formatVND(d.price) }}</td>
-<td class="px-4 py-3 text-right font-bold text-[#4361ee]" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">{{ formatVND(d.quantity * d.price) }}</td>
+                      <td class="px-4 py-3 text-right" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER' && selectedReceipt.type !== 'DISPOSAL'">{{ formatVND(d.price) }}</td>
+<td class="px-4 py-3 text-right font-bold text-[#4361ee]" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER' && selectedReceipt.type !== 'DISPOSAL'">{{ formatVND(d.quantity * d.price) }}</td>
                     </tr>
                   </tbody>
-                  <tfoot v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">
+                  <tfoot v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER' && selectedReceipt.type !== 'DISPOSAL'">
                     <tr class="bg-[#f8f9fa]">
                       <td :colspan="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null) ? 6 : 5" class="px-4 py-2.5 text-right font-bold text-[#8094ae] text-xs uppercase">Tổng cộng</td>
                       <td class="px-4 py-2.5 text-right font-extrabold text-[#4361ee]">
@@ -2759,6 +2834,33 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                       class="w-full h-20 p-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none resize-y"></textarea>
                   </template>
                 </div>
+
+                <template v-if="createForm.type === 'DISPOSAL'">
+                  <div class="col-span-2 sm:col-span-1">
+                    <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Phương pháp tiêu hủy <span class="text-red-500">*</span></label>
+                    <select v-model="createForm.disposalMethod"
+                      class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
+                      <option value="">-- Chọn phương pháp --</option>
+                      <option value="Thiêu đốt">Thiêu đốt</option>
+                      <option value="Chôn lấp">Chôn lấp</option>
+                      <option value="Thuê đơn vị xử lý ngoài">Thuê đơn vị xử lý ngoài</option>
+                      <option value="Tái chế">Tái chế</option>
+                      <option value="Khác">Khác</option>
+                    </select>
+                  </div>
+                  <div class="col-span-2 sm:col-span-1">
+                    <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Biên bản tiêu hủy</label>
+                    <div class="relative flex items-center">
+                      <input v-model="createForm.attachmentUrl" type="text" placeholder="Dán link hoặc đính kèm file..."
+                        class="w-full h-10 px-3 pr-10 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" :disabled="uploadingAttachment" />
+                      <input type="file" ref="fileInput" class="hidden" @change="onAttachmentSelected" />
+                      <button @click="fileInput.click()" type="button" class="absolute right-2 text-[#8094ae] hover:text-[#4361ee] transition-colors w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100" title="Tải file lên">
+                        <i class="fas fa-spinner fa-spin" v-if="uploadingAttachment"></i>
+                        <i class="fas fa-paperclip" v-else></i>
+                      </button>
+                    </div>
+                  </div>
+                </template>
               </div>
 
               <!-- Detail rows -->
