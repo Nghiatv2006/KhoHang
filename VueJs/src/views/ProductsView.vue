@@ -480,7 +480,7 @@ function formatCurrency(val: any) {
             <div>
               Hiển thị {{ filteredProducts.length }} / {{ totalElements }} sản phẩm
             </div>
-            <div v-if="totalPages > 1" class="flex items-center gap-2">
+            <div v-if="totalPages >= 1" class="flex items-center gap-2">
               <button 
                 :disabled="currentPage === 0"
                 @click="loadProducts(currentPage - 1)"
@@ -587,7 +587,7 @@ function formatCurrency(val: any) {
             <div>
               Hiển thị {{ filteredCategories.length }} / {{ cTotalElements }} danh mục
             </div>
-            <div v-if="cTotalPages > 1" class="flex items-center gap-2">
+            <div v-if="cTotalPages >= 1" class="flex items-center gap-2">
               <button 
                 :disabled="cCurrentPage === 0"
                 @click="loadCategories(cCurrentPage - 1)"

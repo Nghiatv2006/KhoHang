@@ -241,6 +241,19 @@ const filteredInventories = computed(() => {
   })
 })
 
+// Pagination
+const currentPage = ref(1)
+const itemsPerPage = 10
+const totalPages = computed(() => Math.ceil(filteredInventories.value.length / itemsPerPage) || 1)
+const paginatedInventories = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  return filteredInventories.value.slice(start, start + itemsPerPage)
+})
+
+watch([searchKeyword, selectedCategoryId, onlyWarning, onlyExpired, activeTab, selectedSubBranchId], () => {
+  currentPage.value = 1
+})
+
 // Summaries
 const totalDistinctProducts = computed(() => new Set(activeTabInventories.value.map(i => i.productId)).size)
 const totalInventoryValue = computed(() => activeTabInventories.value.reduce((sum, item) => sum + item.totalValue, 0))
@@ -747,7 +760,7 @@ function exportExcel() {
             </thead>
             <tbody>
               <tr 
-                v-for="(inv, index) in filteredInventories" 
+                v-for="(inv, index) in paginatedInventories" 
                 :key="inv.id" 
                 :class="['border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer select-none group hover:-translate-y-[1px]', isInitialLoad ? 'inventory-row-anim' : '']"
                 :style="isInitialLoad ? { '--row-delay': `${200 + index * 15}ms` } : {}"
@@ -808,9 +821,46 @@ function exportExcel() {
           </tbody>
         </table>
         
-        <!-- Summary footer -->
-        <div v-if="!loading && filteredInventories.length > 0" class="px-6 py-4 bg-[#f8f9fa] border-t border-[#f1f5f9] text-xs font-bold text-[#8094ae]">
-          Tổng cộng: {{ filteredInventories.length }} dòng tồn kho
+        <!-- Summary & Pagination footer -->
+        <div v-if="!loading && filteredInventories.length > 0" class="px-6 py-4 bg-[#f8f9fa] border-t border-[#f1f5f9] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-bold text-[#8094ae]">
+          <div>
+            Hiển thị {{ Math.min((currentPage - 1) * itemsPerPage + 1, filteredInventories.length) }} - {{ Math.min(currentPage * itemsPerPage, filteredInventories.length) }} của {{ filteredInventories.length }} dòng tồn kho
+          </div>
+          
+          <div v-if="totalPages >= 1" class="flex items-center gap-1.5">
+            <!-- Prev Button -->
+            <button 
+              :disabled="currentPage === 1" 
+              @click="currentPage--"
+              class="w-8 h-8 rounded-lg border border-[#e2e8f0] bg-white hover:bg-[#e2e8f0]/40 flex items-center justify-center text-[#8094ae] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            >
+              <i class="fas fa-chevron-left text-[10px]"></i>
+            </button>
+            
+            <!-- Page Buttons -->
+            <button 
+              v-for="p in totalPages" 
+              :key="p" 
+              @click="currentPage = p"
+              :class="[
+                'w-8 h-8 rounded-lg border flex items-center justify-center transition-all cursor-pointer font-bold',
+                currentPage === p 
+                  ? 'bg-[#4361ee] border-[#4361ee] text-white shadow-sm shadow-[#4361ee]/20' 
+                  : 'bg-white border-[#e2e8f0] hover:bg-[#e2e8f0]/40 text-[#364a63]'
+              ]"
+            >
+              {{ p }}
+            </button>
+            
+            <!-- Next Button -->
+            <button 
+              :disabled="currentPage === totalPages" 
+              @click="currentPage++"
+              class="w-8 h-8 rounded-lg border border-[#e2e8f0] bg-white hover:bg-[#e2e8f0]/40 flex items-center justify-center text-[#8094ae] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            >
+              <i class="fas fa-chevron-right text-[10px]"></i>
+            </button>
+          </div>
         </div>
       </div>
     </div>
