@@ -38,6 +38,7 @@ public interface AuditLogService {
      * Tìm kiếm log theo nhiều điều kiện lọc (dành cho giao diện quản lý).
      * Tự động giới hạn branchId theo phân quyền của currentUser.
      */
-    List<AuditLog> searchLogs(User currentUser, Integer filterUserId, String action,
-                               LocalDateTime from, LocalDateTime to, String keyword);
+    org.springframework.data.domain.Page<AuditLog> searchLogs(User currentUser, Integer filterUserId, String action, LocalDateTime from, LocalDateTime to, String keyword, org.springframework.data.domain.Pageable pageable);
+
+    void cleanupOldLogs();
 }

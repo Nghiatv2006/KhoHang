@@ -175,7 +175,11 @@ async function handleExcelImport(event: Event) {
     const res = await api.upload('/api/products/import?preview=true', formData)
     const data = await res.json()
     if (res.ok) {
-      importPreviewResult.value = data
+      importPreviewResult.value = {
+        ...data,
+        showNew: true,
+        showUpdate: true
+      }
     } else {
       toast.error(data.message || 'Lỗi phân tích file Excel')
       pendingImportFile.value = null
@@ -823,30 +827,56 @@ function formatCurrency(val: any) {
     <ConfirmDialog :show="showDeleteCat" title="Xóa danh mục" :message="`Bạn có chắc muốn xóa danh mục '${deletingCat?.name}'?`" confirm-text="Xóa" :danger="true" @confirm="doDeleteCat" @cancel="showDeleteCat = false" />
 
     <!-- Import Preview Modal -->
-    <AppModal :show="!!importPreviewResult" title="Phân tích File Excel" size="md" @close="cancelExcelImport">
+    <AppModal :show="!!importPreviewResult" title="Xác nhận dữ liệu nhập" size="md" @close="cancelExcelImport">
       <div class="p-6">
         <div class="text-slate-700 dark:text-slate-300 font-medium mb-4">Hệ thống đã đọc xong file Excel, thống kê trước khi thực hiện:</div>
         
         <div class="space-y-3 mb-6">
-          <div v-if="importPreviewResult?.newCount > 0" class="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-xl border border-blue-100 dark:border-blue-800/50">
-            <i class="fas fa-plus-circle text-lg"></i>
-            <div>Sẽ <strong>thêm mới</strong>: {{ importPreviewResult.newCount }} sản phẩm.</div>
+          <div v-if="importPreviewResult?.newCount > 0" class="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-xl border border-blue-100 dark:border-blue-800/50">
+            <div class="flex items-center gap-3 mb-2 cursor-pointer hover:opacity-80 transition-opacity select-none" @click="importPreviewResult.showNew = !importPreviewResult.showNew">
+              <i class="fas fa-plus-circle text-lg"></i>
+              <div class="flex-1">Sẽ <strong>thêm mới</strong>: {{ importPreviewResult.newCount }} sản phẩm.</div>
+              <i :class="['fas text-sm transition-transform', importPreviewResult.showNew ? 'fa-chevron-up' : 'fa-chevron-down']"></i>
+            </div>
+            <div class="grid transition-[grid-template-rows,opacity] duration-300 ease-in-out" :class="importPreviewResult.showNew ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'">
+              <div class="overflow-hidden">
+                <div class="pl-7 pt-1" v-if="importPreviewResult.newDetails?.length > 0">
+                  <ul class="space-y-2 text-sm max-h-[150px] overflow-y-auto custom-scrollbar pr-2">
+                    <li v-for="(detail, idx) in importPreviewResult.newDetails" :key="idx" class="border-b border-blue-200/50 dark:border-blue-700/50 last:border-0 pb-1.5 last:pb-0">
+                      <div class="font-bold text-blue-900 dark:text-blue-300 mb-0.5">{{ detail.name }}</div>
+                      <div class="text-blue-700/90 dark:text-blue-400/90 pl-3 border-l-2 border-blue-300 dark:border-blue-600 ml-1 text-[13px] leading-relaxed">
+                        <div>• Danh mục: {{ detail.category }}</div>
+                        <div class="flex gap-4">
+                          <span>• Giá nhập: {{ detail.importPrice }}</span>
+                          <span>• Giá bán: {{ detail.price }}</span>
+                        </div>
+                      </div>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
           </div>
           
           <div v-if="importPreviewResult?.updateCount > 0" class="p-3 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded-xl border border-amber-100 dark:border-amber-800/50">
-            <div class="flex items-center gap-3 mb-2">
+            <div class="flex items-center gap-3 mb-2 cursor-pointer hover:opacity-80 transition-opacity select-none" @click="importPreviewResult.showUpdate = !importPreviewResult.showUpdate">
               <i class="fas fa-edit text-lg"></i>
-              <div>Sẽ <strong>cập nhật</strong>: {{ importPreviewResult.updateCount }} sản phẩm.</div>
+              <div class="flex-1">Sẽ <strong>cập nhật</strong>: {{ importPreviewResult.updateCount }} sản phẩm.</div>
+              <i :class="['fas text-sm transition-transform', importPreviewResult.showUpdate ? 'fa-chevron-up' : 'fa-chevron-down']"></i>
             </div>
-            <div class="pl-7">
-              <ul class="space-y-2 text-sm max-h-[150px] overflow-y-auto custom-scrollbar pr-2">
-                <li v-for="(detail, idx) in importPreviewResult.updateDetails" :key="idx" class="border-b border-amber-200/50 dark:border-amber-700/50 last:border-0 pb-1.5 last:pb-0">
-                  <div class="font-bold text-amber-900 dark:text-amber-300 mb-0.5">{{ detail.name }}</div>
-                  <div class="text-amber-700/90 dark:text-amber-400/90 pl-3 border-l-2 border-amber-300 dark:border-amber-600 ml-1 text-[13px] leading-relaxed">
-                    <div v-for="(change, cIdx) in detail.changes" :key="cIdx">• Cập nhật: {{ change }}</div>
-                  </div>
-                </li>
-              </ul>
+            <div class="grid transition-[grid-template-rows,opacity] duration-300 ease-in-out" :class="importPreviewResult.showUpdate ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'">
+              <div class="overflow-hidden">
+                <div class="pl-7 pt-1">
+                  <ul class="space-y-2 text-sm max-h-[150px] overflow-y-auto custom-scrollbar pr-2">
+                    <li v-for="(detail, idx) in importPreviewResult.updateDetails" :key="idx" class="border-b border-amber-200/50 dark:border-amber-700/50 last:border-0 pb-1.5 last:pb-0">
+                      <div class="font-bold text-amber-900 dark:text-amber-300 mb-0.5">{{ detail.name }}</div>
+                      <div class="text-amber-700/90 dark:text-amber-400/90 pl-3 border-l-2 border-amber-300 dark:border-amber-600 ml-1 text-[13px] leading-relaxed">
+                        <div v-for="(change, cIdx) in detail.changes" :key="cIdx">• Cập nhật: {{ change }}</div>
+                      </div>
+                    </li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
 

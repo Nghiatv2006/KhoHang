@@ -865,8 +865,6 @@ public class ReportServiceImpl implements ReportService {
         if (period == null || period.isEmpty()) period = "month";
         switch (period) {
             case "today":
-                sheetConfigs = new String[][]{{"Chi tiết Hóa đơn", "RECEIPT"}};
-                break;
             case "week":
             case "month":
             case "custom":
@@ -1184,8 +1182,6 @@ public class ReportServiceImpl implements ReportService {
         if (period == null || period.isEmpty()) period = "month";
         switch (period) {
             case "today":
-                sheetConfigs = new String[][]{{"Chi tiết Phiếu", "RECEIPT"}};
-                break;
             case "week":
             case "month":
             case "custom":

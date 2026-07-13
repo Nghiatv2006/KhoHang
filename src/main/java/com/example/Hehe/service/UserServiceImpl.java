@@ -197,9 +197,20 @@ public class UserServiceImpl implements UserService {
         User savedUser = userRepository.save(user);
 
         // Ghi Nhật ký
+        String logDetails;
+        if (savedUser.getRole() == UserRole.MANAGER) {
+            String branchName = savedUser.getBranch() != null ? savedUser.getBranch().getName() : "chi nhánh";
+            logDetails = "Bổ nhiệm Quản lý cho " + branchName + ": " + savedUser.getFullName();
+        } else if (savedUser.getRole() == UserRole.STAFF) {
+            logDetails = "Thêm nhân viên kho mới: " + savedUser.getFullName();
+        } else if (savedUser.getRole() == UserRole.ADMIN) {
+            logDetails = "Khởi tạo tài khoản Quản trị hệ thống: " + savedUser.getFullName();
+        } else {
+            logDetails = "Tạo tài khoản mới: " + savedUser.getFullName();
+        }
+
         auditLogService.logAction(currentUser, "CREATE", "users",
-                String.valueOf(savedUser.getId()),
-                "Tạo tài khoản mới: " + savedUser.getFullName() + " (" + savedUser.getUsername() + ") - Vai trò: " + savedUser.getRole().name());
+                String.valueOf(savedUser.getId()), logDetails);
 
         return convertToResponse(savedUser);
     }

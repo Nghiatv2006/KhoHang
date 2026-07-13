@@ -33,7 +33,7 @@ const pageConfig = computed(() => {
       icon: 'fas fa-exchange-alt',
       btnLabel: 'Lập phiếu điều chuyển'
     },
-    ADJUST_OUT: {
+    DISPOSAL: {
       title: 'Quản lý Tiêu Hủy',
       desc: 'Theo dõi, lập và quản lý các phiếu tiêu hủy hàng hóa',
       icon: 'fas fa-trash-alt',

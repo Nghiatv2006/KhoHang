@@ -124,6 +124,8 @@ public class StocktakeServiceImpl implements StocktakeService {
 
         s.setNotes(request.getNotes());
 
+        List<String> changes = new ArrayList<>();
+
         if (request.getDetails() != null) {
             for (StocktakeDetailSaveRequest detailReq : request.getDetails()) {
                 StocktakeDetail d = stocktakeDetailRepository.findById(detailReq.getId())
@@ -137,6 +139,14 @@ public class StocktakeServiceImpl implements StocktakeService {
                     throw new RuntimeException("Số lượng thực tế kiểm đếm không được âm.");
                 }
 
+                if (!d.getActualQuantity().equals(detailReq.getActualQuantity())) {
+                    changes.add(String.format("• %s (Lô: %s): %d -> %d", 
+                        d.getProduct().getName(), 
+                        d.getBatchCode() != null ? d.getBatchCode() : "Mặc định",
+                        d.getActualQuantity(), 
+                        detailReq.getActualQuantity()));
+                }
+
                 d.setActualQuantity(detailReq.getActualQuantity());
                 stocktakeDetailRepository.save(d);
             }
@@ -144,8 +154,10 @@ public class StocktakeServiceImpl implements StocktakeService {
 
         s = stocktakeRepository.save(s);
 
-        logAudit(currentUser, "UPDATE_STOCKTAKE", "stocktakes", s.getId().toString(),
-                "Cập nhật số liệu kiểm kê cho phiên " + s.getCode());
+        if (!changes.isEmpty()) {
+            String detailMessage = "Cập nhật số liệu kiểm kê cho phiên " + s.getCode() + "\n" + String.join("\n", changes);
+            logAudit(currentUser, "UPDATE_STOCKTAKE", "stocktakes", s.getId().toString(), detailMessage);
+        }
 
         return new StocktakeResponse(s);
     }
@@ -265,8 +277,12 @@ public class StocktakeServiceImpl implements StocktakeService {
         s.setStatus(StocktakeStatus.COMPLETED);
         s = stocktakeRepository.save(s);
 
+        String roleStr = currentUser.getRole() == UserRole.ADMIN ? "Admin" : "Quản lý";
+        boolean hasDeviation = !surplusList.isEmpty() || !deficitList.isEmpty();
+        String resultStr = hasDeviation ? "Đã cân bằng tồn kho thực tế." : "Số lượng thực tế khớp với hệ thống, không có chênh lệch.";
+
         logAudit(currentUser, "COMPLETE_STOCKTAKE", "stocktakes", s.getId().toString(),
-                "Manager duyệt hoàn tất phiên kiểm kê " + s.getCode() + ". Đã cân bằng tồn kho thực tế.");
+                roleStr + " duyệt hoàn tất phiên kiểm kê " + s.getCode() + ". " + resultStr);
 
         return new StocktakeResponse(s);
     }

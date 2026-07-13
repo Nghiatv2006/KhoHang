@@ -8,6 +8,9 @@ import com.example.Hehe.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,8 +26,10 @@ public class AuditLogServiceImpl implements AuditLogService {
     private static final int SPAM_WINDOW_SECONDS = 10;     // Cửa sổ thời gian: 10 giây
     private static final int SPAM_WARN_THRESHOLD = 5;      // 5 lần miễn phí, lần thứ 6 bị khóa
     
-    @SuppressWarnings("unused")
-    private static final int BAN_SECONDS = 3;              // Phạt khóa cứng 3 giây
+    // Cấu hình số giây cấm (BAN_SECONDS)
+    private static final int BAN_SECONDS = 3;
+
+    private static final Logger log = LoggerFactory.getLogger(AuditLogServiceImpl.class);
 
     private final AuditLogRepository auditLogRepository;
     
@@ -88,8 +93,8 @@ public class AuditLogServiceImpl implements AuditLogService {
      * Tìm kiếm log theo nhiều điều kiện, tự động giới hạn branchId theo phân quyền.
      */
     @Override
-    public List<AuditLog> searchLogs(User currentUser, Integer filterUserId, String action,
-                                      LocalDateTime from, LocalDateTime to, String keyword) {
+    public org.springframework.data.domain.Page<AuditLog> searchLogs(User currentUser, Integer filterUserId, String action,
+                                      LocalDateTime from, LocalDateTime to, String keyword, org.springframework.data.domain.Pageable pageable) {
         // Xác định branchId được phép xem: ADMIN -> 1, MANAGER/STAFF -> chi nhánh của họ
         Integer branchId;
         if (currentUser.getRole() == UserRole.ADMIN) {
@@ -100,7 +105,25 @@ public class AuditLogServiceImpl implements AuditLogService {
         }
 
         return auditLogRepository.searchLogs(branchId, filterUserId, action, from, to,
-                (keyword != null && keyword.isBlank()) ? null : keyword);
+                (keyword != null && keyword.isBlank()) ? null : keyword, pageable);
+    }
+
+    /**
+     * Tự động chạy dọn dẹp các log cũ hơn 1 năm.
+     * Chạy lúc 00:00:00 mỗi ngày.
+     */
+    @Override
+    @Transactional
+    @Scheduled(cron = "0 0 0 * * ?")
+    public void cleanupOldLogs() {
+        LocalDateTime cutoffDate = LocalDateTime.now().minusYears(1);
+        int deletedCount = auditLogRepository.deleteByCreatedAtBefore(cutoffDate);
+        
+        if (deletedCount > 0) {
+            AuditLog systemLog = new AuditLog(null, 1, "DỌN DẸP", "hệ thống", "", 
+                "Hệ thống đã tự động dọn dẹp vĩnh viễn " + deletedCount + " bản ghi nhật ký quá 1 năm.");
+            auditLogRepository.save(systemLog);
+        }
     }
 
     // ─── Private Helpers ─────────────────────────────────────────────────────

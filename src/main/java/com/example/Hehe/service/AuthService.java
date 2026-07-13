@@ -45,6 +45,11 @@ public class AuthService {
                 user.setBanUntil(java.time.LocalDateTime.now().plusSeconds(30));
                 userRepository.save(user);
                 failedAttempts.remove(user.getUsername());
+                
+                // Ghi vào Nhật ký hệ thống bằng Tiếng Việt thuần túy, rõ ràng tài khoản nào bị khóa
+                String chiTiet = "Tài khoản '" + user.getUsername() + "' đã bị hệ thống tự động khóa tạm thời do cố tình nhập sai mật khẩu quá 5 lần liên tiếp.";
+                auditLogService.logAction(user, "KHÓA TÀI KHOẢN", "users", String.valueOf(user.getId()), chiTiet);
+                
                 throw new RuntimeException("Bạn đã nhập sai mật khẩu quá nhiều lần. Vui lòng thử lại sau.");
             } else {
                 failedAttempts.put(user.getUsername(), attempts);
