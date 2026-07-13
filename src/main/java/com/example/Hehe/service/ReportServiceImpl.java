@@ -1439,19 +1439,36 @@ public class ReportServiceImpl implements ReportService {
 
     @Override
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
-    public java.util.Map<Integer, java.util.List<java.math.BigDecimal>> getBranchSalesTrend30Days() {
-        // Trả về doanh thu xuất bán 30 ngày cho TẤT CẢ chi nhánh (Không phụ thuộc vai trò người dùng)
-        // Điều này phục vụ riêng cho Dashboard để hiện "tất cả chi nhánh" theo yêu cầu.
-        
+    public java.util.Map<Integer, java.util.List<java.math.BigDecimal>> getBranchSalesTrend30Days(User currentUser) {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime thirtyDaysAgoStart = now.minusDays(29).toLocalDate().atStartOfDay();
 
-        List<Receipt> exportReceipts = receiptRepository.findByTypeAndStatus(ReceiptType.EXPORT, ReceiptStatus.COMPLETED);
-        
-        java.util.List<Branch> allBranches = branchRepository.findAll();
+        List<Receipt> exportReceipts;
+        java.util.List<Branch> branchesToQuery;
+
+        boolean isGlobalUser = currentUser.getRole() == UserRole.ADMIN || 
+                               (currentUser.getBranch() != null && currentUser.getBranch().getId() == 1);
+
+        if (isGlobalUser) {
+            exportReceipts = receiptRepository.findByTypeAndStatus(ReceiptType.EXPORT, ReceiptStatus.COMPLETED);
+            branchesToQuery = branchRepository.findAll();
+        } else {
+            Integer myBranchId = currentUser.getBranch() != null ? currentUser.getBranch().getId() : null;
+            if (myBranchId == null) {
+                exportReceipts = java.util.Collections.emptyList();
+                branchesToQuery = java.util.Collections.emptyList();
+            } else {
+                exportReceipts = receiptRepository.findByTypeAndStatusAndSourceBranchId(
+                        ReceiptType.EXPORT, ReceiptStatus.COMPLETED, myBranchId);
+                branchesToQuery = branchRepository.findById(myBranchId)
+                        .map(java.util.List::of)
+                        .orElse(java.util.Collections.emptyList());
+            }
+        }
+
         java.util.Map<Integer, java.util.List<java.math.BigDecimal>> branchSalesMap = new java.util.HashMap<>();
         
-        for (Branch b : allBranches) {
+        for (Branch b : branchesToQuery) {
             java.util.List<java.math.BigDecimal> dailySales = new java.util.ArrayList<>();
             for (int i = 0; i < 30; i++) {
                 dailySales.add(BigDecimal.ZERO);

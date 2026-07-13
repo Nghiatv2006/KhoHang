@@ -11,17 +11,17 @@ const iconMap = {
 }
 
 const colorMap = {
-  success: 'bg-emerald-50 border-emerald-200 text-emerald-800',
-  error: 'bg-red-50 border-red-200 text-red-800',
-  warning: 'bg-amber-50 border-amber-200 text-amber-800',
-  info: 'bg-blue-50 border-blue-200 text-blue-800',
+  success: 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-900/80 dark:border-emerald-400/50 dark:text-emerald-200',
+  error: 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/80 dark:border-red-400/50 dark:text-red-200',
+  warning: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/80 dark:border-amber-400/50 dark:text-amber-200',
+  info: 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/80 dark:border-blue-400/50 dark:text-blue-200',
 }
 
 const iconColorMap = {
-  success: 'text-emerald-500',
-  error: 'text-red-500',
-  warning: 'text-amber-500',
-  info: 'text-blue-500',
+  success: 'text-emerald-500 dark:text-emerald-300',
+  error: 'text-red-500 dark:text-red-300',
+  warning: 'text-amber-500 dark:text-amber-300',
+  info: 'text-blue-500 dark:text-blue-300',
 }
 </script>
 
