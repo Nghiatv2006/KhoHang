@@ -71,4 +71,15 @@ git diff <đường-dẫn-file>
 * **Không dùng từ ngữ gây hoang mang**: Từ ngữ hiển thị phải phản ánh đúng bản chất và phạm vi thực tế của hành động (tạm thời hay vĩnh viễn, cá nhân hay hệ thống). Tránh dùng từ ngữ nặng nề hoặc có nghĩa vĩnh viễn cho các trạng thái tạm thời.
 * **Xác nhận nghiệp vụ trước khi viết thông báo**: Luôn cân nhắc ảnh hưởng của từ ngữ đến người dùng cuối và bộ phận Hỗ trợ (Support) trước khi quyết định nội dung thông báo.
 
+# Quy tắc tối ưu hóa thao tác hệ thống (Hạn chế Git và Quét file)
 
+Để đảm bảo hiệu năng và tránh gây khó chịu cho người dùng, AI phải tuân thủ nghiêm ngặt ranh giới thao tác sau:
+
+1. **Hạn chế tối đa MỌI câu lệnh Git:**
+   - Tuyệt đối không được tự ý/liên tục gọi BẤT KỲ lệnh `git` nào (bao gồm cả `git status`, `git diff`, `git log`, `git show`, `git branch`...).
+   - Chỉ sử dụng Git ở mức độ **ít nhất có thể** hoặc khi có yêu cầu cụ thể của người dùng (như gộp nhánh, khôi phục code).
+
+2. **Hạn chế tối đa việc đọc và tìm kiếm file diện rộng:**
+   - Hạn chế tối đa việc sử dụng công cụ `grep_search` và `view_file` một cách vô tội vạ.
+   - Khi cần phân tích, chỉ được phép khoanh vùng và đọc **1 đến 2 file thực sự liên quan trực tiếp** đến vấn đề đang thảo luận. Không mở rộng phạm vi đọc file sang các file xung quanh nếu không có lý do cực kỳ chính đáng.
+   - Ưu tiên suy luận logic từ các file chính thay vì lạm dụng công cụ tìm kiếm càn quét toàn bộ thư mục.

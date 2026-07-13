@@ -60,8 +60,8 @@ INSERT INTO products (code, name, unit, import_price, price, category_id, has_ex
 ('IP15', 'iPhone 15 Pro Max 256GB', 'Chiếc', 25000000, 29900000, 1, FALSE, '/uploads/images/iphone_15.png', '1970-01-01', '1970-01-01'),
 ('MACM2', 'MacBook Air M2 8GB/256GB', 'Chiếc', 20000000, 25500000, 2, FALSE, '/uploads/images/macbook_air.png', '1970-01-01', '1970-01-01'),
 ('AIRPODS', 'AirPods Pro 2', 'Hộp', 4000000, 5500000, 3, FALSE, '/uploads/images/airpods_pro.png', '1970-01-01', '1970-01-01'),
-('MILK_OLD', 'Sữa tươi tiệt trùng 1L (Lô cũ)', 'Hộp', 20000, 35000, 4, TRUE, '/uploads/images/milk_old.png', '2024-01-01', '2024-07-01'),
-('MILK_NEW', 'Sữa tươi tiệt trùng 1L (Lô mới)', 'Hộp', 20000, 35000, 4, TRUE, '/uploads/images/milk_new.png', '2024-05-01', '2024-11-01'),
+('MILK_OLD', 'Sữa tươi tiệt trùng 1L (Lô cũ)', 'Hộp', 20000, 35000, 4, TRUE, '/uploads/images/milk_old.png', CURRENT_DATE - INTERVAL '150 days', CURRENT_DATE - INTERVAL '30 days'),
+('MILK_NEW', 'Sữa tươi tiệt trùng 1L (Lô mới)', 'Hộp', 20000, 35000, 4, TRUE, '/uploads/images/milk_new.png', CURRENT_DATE - INTERVAL '10 days', CURRENT_DATE + INTERVAL '120 days'),
 ('DELL_U27', 'Màn hình Dell UltraSharp U2723QE', 'Chiếc', 10000000, 12500000, 5, FALSE, '/uploads/images/dell_u27.png', '1970-01-01', '1970-01-01'),
 ('KEYCHRON', 'Bàn phím cơ Keychron K8 Pro', 'Chiếc', 1500000, 2100000, 6, FALSE, '/uploads/images/keychron.png', '1970-01-01', '1970-01-01'),
 ('LOGI_MX', 'Chuột Logitech MX Master 3S', 'Chiếc', 1800000, 2490000, 6, FALSE, '/uploads/images/logi_mx.png', '1970-01-01', '1970-01-01'),
@@ -69,24 +69,28 @@ INSERT INTO products (code, name, unit, import_price, price, category_id, has_ex
 ('S24_ULTRA', 'Samsung Galaxy S24 Ultra 512GB', 'Chiếc', 28000000, 33900000, 1, FALSE, '/uploads/images/s24_ultra.png', '1970-01-01', '1970-01-01');
 
 -- Thêm Tồn kho (Inventories)
-INSERT INTO inventories (branch_id, product_id, mfg_date, exp_date, batch_code, quantity) VALUES
+INSERT INTO inventories (branch_id, product_id, mfg_date, exp_date, batch_code, quantity, has_expiry) VALUES
 -- Tồn tại Chi nhánh Hà Nội
-(1, 1, '1970-01-01', '1970-01-01', 'IP15-HN-001', 50),
-(1, 2, '1970-01-01', '1970-01-01', 'MACM2-HN-001', 20),
-(1, 3, '1970-01-01', '1970-01-01', 'AIR-HN-001', 1),
-(1, 4, '2024-01-01', '2024-07-01', 'MILK-2024A', 100),
-(1, 5, '2024-05-01', '2024-11-01', 'MILK-2024B', 200),
-(1, 6, '1970-01-01', '1970-01-01', 'DELL-HN-001', 15),
-(1, 7, '1970-01-01', '1970-01-01', 'KEY-HN-001', 40),
-(1, 8, '1970-01-01', '1970-01-01', 'MX-HN-001', 35),
+(1, 1, '1970-01-01', '1970-01-01', 'IP15-HN-001', 50, FALSE),
+(1, 2, '1970-01-01', '1970-01-01', 'MACM2-HN-001', 20, FALSE),
+(1, 3, '1970-01-01', '1970-01-01', 'AIR-HN-001', 1, FALSE),
+(1, 4, CURRENT_DATE - INTERVAL '150 days', CURRENT_DATE - INTERVAL '30 days', 'MILK-2024A', 100, TRUE),
+(1, 5, CURRENT_DATE - INTERVAL '10 days', CURRENT_DATE + INTERVAL '120 days', 'MILK-2024B', 200, TRUE),
+(1, 6, '1970-01-01', '1970-01-01', 'DELL-HN-001', 15, FALSE),
+(1, 7, '1970-01-01', '1970-01-01', 'KEY-HN-001', 40, FALSE),
+(1, 8, '1970-01-01', '1970-01-01', 'MX-HN-001', 35, FALSE),
 -- Tồn tại Chi nhánh HCM
-(2, 1, '1970-01-01', '1970-01-01', 'IP15-HCM-001', 12),
-(2, 2, '1970-01-01', '1970-01-01', 'MACM2-HCM-001', 18),
-(2, 6, '1970-01-01', '1970-01-01', 'DELL-HCM-001', 22),
-(2, 9, '1970-01-01', '1970-01-01', 'MAR-HCM-001', 10),
+(2, 1, '1970-01-01', '1970-01-01', 'IP15-HCM-001', 12, FALSE),
+(2, 2, '1970-01-01', '1970-01-01', 'MACM2-HCM-001', 18, FALSE),
+(2, 6, '1970-01-01', '1970-01-01', 'DELL-HCM-001', 22, FALSE),
+(2, 9, '1970-01-01', '1970-01-01', 'MAR-HCM-001', 10, FALSE),
+(2, 4, CURRENT_DATE - INTERVAL '120 days', CURRENT_DATE - INTERVAL '10 days', 'MILK-HCM-OLD', 50, TRUE),
+(2, 5, CURRENT_DATE - INTERVAL '5 days', CURRENT_DATE + INTERVAL '90 days', 'MILK-HCM-NEW', 150, TRUE),
 -- Tồn tại Chi nhánh Đà Nẵng
-(3, 10, '1970-01-01', '1970-01-01', 'S24-DN-001', 30),
-(3, 3, '1970-01-01', '1970-01-01', 'AIR-DN-001', 50);
+(3, 10, '1970-01-01', '1970-01-01', 'S24-DN-001', 30, FALSE),
+(3, 3, '1970-01-01', '1970-01-01', 'AIR-DN-001', 50, FALSE),
+(3, 4, CURRENT_DATE - INTERVAL '110 days', CURRENT_DATE - INTERVAL '5 days', 'MILK-DN-OLD', 40, TRUE),
+(3, 5, CURRENT_DATE - INTERVAL '2 days', CURRENT_DATE + INTERVAL '80 days', 'MILK-DN-NEW', 120, TRUE);
 
 
 -- ==============================================================================
@@ -154,20 +158,20 @@ INSERT INTO receipts (code, type, status, payment_status, source_branch_id, dest
 ('EX20260620', 'EXPORT', 'COMPLETED', 'PAID', 3, NULL, 3, 2, 'Bán MacBook và AirPods ĐN', CURRENT_TIMESTAMP - INTERVAL '5 days'),
 ('EX20260621', 'EXPORT', 'COMPLETED', 'PAID', 1, NULL, 2, 2, 'Bán sữa hộp HN', CURRENT_TIMESTAMP - INTERVAL '3 days');
 
-INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code) VALUES
-((SELECT id FROM receipts WHERE code='EX20260601'), 1, 5, 29900000, 'IP15-HN-001'),
-((SELECT id FROM receipts WHERE code='EX20260603'), 2, 3, 25500000, 'MACM2-HN-001'),
-((SELECT id FROM receipts WHERE code='EX20260605'), 1, 1, 29900000, 'IP15-HN-001'),
-((SELECT id FROM receipts WHERE code='EX20260605'), 3, 4, 5500000, 'AIR-HN-001'),
-((SELECT id FROM receipts WHERE code='EX20260608'), 3, 6, 5500000, 'AIR-HN-001'),
-((SELECT id FROM receipts WHERE code='EX20260610'), 4, 50, 35000, 'MILK-2024A'),
-((SELECT id FROM receipts WHERE code='EX20260610'), 5, 150, 35000, 'MILK-2024B'),
-((SELECT id FROM receipts WHERE code='EX20260612'), 1, 2, 29900000, 'IP15-HN-001'),
-((SELECT id FROM receipts WHERE code='EX20260615'), 2, 4, 25500000, 'MACM2-HN-001'),
-((SELECT id FROM receipts WHERE code='EX20260618'), 1, 8, 29900000, 'IP15-HN-001'),
-((SELECT id FROM receipts WHERE code='EX20260620'), 2, 2, 25500000, 'MACM2-HN-001'),
-((SELECT id FROM receipts WHERE code='EX20260620'), 3, 2, 5500000, 'AIR-HN-001'),
-((SELECT id FROM receipts WHERE code='EX20260621'), 5, 80, 35000, 'MILK-2024B');
+INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code, mfg_date, exp_date) VALUES
+((SELECT id FROM receipts WHERE code='EX20260601'), 1, 5, 29900000, 'IP15-HN-001', '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='EX20260603'), 2, 3, 25500000, 'MACM2-HN-001', '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='EX20260605'), 1, 1, 29900000, 'IP15-HN-001', '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='EX20260605'), 3, 4, 5500000, 'AIR-HN-001', '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='EX20260608'), 3, 6, 5500000, 'AIR-HN-001', '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='EX20260610'), 4, 50, 35000, 'MILK-2024A', CURRENT_DATE - INTERVAL '150 days', CURRENT_DATE - INTERVAL '30 days'),
+((SELECT id FROM receipts WHERE code='EX20260610'), 5, 150, 35000, 'MILK-2024B', CURRENT_DATE - INTERVAL '10 days', CURRENT_DATE + INTERVAL '120 days'),
+((SELECT id FROM receipts WHERE code='EX20260612'), 1, 2, 29900000, 'IP15-HN-001', '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='EX20260615'), 2, 4, 25500000, 'MACM2-HN-001', '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='EX20260618'), 1, 8, 29900000, 'IP15-HN-001', '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='EX20260620'), 2, 2, 25500000, 'MACM2-HN-001', '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='EX20260620'), 3, 2, 5500000, 'AIR-HN-001', '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='EX20260621'), 5, 80, 35000, 'MILK-2024B', CURRENT_DATE - INTERVAL '10 days', CURRENT_DATE + INTERVAL '120 days');
 
 -- Phiếu nhập kho (IMPORT)
 INSERT INTO receipts (code, type, status, payment_status, source_branch_id, dest_branch_id, created_by, customer_id, description, created_at) VALUES
@@ -175,11 +179,11 @@ INSERT INTO receipts (code, type, status, payment_status, source_branch_id, dest
 ('IM20260607', 'IMPORT', 'COMPLETED', 'PAID', NULL, 2, 5, NULL, 'Nhập thêm sữa HCM', CURRENT_TIMESTAMP - INTERVAL '20 days'),
 ('IM20260614', 'IMPORT', 'COMPLETED', 'PAID', NULL, 3, 3, NULL, 'Nhập AirPods Đà Nẵng', CURRENT_TIMESTAMP - INTERVAL '12 days');
 
-INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code) VALUES
-((SELECT id FROM receipts WHERE code='IM20260602'), 1, 10, 29000000, 'IP15-HN-001'),
-((SELECT id FROM receipts WHERE code='IM20260602'), 2, 5, 24000000, 'MACM2-HN-001'),
-((SELECT id FROM receipts WHERE code='IM20260607'), 5, 300, 30000, 'MILK-2024B'),
-((SELECT id FROM receipts WHERE code='IM20260614'), 3, 15, 5000000, 'AIR-HN-001');
+INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code, mfg_date, exp_date) VALUES
+((SELECT id FROM receipts WHERE code='IM20260602'), 1, 10, 29000000, 'IP15-HN-001', '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='IM20260602'), 2, 5, 24000000, 'MACM2-HN-001', '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='IM20260607'), 5, 300, 30000, 'MILK-2024B', CURRENT_DATE - INTERVAL '10 days', CURRENT_DATE + INTERVAL '120 days'),
+((SELECT id FROM receipts WHERE code='IM20260614'), 3, 15, 5000000, 'AIR-HN-001', '1970-01-01', '1970-01-01');
 
 
 -- ==============================================================================
@@ -256,12 +260,30 @@ BEGIN
                     exp_qty := (exp_trend + (p_id % 3)) * 0.8; 
                 END IF;
 
-                INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code)
-                VALUES (r_imp_id, p_id, imp_qty, p_import_price, p_batch || '-BATCH-' || day_offset || '-' || target_branch);
+                IF p_id = 4 OR p_id = 5 THEN
+                    -- Milk (has expiry):
+                    -- Lô cũ (p_id = 4) là hàng hết hạn (exp_date trước curr_date)
+                    -- Lô mới (p_id = 5) là hàng còn hạn (exp_date sau curr_date)
+                    INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code, mfg_date, exp_date)
+                    VALUES (r_imp_id, p_id, imp_qty, p_import_price, p_batch || '-BATCH-' || day_offset || '-' || target_branch,
+                            (curr_date - INTERVAL '150 days')::DATE,
+                            (curr_date + CASE WHEN p_id = 4 THEN -INTERVAL '15 days' ELSE INTERVAL '120 days' END)::DATE);
 
-                IF target_branch > 1 THEN
-                    INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code)
-                    VALUES (r_exp_id, p_id, exp_qty, p_price, p_batch || '-BATCH-' || day_offset || '-' || target_branch);
+                    IF target_branch > 1 THEN
+                        INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code, mfg_date, exp_date)
+                        VALUES (r_exp_id, p_id, exp_qty, p_price, p_batch || '-BATCH-' || day_offset || '-' || target_branch,
+                                (curr_date - INTERVAL '150 days')::DATE,
+                                (curr_date + CASE WHEN p_id = 4 THEN -INTERVAL '15 days' ELSE INTERVAL '120 days' END)::DATE);
+                    END IF;
+                ELSE
+                    -- Các sản phẩm không có hạn sử dụng (has_expiry = false)
+                    INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code, mfg_date, exp_date)
+                    VALUES (r_imp_id, p_id, imp_qty, p_import_price, p_batch || '-BATCH-' || day_offset || '-' || target_branch, '1970-01-01', '1970-01-01');
+
+                    IF target_branch > 1 THEN
+                        INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code, mfg_date, exp_date)
+                        VALUES (r_exp_id, p_id, exp_qty, p_price, p_batch || '-BATCH-' || day_offset || '-' || target_branch, '1970-01-01', '1970-01-01');
+                    END IF;
                 END IF;
             END LOOP;
         END LOOP;
