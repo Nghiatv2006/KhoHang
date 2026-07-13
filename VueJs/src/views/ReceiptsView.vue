@@ -351,6 +351,7 @@ onMounted(loadData)
 // HEAD BRANCH
 // ──────────────────────────────────────────────────────────────
 const headBranch = computed(() => branches.value.find(b => b.isHead) || branches.value[0] || null)
+const isHeadBranch = computed(() => user.value?.branchId === headBranch.value?.id)
 // const subBranches = computed(() => branches.value.filter(b => b.id !== headBranch.value?.id))
 
 // ──────────────────────────────────────────────────────────────
@@ -588,6 +589,7 @@ interface DetailRow {
   expirationDate: string
   quantity: number
   price: number
+  isCollapsed?: boolean
 }
 
 function openCreateModal() {
@@ -610,7 +612,8 @@ function openCreateModal() {
 
 function addDetailRow() {
   const isExternalImport = createForm.value.type === 'IMPORT' && !createForm.value.sourceBranchId;
-  createForm.value.details.push({ categoryId: '', productId: '', batchCode: '', isNewBatch: isExternalImport, hasExpiryDate: false, manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 })
+  const today = new Date().toISOString().split('T')[0];
+    createForm.value.details.push({ categoryId: '', productId: '', batchCode: '', isNewBatch: isExternalImport, hasExpiryDate: false, manufacturingDate: today, expirationDate: today, quantity: 1, price: 0, isCollapsed: false })
 }
 
 function removeDetailRow(index: number) {
@@ -619,7 +622,7 @@ function removeDetailRow(index: number) {
 }
 
 // Chi nhánh hiện tại có phải chi nhánh gốc (Hà Nội) không?
-const isHeadBranch = computed(() => user.value?.branchId === headBranch.value?.id || isAdmin.value || !user.value?.branchId)
+
 
 function onTypeChange() {
   const t = createForm.value.type
@@ -966,11 +969,11 @@ function onBatchChange(row: DetailRow) {
   constrainQuantity(row)
 }
 
-const selectedProductHasExpiry = (row: DetailRow) => {
-  if (!row.productId) return false
-  const p = products.value.find(x => x.id === Number(row.productId))
-  return p?.hasExpiry ?? false
-}
+// const selectedProductHasExpiry = (row: DetailRow) => {
+//   if (!row.productId) return false
+//   const p = products.value.find(x => x.id === Number(row.productId))
+//   return p?.hasExpiry ?? false
+// }
 
 function getMaxQuantity(row: DetailRow) {
   if (!row.productId) return null
@@ -2881,7 +2884,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                         </div>
 
                         <!-- Row 2: NSX, HSD -->
-                        <div v-if="(d.isNewBatch || d.batchCode)" class="grid grid-cols-2 gap-5 pt-4 border-t border-[#e2e8f0]">
+                        <div v-show="!d.isCollapsed" v-if="(d.isNewBatch || d.batchCode)" class="grid grid-cols-2 gap-5 pt-4 border-t border-[#e2e8f0]">
                           <div>
                             <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Ngày sản xuất</label>
                             <input v-model="d.manufacturingDate" type="date" :disabled="!d.isNewBatch"

@@ -276,7 +276,7 @@ async function loadProducts(page = 0) {
   pLoading.value = true
   currentPage.value = page
   try {
-    const res = await api.get(`/api/products?page=${page}&keyword=${pSearch.value.trim()}&categoryId=${pCategoryId.value}`)
+    const res = await api.get(`/api/products?page=${page}&size=50&keyword=${pSearch.value.trim()}&categoryId=${pCategoryId.value}`)
     if (res.ok) {
       const data = await res.json()
       products.value = data.content || data
@@ -289,7 +289,7 @@ async function loadCategories(page = 0) {
   cLoading.value = true
   cCurrentPage.value = page
   try {
-    const res = await api.get(`/api/categories?page=${page}&keyword=${cSearch.value.trim()}`)
+    const res = await api.get(`/api/categories?page=${page}&size=50&keyword=${cSearch.value.trim()}`)
     if (res.ok) {
       const data = await res.json()
       categories.value = data.content || data
