@@ -618,6 +618,8 @@ interface DetailRow {
 function openCreateModal() {
   isSpaceEasterEgg.value = Math.random() < 0.004;
   const defaultType = props.receiptType || ((user.value?.branchId !== headBranch.value?.id && !isManager.value) ? 'IMPORT' : 'EXPORT');
+  const today = new Date().toISOString().split('T')[0];
+  const isImportOrAdjust = (defaultType as string) === 'IMPORT' || (defaultType as string) === 'ADJUST_IN';
   createForm.value = {
     type: defaultType,
     sourceBranchId: user.value?.branchId || headBranch.value?.id || '',
@@ -627,7 +629,7 @@ function openCreateModal() {
     customerPhone: '',
     paymentStatus: 'UNPAID',
     description: '',
-    details: [{ categoryId: '', productId: '', batchCode: '', isNewBatch: false, hasExpiryDate: false, manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 }]
+    details: [{ categoryId: '', productId: '', batchCode: '', isNewBatch: isImportOrAdjust, hasExpiryDate: false, manufacturingDate: today, expirationDate: today, quantity: 1, price: 0, isCollapsed: false }]
   }
   onTypeChange()
   showCreateModal.value = true
@@ -897,11 +899,11 @@ function onProductChange(row: DetailRow) {
     row.quantity = 1 // Reset quantity to 1 when changing to a valid product
     row.price = Number(p.price) || 0
     if (!p.hasExpiry) {
-      row.manufacturingDate = '1970-01-01'
-      row.expirationDate = '1970-01-01'
+      row.manufacturingDate = new Date().toISOString().split('T')[0]
+      row.expirationDate = new Date().toISOString().split('T')[0]
     } else {
-      row.manufacturingDate = ''
-      row.expirationDate = ''
+      row.manufacturingDate = new Date().toISOString().split('T')[0]
+      row.expirationDate = new Date().toISOString().split('T')[0]
     }
   } else {
     row.quantity = 0 // Reset to 0 if no product is selected
@@ -2744,12 +2746,6 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                     <option value="TRANSFER">Điều chuyển</option>
                   </select>
                 </div>
-                <div v-else>
-                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Loại phiếu</label>
-                  <input type="text" disabled
-                    :value="receiptType === 'IMPORT' ? '📥 Nhập kho' : receiptType === 'EXPORT' ? '📤 Hóa đơn' : receiptType === 'DISPOSAL' ? '🗑️ Tiêu hủy' : '🔄 Điều chuyển'"
-                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm bg-[#f1f5f9] text-[#8094ae] cursor-not-allowed" />
-                </div>
                 <div v-if="createForm.type === 'IMPORT'">
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh nguồn</label>
                   <select v-model="createForm.sourceBranchId" disabled
@@ -2848,15 +2844,21 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                     class="border border-[#e2e8f0] rounded-xl p-4 bg-white space-y-3">
                     <div class="flex items-center justify-between">
                       <span class="text-xs font-bold text-[#8094ae]">Dòng {{ idx + 1 }}</span>
-                      <button v-if="createForm.details.length > 1" @click="removeDetailRow(idx)"
-                        class="w-6 h-6 flex items-center justify-center rounded bg-red-50 text-red-400 hover:bg-red-500 hover:text-white transition-all">
-                        <i class="fas fa-times text-xs"></i>
-                      </button>
+                      <div class="flex items-center gap-2">
+                        <button @click.prevent="d.isCollapsed = !d.isCollapsed"
+                          class="w-6 h-6 flex items-center justify-center rounded bg-slate-50 text-slate-400 hover:bg-slate-200 transition-all" title="Thu nhỏ/Phóng to">
+                          <i :class="d.isCollapsed ? 'fas fa-chevron-down' : 'fas fa-chevron-up'" class="text-xs"></i>
+                        </button>
+                        <button v-if="createForm.details.length > 1" @click="removeDetailRow(idx)"
+                          class="w-6 h-6 flex items-center justify-center rounded bg-red-50 text-red-400 hover:bg-red-500 hover:text-white transition-all">
+                          <i class="fas fa-times text-xs"></i>
+                        </button>
+                      </div>
                     </div>
                     <div class="space-y-4">
                       <!-- Sản phẩm & Lô sản xuất (Chiếm toàn bộ chiều ngang) -->
                       <div class="grid grid-cols-12 gap-4">
-                        <div class="col-span-12 lg:col-span-4">
+                        <div class="col-span-12 lg:col-span-3">
                           <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Danh mục</label>
                           <select v-model="d.categoryId" @change="d.productId = ''; onProductChange(d)"
                             class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none bg-white">
@@ -2876,7 +2878,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                             </div>
                         </div>
                         
-                        <div class="col-span-12 lg:col-span-4" v-if="d.productId">
+                        <div class="col-span-12 lg:col-span-5" v-if="d.productId">
                           <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Lô sản xuất <span class="text-red-500">*</span></label>
                           <div class="flex gap-2">
                             <select v-if="!d.isNewBatch" v-model="d.batchCode" @change="onBatchChange(d)"
@@ -2889,7 +2891,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                             <input v-else v-model="d.batchCode" type="text" placeholder="Nhập mã lô mới..."
                               class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium outline-none focus:border-[#4361ee]" />
                             
-                            <button v-if="createForm.type === 'IMPORT' && createForm.sourceBranchId === createForm.destBranchId && createForm.sourceBranchId" @click="d.isNewBatch = !d.isNewBatch; d.batchCode = ''" 
+                            <button v-if="createForm.type === 'IMPORT' || createForm.type === 'ADJUST_IN'" @click="d.isNewBatch = !d.isNewBatch; d.batchCode = ''" 
                                     class="px-3 h-10 border border-[#e2e8f0] rounded-xl text-xs font-bold bg-white hover:bg-gray-50 whitespace-nowrap shadow-sm transition-all text-[#364a63]">
                               <i :class="d.isNewBatch ? 'fas fa-list text-[#4361ee] mr-1' : 'fas fa-plus text-[#10b981] mr-1'"></i> {{ d.isNewBatch ? 'Chọn lô có sẵn' : 'Tạo lô mới' }}
                             </button>
@@ -2898,7 +2900,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                       </div>
 
                       <!-- Thông tin Số lượng, Tiền & NSX/HSD (Nhóm trong khung nền xám nhạt để dễ nhìn) -->
-                      <div v-if="d.productId" class="p-4 bg-[#f8f9fa] rounded-xl border border-[#e2e8f0] space-y-4">
+                      <div v-if="d.productId" class="p-4 bg-[#f8f9fa] rounded-xl border border-[#e2e8f0] space-y-4" v-show="!d.isCollapsed">
                         <!-- Row 1: Số lượng, Đơn giá, Thành tiền -->
                         <div :class="(createForm.type === 'IMPORT' || createForm.type === 'TRANSFER' || createForm.type === 'DISPOSAL') ? 'grid grid-cols-1' : 'grid grid-cols-3 gap-5'">
                           <div>
