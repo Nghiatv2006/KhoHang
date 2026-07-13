@@ -147,12 +147,16 @@ public class ReceiptServiceImpl implements ReceiptService {
             }
             
             if (currentUser.getRole() == UserRole.STAFF) {
-                boolean isMyReceipt = r.getCreatedBy() != null && r.getCreatedBy().getId().equals(currentUser.getId());
-                boolean isIncoming = (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.TRANSFER) 
-                                     && r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId)
-                                     && (r.getStatus() != ReceiptStatus.DRAFT && r.getStatus() != ReceiptStatus.PENDING_ADMIN);
-                if (!isMyReceipt && !isIncoming) {
-                    throw new RuntimeException("Bạn không có quyền xem phiếu này.");
+                if (r.getType() == ReceiptType.EXPORT) {
+                    // Allowed since it's already verified to belong to the branch
+                } else {
+                    boolean isMyReceipt = r.getCreatedBy() != null && r.getCreatedBy().getId().equals(currentUser.getId());
+                    boolean isIncoming = (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.TRANSFER) 
+                                         && r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId)
+                                         && (r.getStatus() != ReceiptStatus.DRAFT && r.getStatus() != ReceiptStatus.PENDING_ADMIN);
+                    if (!isMyReceipt && !isIncoming) {
+                        throw new RuntimeException("Bạn không có quyền xem phiếu này.");
+                    }
                 }
             }
         }
@@ -189,6 +193,7 @@ public class ReceiptServiceImpl implements ReceiptService {
                     if (!relatedToBranch) return false;
                     
                     if (currentUser.getRole() == UserRole.STAFF) {
+                        if (r.getType() == ReceiptType.EXPORT) return true;
                         boolean isMyReceipt = r.getCreatedBy() != null && r.getCreatedBy().getId().equals(currentUser.getId());
                         boolean isIncoming = (r.getType() == ReceiptType.IMPORT || r.getType() == ReceiptType.TRANSFER) 
                                              && r.getDestBranch() != null && r.getDestBranch().getId().equals(myBranchId)
