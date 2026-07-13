@@ -153,8 +153,8 @@ const mainNavItems = computed(() => {
   const isHeadBranch = user.value?.branchName?.includes('Hà Nội') || user.value?.branch?.isHead === true;
   if (!isHeadBranch) {
     items.push({ label: 'Hóa đơn', to: '/invoices', icon: 'fas fa-file-invoice-dollar', badge: badgeInvoice.value })
-    items.push({ label: 'Điều chuyển', to: '/transfers', icon: 'fas fa-exchange-alt', badge: badgeTransfer.value })
   }
+  items.push({ label: 'Điều chuyển', to: '/transfers', icon: 'fas fa-exchange-alt', badge: badgeTransfer.value })
   
   items.push({ label: 'Tiêu hủy', to: '/disposals', icon: 'fas fa-trash-alt', badge: badgeDisposal.value })
   if (hasCrudPermission.value) {

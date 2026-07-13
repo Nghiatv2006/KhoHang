@@ -263,6 +263,8 @@ const filteredReceipts = computed(() => {
   if (filterStatus.value) {
     if (filterStatus.value === 'UNPAID') {
       result = result.filter(r => r.type === 'EXPORT' && r.status === 'COMPLETED' && (r.paymentStatus === 'UNPAID' || r.paymentStatus === 'Chưa thanh toán'))
+    } else if (filterStatus.value === 'COMPENSATION') {
+      result = result.filter(r => r.code && r.code.startsWith('COMP-'))
     } else {
       result = result.filter(r => r.status === filterStatus.value || r.paymentStatus === filterStatus.value)
     }
@@ -333,7 +335,10 @@ async function loadData() {
     }
     if (bRes.ok) branches.value = await bRes.json()
     if (cRes.ok) customers.value = await cRes.json()
-    if (catRes.ok) categories.value = await catRes.json()
+    if (catRes.ok) {
+      const catData = await catRes.json()
+      categories.value = catData.content || catData
+    }
   } catch (e: any) {
     toast.error('Lỗi tải dữ liệu: ' + e.message)
   } finally {
@@ -358,7 +363,12 @@ const statCancelled = computed(() => typeFilteredReceipts.value.filter(r => r.st
 const statUnpaid = computed(() => typeFilteredReceipts.value.filter(r => r.type === 'EXPORT' && r.status === 'COMPLETED' && (r.paymentStatus === 'UNPAID' || r.paymentStatus === 'Chưa thanh toán')).length)
 
 // Nhập kho: Chờ Admin duyệt
-const statPendingAdmin = computed(() => typeFilteredReceipts.value.filter(r => r.status === 'PENDING_ADMIN').length)
+const statPendingAdmin = computed(() => {
+  if (props.receiptType === 'TRANSFER') {
+    return typeFilteredReceipts.value.filter(r => r.code && r.code.startsWith('COMP-')).length;
+  }
+  return typeFilteredReceipts.value.filter(r => r.status === 'PENDING_ADMIN').length;
+})
 
 // ──────────────────────────────────────────────────────────────
 // DETAIL PANEL
@@ -569,9 +579,11 @@ function onCustomerInput() {
 }
 
 interface DetailRow {
+  categoryId: number | ''
   productId: number | ''
   batchCode: string
   isNewBatch?: boolean
+  hasExpiryDate?: boolean
   manufacturingDate: string
   expirationDate: string
   quantity: number
@@ -590,14 +602,15 @@ function openCreateModal() {
     customerPhone: '',
     paymentStatus: 'UNPAID',
     description: '',
-    details: [{ productId: '', batchCode: '', isNewBatch: false, manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 }]
+    details: [{ categoryId: '', productId: '', batchCode: '', isNewBatch: false, hasExpiryDate: false, manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 }]
   }
   onTypeChange()
   showCreateModal.value = true
 }
 
 function addDetailRow() {
-  createForm.value.details.push({ productId: '', batchCode: '', isNewBatch: false, manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 })
+  const isExternalImport = createForm.value.type === 'IMPORT' && !createForm.value.sourceBranchId;
+  createForm.value.details.push({ categoryId: '', productId: '', batchCode: '', isNewBatch: isExternalImport, hasExpiryDate: false, manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 })
 }
 
 function removeDetailRow(index: number) {
@@ -606,7 +619,7 @@ function removeDetailRow(index: number) {
 }
 
 // Chi nhánh hiện tại có phải chi nhánh gốc (Hà Nội) không?
-const isHeadBranch = computed(() => user.value?.branchId === headBranch.value?.id)
+const isHeadBranch = computed(() => user.value?.branchId === headBranch.value?.id || isAdmin.value || !user.value?.branchId)
 
 function onTypeChange() {
   const t = createForm.value.type
@@ -627,7 +640,8 @@ function onTypeChange() {
     createForm.value.destBranchId = ''
   }
   // Reset products when changing type to avoid stale/out-of-stock products
-  createForm.value.details = [{ productId: '', batchCode: '', manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 }]
+  const isExternalImport = createForm.value.type === 'IMPORT' && !createForm.value.sourceBranchId;
+  createForm.value.details = [{ categoryId: '', productId: '', batchCode: '', isNewBatch: isExternalImport, hasExpiryDate: false, manufacturingDate: '', expirationDate: '', quantity: 1, price: 0 }]
 }
 
 const sourceInventories = ref<any[]>([])
@@ -814,19 +828,40 @@ const availableProducts = computed(() => {
 })
 
 function getAvailableProductsForRow(index: number) {
+  const row = createForm.value.details[index];
   const selectedIds = new Set(
     createForm.value.details
       .map((d, i) => i !== index ? Number(d.productId) : null)
       .filter(id => id !== null && !isNaN(id))
   )
-  return availableProducts.value.filter(p => !selectedIds.has(p.id))
+  let products = availableProducts.value.filter(p => !selectedIds.has(p.id));
+  if (row.categoryId) {
+    products = products.filter(p => p.categoryId === Number(row.categoryId));
+  }
+  return products;
+}
+
+function getAvailableCategoriesForRow(index: number) {
+  const row = createForm.value.details[index];
+  const selectedIds = new Set(
+    createForm.value.details
+      .map((d, i) => i !== index ? Number(d.productId) : null)
+      .filter(id => id !== null && !isNaN(id))
+  )
+  const remainingProducts = availableProducts.value.filter(p => !selectedIds.has(p.id));
+  const categoryIdsWithProducts = new Set(remainingProducts.map(p => p.categoryId));
+  if (row.categoryId) {
+    categoryIdsWithProducts.add(Number(row.categoryId));
+  }
+  return categories.value.filter(c => categoryIdsWithProducts.has(c.id));
 }
 
 function onProductChange(row: DetailRow) {
   const p = products.value.find(x => x.id === Number(row.productId))
   row.batchCode = ''
-  row.isNewBatch = false
+  row.isNewBatch = (createForm.value.type === 'IMPORT' && !createForm.value.sourceBranchId) ? true : false;
   if (p) {
+    row.categoryId = p.categoryId || ''
     row.quantity = 1 // Reset quantity to 1 when changing to a valid product
     row.price = Number(p.price) || 0
     if (!p.hasExpiry) {
@@ -841,6 +876,16 @@ function onProductChange(row: DetailRow) {
     row.price = 0
   }
   constrainQuantity(row)
+
+  // Tự động dọn dẹp danh mục bị kẹt cho các dòng khác chưa chọn sản phẩm
+  createForm.value.details.forEach((d, idx) => {
+    if (d !== row && d.categoryId && !d.productId) {
+      const availProds = getAvailableProductsForRow(idx).filter(p => p.categoryId === Number(d.categoryId));
+      if (availProds.length === 0) {
+        d.categoryId = '';
+      }
+    }
+  });
 }
 
 function getBatchesForProduct(productId: number | string | null) {
@@ -911,7 +956,12 @@ function onBatchChange(row: DetailRow) {
   const inv = globalInventories.value.find(x => x.productId === Number(row.productId) && x.batchCode === row.batchCode)
   if (inv) {
     if (inv.manufacturingDate && inv.manufacturingDate !== '1970-01-01') row.manufacturingDate = inv.manufacturingDate
-    if (inv.expirationDate && inv.expirationDate !== '1970-01-01') row.expirationDate = inv.expirationDate
+    if (inv.expirationDate && inv.expirationDate !== '1970-01-01' && !inv.expirationDate.startsWith('2099')) {
+      row.hasExpiryDate = true
+      row.expirationDate = inv.expirationDate
+    } else {
+      row.hasExpiryDate = false
+    }
   }
   constrainQuantity(row)
 }
@@ -1010,6 +1060,14 @@ async function submitCreateDraft() {
     toast.error('Vui lòng điền đầy đủ sản phẩm, lô sản xuất và số lượng hợp lệ.')
     return
   }
+  for (const d of f.details) {
+    if (d.hasExpiryDate && d.manufacturingDate && d.expirationDate) {
+      if (new Date(d.expirationDate) < new Date(d.manufacturingDate)) {
+        toast.error('Hạn sử dụng không được nhỏ hơn Ngày sản xuất.');
+        return;
+      }
+    }
+  }
   if (f.type === 'EXPORT') {
     if (!f.customerName?.trim()) {
       toast.error('Vui lòng nhập tên khách hàng khi xuất bán.')
@@ -1051,7 +1109,7 @@ async function submitCreateDraft() {
       quantity: d.quantity,
       price: d.price,
       manufacturingDate: d.manufacturingDate || '1970-01-01',
-      expirationDate: d.expirationDate || '2099-12-31',
+      expirationDate: d.hasExpiryDate ? (d.expirationDate || '2099-12-31') : '2099-12-31',
     }))
   }
 
@@ -1397,7 +1455,7 @@ async function compensateShortfall(receipt: any) {
 // HELPERS
 // ──────────────────────────────────────────────────────────────
 function formatDate(s: string) {
-  if (!s || s.startsWith('1970-01-01')) return '-'
+  if (!s || s.startsWith('1970-01-01') || s.startsWith('2099-12-31')) return '-'
   try { return new Date(s).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) }
   catch { return s }
 }
@@ -1911,7 +1969,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
         </button>
 
         <button
-          v-if="user?.role === 'STAFF'"
+          v-if="user?.role === 'STAFF' && !(receiptType === 'TRANSFER' && isHeadBranch)"
           @click="openCreateModal"
           class="h-[42px] bg-[#4361ee] hover:bg-[#3a0ca3] text-white px-5 rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-2"
         >
@@ -1967,13 +2025,13 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
       </div>
 
       <!-- Nhập kho / Điều chuyển: card Chờ Admin -->
-      <div v-if="receiptType === 'IMPORT' || receiptType === 'TRANSFER'" @click="filterStatus = filterStatus === 'PENDING_ADMIN' ? '' : 'PENDING_ADMIN'"
-        :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'PENDING_ADMIN' ? 'border-blue-400 ring-2 ring-blue-200' : 'border-[#f1f5f9] hover:border-blue-300']">
+      <div v-if="receiptType === 'IMPORT' || receiptType === 'TRANSFER'" @click="filterStatus = filterStatus === (receiptType === 'TRANSFER' ? 'COMPENSATION' : 'PENDING_ADMIN') ? '' : (receiptType === 'TRANSFER' ? 'COMPENSATION' : 'PENDING_ADMIN')"
+        :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === (receiptType === 'TRANSFER' ? 'COMPENSATION' : 'PENDING_ADMIN') ? 'border-blue-400 ring-2 ring-blue-200' : 'border-[#f1f5f9] hover:border-blue-300']">
         <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500 text-xl">
-          <i class="fas fa-shield-alt"></i>
+          <i :class="receiptType === 'TRANSFER' ? 'fas fa-truck-loading' : 'fas fa-shield-alt'"></i>
         </div>
         <div>
-          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide">Chờ Admin</div>
+          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide">{{ receiptType === 'TRANSFER' ? 'Điều chuyển bù' : 'Chờ Admin' }}</div>
           <div class="text-2xl font-extrabold text-blue-500">{{ statPendingAdmin }}</div>
         </div>
       </div>
@@ -2130,7 +2188,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                 <div v-else class="text-xs text-slate-400">—</div>
               </td>
               <td class="px-5 py-4">
-                <span class="text-[#364a63] font-medium">{{ r.sourceBranchName || '—' }}</span>
+                <span class="text-[#364a63] font-medium">{{ r.sourceBranchName || 'Bên ngoài hệ thống' }}</span>
               </td>
               <td class="px-5 py-4">
                 <span class="text-[#364a63] font-medium" v-if="r.type === 'EXPORT'">{{ getCustomerName(r) }}</span>
@@ -2303,7 +2361,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
               </div>
               <div>
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Chi nhánh nguồn</div>
-                <div class="font-semibold text-[#364a63]">{{ selectedReceipt.sourceBranchName || '—' }}</div>
+                <div class="font-semibold text-[#364a63]">{{ selectedReceipt.sourceBranchName || 'Bên ngoài hệ thống' }}</div>
               </div>
               <div v-if="selectedReceipt.type === 'EXPORT'">
                 <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Khách hàng</div>
@@ -2359,7 +2417,11 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                   <tbody class="divide-y divide-[#f1f5f9]">
                     <tr v-for="d in selectedReceipt.details" :key="d.id" class="hover:bg-[#f8f9fa]/50">
                       <td class="px-4 py-3">
+                        <div class="text-[10px] text-[#8094ae] uppercase tracking-wider mb-0.5 font-bold" v-if="d.productCategory">{{ d.productCategory }}</div>
                         <div class="font-semibold text-[#364a63]">{{ d.productName }}</div>
+                        <div class="text-[11px] text-[#8094ae] mt-1" v-if="d.batchCode">
+                          <i class="fas fa-box-open mr-1 opacity-70"></i> Lô: <span class="font-bold text-[#4361ee]">{{ d.batchCode }}</span>
+                        </div>
                       </td>
                       <td class="px-4 py-3 text-center text-[#8094ae]">{{ formatDate(d.manufacturingDate) }}</td>
                       <td class="px-4 py-3 text-center text-[#8094ae]">{{ formatDate(d.expirationDate) }}</td>
@@ -2738,16 +2800,27 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                     <div class="space-y-4">
                       <!-- Sản phẩm & Lô sản xuất (Chiếm toàn bộ chiều ngang) -->
                       <div class="grid grid-cols-12 gap-4">
-                        <div class="col-span-12 lg:col-span-6">
-                          <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Sản phẩm <span class="text-red-500">*</span></label>
-                          <select v-model="d.productId" @change="onProductChange(d)"
+                        <div class="col-span-12 lg:col-span-4">
+                          <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Danh mục</label>
+                          <select v-model="d.categoryId" @change="d.productId = ''; onProductChange(d)"
                             class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none bg-white">
-                            <option value="">-- Chọn sản phẩm --</option>
-                            <option v-for="p in getAvailableProductsForRow(idx)" :key="p.id" :value="p.id">{{ p.name }} ({{ p.sku }})</option>
+                            <option value="">-- Tất cả --</option>
+                            <option v-for="c in getAvailableCategoriesForRow(idx)" :key="c.id" :value="c.id">{{ c.name }}</option>
                           </select>
                         </div>
+                        <div class="col-span-12 lg:col-span-4">
+                          <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Sản phẩm <span class="text-red-500">*</span></label>
+                            <select v-if="getAvailableProductsForRow(idx).length > 0" v-model="d.productId" @change="onProductChange(d)"
+                              class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none bg-white">
+                              <option value="">-- Chọn sản phẩm --</option>
+                              <option v-for="p in getAvailableProductsForRow(idx)" :key="p.id" :value="p.id">{{ p.name }} ({{ p.sku }})</option>
+                            </select>
+                            <div v-else class="w-full h-10 px-3 border border-dashed border-[#cbd5e1] bg-[#f8fafc] rounded-xl text-sm text-[#94a3b8] flex items-center justify-center italic">
+                              Chưa có sản phẩm
+                            </div>
+                        </div>
                         
-                        <div class="col-span-12 lg:col-span-6" v-if="d.productId">
+                        <div class="col-span-12 lg:col-span-4" v-if="d.productId">
                           <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Lô sản xuất <span class="text-red-500">*</span></label>
                           <div class="flex gap-2">
                             <select v-if="!d.isNewBatch" v-model="d.batchCode" @change="onBatchChange(d)"
@@ -2760,7 +2833,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                             <input v-else v-model="d.batchCode" type="text" placeholder="Nhập mã lô mới..."
                               class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium outline-none focus:border-[#4361ee]" />
                             
-                            <button v-if="createForm.type === 'IMPORT' && createForm.sourceBranchId === createForm.destBranchId" @click="d.isNewBatch = !d.isNewBatch; d.batchCode = ''" 
+                            <button v-if="createForm.type === 'IMPORT' && createForm.sourceBranchId === createForm.destBranchId && createForm.sourceBranchId" @click="d.isNewBatch = !d.isNewBatch; d.batchCode = ''" 
                                     class="px-3 h-10 border border-[#e2e8f0] rounded-xl text-xs font-bold bg-white hover:bg-gray-50 whitespace-nowrap shadow-sm transition-all text-[#364a63]">
                               <i :class="d.isNewBatch ? 'fas fa-list text-[#4361ee] mr-1' : 'fas fa-plus text-[#10b981] mr-1'"></i> {{ d.isNewBatch ? 'Chọn lô có sẵn' : 'Tạo lô mới' }}
                             </button>
@@ -2808,16 +2881,22 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                         </div>
 
                         <!-- Row 2: NSX, HSD -->
-                        <div v-if="selectedProductHasExpiry(d) && (d.isNewBatch || d.batchCode)" class="grid grid-cols-2 gap-5 pt-4 border-t border-[#e2e8f0]">
+                        <div v-if="(d.isNewBatch || d.batchCode)" class="grid grid-cols-2 gap-5 pt-4 border-t border-[#e2e8f0]">
                           <div>
                             <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Ngày sản xuất</label>
                             <input v-model="d.manufacturingDate" type="date" :disabled="!d.isNewBatch"
                               class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-gray-100 disabled:text-gray-500" />
                           </div>
                           <div>
-                            <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Hạn sử dụng</label>
-                            <input v-model="d.expirationDate" type="date" :disabled="!d.isNewBatch"
+                            <label class="flex items-center gap-2 text-xs font-bold text-[#8094ae] uppercase mb-1.5" :class="d.isNewBatch ? 'cursor-pointer' : ''">
+                              <input type="checkbox" v-model="d.hasExpiryDate" class="w-3.5 h-3.5 rounded border-gray-300 text-[#4361ee] focus:ring-[#4361ee]" :disabled="!d.isNewBatch" />
+                              Hạn sử dụng
+                            </label>
+                            <input v-if="d.hasExpiryDate" v-model="d.expirationDate" type="date" :disabled="!d.isNewBatch"
                               class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-gray-100 disabled:text-gray-500" />
+                            <div v-else class="w-full h-10 px-3 border border-dashed border-[#cbd5e1] bg-[#f8fafc] rounded-xl text-sm text-[#94a3b8] flex items-center italic" :class="{'opacity-50 cursor-not-allowed': !d.isNewBatch}">
+                              Không quản lý HSD
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -2844,6 +2923,8 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
         </div>
       </Transition>
     </Teleport>
+
+
 
     <!-- ═══════════════════════════════════════════════════════════ -->
     <!-- STOCKTAKE MODAL (IMPORT) -->

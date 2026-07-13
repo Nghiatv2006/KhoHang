@@ -197,10 +197,6 @@ public class ReceiptServiceImpl implements ReceiptService {
         
         if (request.getSourceBranchId() != null) {
             r.setSourceBranch(branchRepository.findById(request.getSourceBranchId()).orElseThrow(() -> new RuntimeException("Source branch not found")));
-        } else if (request.getType() == ReceiptType.IMPORT) {
-            Branch head = branchRepository.findByIsHeadTrue().stream().findFirst()
-                    .orElseGet(() -> branchRepository.findById(1).orElse(null));
-            r.setSourceBranch(head);
         }
         
         if (request.getDestBranchId() != null) {
@@ -939,7 +935,9 @@ public class ReceiptServiceImpl implements ReceiptService {
                 }
                 if (shouldRevertSource) {
                     for (ReceiptDetail d : r.getDetails()) {
-                        addInventory(r.getSourceBranch(), d, d.getQuantity());
+                        if (r.getSourceBranch() != null) {
+                            addInventory(r.getSourceBranch(), d, d.getQuantity());
+                        }
                     }
                 }
                 receiptRepository.save(r);
@@ -963,47 +961,45 @@ public class ReceiptServiceImpl implements ReceiptService {
             }
             
             // Admin approves -> Tự động sinh phiếu bù và hoàn tất phiếu gốc
-            boolean isInternalTransfer = r.getSourceBranch() != null;
-            if (isInternalTransfer) {
-                // Tạo phiếu điều chuyển bù
-                Receipt newTransfer = new Receipt();
-                newTransfer.setCode("COMP-" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase());
-                newTransfer.setType(ReceiptType.TRANSFER);
-                newTransfer.setStatus(ReceiptStatus.PENDING_STOCKTAKE); // Đẩy thẳng lên chờ Kiểm kê (hàng đang trên đường đi)
-                newTransfer.setSourceBranch(r.getSourceBranch());
-                newTransfer.setDestBranch(r.getDestBranch());
-                newTransfer.setCreatedBy(currentUser);
-                newTransfer.setCreatedAt(java.time.LocalDateTime.now());
-                newTransfer.setDescription("Phiếu điều chuyển bù hao hụt cho phiếu " + r.getCode());
-                
-                java.util.List<ReceiptDetail> newDetails = new java.util.ArrayList<>();
-                for (ReceiptDetail d : r.getDetails()) {
-                    if (d.getReceivedQuantity() != null && d.getReceivedQuantity() < d.getQuantity()) {
-                        int shortfallQty = d.getQuantity() - d.getReceivedQuantity();
-                        
-                        // Trừ tồn kho tại chi nhánh nguồn
+            // Tạo phiếu bù cho tất cả (kể cả từ ngoài hệ thống)
+            Receipt newTransfer = new Receipt();
+            newTransfer.setCode("COMP-" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+            newTransfer.setType(ReceiptType.TRANSFER);
+            newTransfer.setStatus(ReceiptStatus.PENDING_STOCKTAKE); // Đẩy thẳng lên chờ Kiểm kê (hàng đang trên đường đi)
+            newTransfer.setSourceBranch(r.getType() == ReceiptType.IMPORT ? null : r.getSourceBranch());
+            newTransfer.setDestBranch(r.getDestBranch());
+            newTransfer.setCreatedBy(currentUser);
+            newTransfer.setCreatedAt(java.time.LocalDateTime.now());
+            newTransfer.setDescription("Phiếu điều chuyển bù hao hụt cho phiếu " + r.getCode());
+            
+            java.util.List<ReceiptDetail> newDetails = new java.util.ArrayList<>();
+            for (ReceiptDetail d : r.getDetails()) {
+                if (d.getReceivedQuantity() != null && d.getReceivedQuantity() < d.getQuantity()) {
+                    int shortfallQty = d.getQuantity() - d.getReceivedQuantity();
+                    
+                    // Trừ tồn kho tại chi nhánh nguồn nếu là nội bộ và không phải là nhập ngoài
+                    if (r.getSourceBranch() != null && r.getType() != ReceiptType.IMPORT) {
                         addInventory(r.getSourceBranch(), d, -shortfallQty);
-                        
-                        // Không cộng thẳng vào kho đích nữa, để cho staff kiểm kê phiếu bù
-                        
-                        ReceiptDetail newDetail = new ReceiptDetail();
-                        newDetail.setReceipt(newTransfer);
-                        newDetail.setProduct(d.getProduct());
-                        newDetail.setQuantity(shortfallQty);
-                        newDetail.setPrice(d.getPrice());
-                        newDetail.setManufacturingDate(d.getManufacturingDate());
-                        newDetail.setExpirationDate(d.getExpirationDate());
-                        newDetails.add(newDetail);
                     }
+                    
+                    ReceiptDetail newDetail = new ReceiptDetail();
+                    newDetail.setReceipt(newTransfer);
+                    newDetail.setProduct(d.getProduct());
+                    newDetail.setQuantity(shortfallQty);
+                    newDetail.setPrice(d.getPrice());
+                    newDetail.setBatchCode(d.getBatchCode());
+                    newDetail.setManufacturingDate(d.getManufacturingDate());
+                    newDetail.setExpirationDate(d.getExpirationDate());
+                    newDetails.add(newDetail);
                 }
-                
-                if (newDetails.isEmpty()) {
-                    throw new RuntimeException("Không tìm thấy hàng hóa nào bị thiếu hụt.");
-                }
-                
-                newTransfer.setDetails(newDetails);
-                receiptRepository.save(newTransfer);
             }
+            
+            if (newDetails.isEmpty()) {
+                throw new RuntimeException("Không tìm thấy hàng hóa nào bị thiếu hụt.");
+            }
+            
+            newTransfer.setDetails(newDetails);
+            receiptRepository.save(newTransfer);
             r.setStatus(ReceiptStatus.COMPLETED);
             updateCustomerDebt(r, true, false, false);
             receiptRepository.save(r);
