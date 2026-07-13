@@ -352,7 +352,7 @@ function formatCurrency(val: any) {
 
     <!-- ── PRODUCTS TAB ── -->
     <Transition name="fade" mode="out-in">
-      <div v-if="activeTab === 'products'" class="bg-indigo-50/50 dark:bg-slate-800/40 rounded-[16px] border border-slate-100 dark:border-slate-700/50 border-t-4 border-t-indigo-500 shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden transition-colors">
+      <div v-if="activeTab === 'products'" class="bg-white dark:bg-slate-800/40 rounded-[16px] border border-slate-100 dark:border-slate-700/50 border-t-4 border-t-indigo-500 shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden transition-colors">
         <!-- Toolbar -->
         <div class="p-5 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between flex-wrap gap-4 bg-slate-50 dark:bg-slate-800/80 transition-colors">
           <div class="flex items-center gap-3 flex-1 min-w-[300px]">
@@ -480,7 +480,7 @@ function formatCurrency(val: any) {
             <div>
               Hiển thị {{ filteredProducts.length }} / {{ totalElements }} sản phẩm
             </div>
-            <div v-if="totalPages > 1" class="flex items-center gap-2">
+            <div v-if="totalPages >= 1" class="flex items-center gap-2">
               <button 
                 :disabled="currentPage === 0"
                 @click="loadProducts(currentPage - 1)"
@@ -506,7 +506,7 @@ function formatCurrency(val: any) {
 
     <!-- ── CATEGORIES TAB ── -->
     <Transition name="fade" mode="out-in">
-      <div v-if="activeTab === 'categories'" class="bg-sky-50/50 dark:bg-slate-800/40 rounded-[16px] border border-slate-100 dark:border-slate-700/50 border-t-4 border-t-sky-500 shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden transition-colors">
+      <div v-if="activeTab === 'categories'" class="bg-white dark:bg-slate-800/40 rounded-[16px] border border-slate-100 dark:border-slate-700/50 border-t-4 border-t-sky-500 shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden transition-colors">
         <!-- Toolbar -->
         <div class="p-5 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between flex-wrap gap-4 bg-slate-50 dark:bg-slate-800/80 transition-colors">
           <div class="flex items-center gap-3 flex-1 min-w-[300px]">
@@ -587,7 +587,7 @@ function formatCurrency(val: any) {
             <div>
               Hiển thị {{ filteredCategories.length }} / {{ cTotalElements }} danh mục
             </div>
-            <div v-if="cTotalPages > 1" class="flex items-center gap-2">
+            <div v-if="cTotalPages >= 1" class="flex items-center gap-2">
               <button 
                 :disabled="cCurrentPage === 0"
                 @click="loadCategories(cCurrentPage - 1)"

@@ -390,7 +390,7 @@ onUnmounted(() => {
                 Hiển thị {{ Math.min((currentPage - 1) * pageSize + 1, filteredUsers.length) }} - {{ Math.min(currentPage * pageSize, filteredUsers.length) }} của {{ filteredUsers.length }} nhân viên
               </div>
               
-              <div v-if="totalPages > 1" class="flex items-center gap-1.5">
+              <div v-if="totalPages >= 1" class="flex items-center gap-1.5">
                 <!-- Prev Button -->
                 <button 
                   :disabled="currentPage === 1" 

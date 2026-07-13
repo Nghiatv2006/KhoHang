@@ -5,7 +5,7 @@ import { useToast } from '../utils/toast'
 import AppModal from '../components/AppModal.vue'
 
 const props = defineProps<{
-  receiptType?: 'IMPORT' | 'EXPORT' | 'TRANSFER' | 'ADJUST_OUT'
+  receiptType?: 'IMPORT' | 'EXPORT' | 'TRANSFER' | 'DISPOSAL'
 }>()
 
 const toast = useToast()
@@ -50,7 +50,11 @@ const isManager = computed(() => user.value?.role === 'MANAGER')
 
 function canApproveReceipt(r: any) {
   if (r.status === 'DRAFT') {
-      if (r.type === 'ADJUST_OUT') {
+      if (r.type === 'DISPOSAL') {
+            if (isManager.value && r.sourceBranchId === user.value?.branchId) return true;
+            if (isAdmin.value) return true;
+        }
+        if (r.type === 'ADJUST_OUT') {
           // Everyone can click the button, backend will handle routing to PENDING_ADMIN or COMPLETED
           if (r.sourceBranchId === user.value?.branchId || isAdmin.value) return true;
       }
@@ -69,7 +73,11 @@ function canApproveReceipt(r: any) {
       return false;
   }
   if (r.status === 'PENDING_ADMIN') {
-      if (r.type === 'ADJUST_OUT') {
+      if (r.type === 'DISPOSAL') {
+            if (isManager.value && r.sourceBranchId === user.value?.branchId) return true;
+            if (isAdmin.value) return true;
+        }
+        if (r.type === 'ADJUST_OUT') {
           if (isAdmin.value || isManager.value) {
               if (isAdmin.value || r.sourceBranchId === user.value?.branchId) return true;
           }
@@ -84,15 +92,27 @@ function canApproveReceipt(r: any) {
           return false;
       }
   }
-  return false;
+      if (r.status === 'PENDING_STOCKTAKE') {
+        if (r.type === 'DISPOSAL' && isAdmin.value) return true;
+    }
+    return false;
 }
 
 function approveReceiptText(r: any) {
     if (r.type === 'ADJUST_OUT' && r.status === 'DRAFT') {
         return "Xác nhận & Xử lý";
     }
+    if (r.type === 'DISPOSAL' && r.status === 'DRAFT') {
+        return "Gửi Admin duyệt";
+    }
     if (r.type === 'ADJUST_OUT' && r.status === 'PENDING_ADMIN') {
         return "Duyệt tiêu hủy";
+    }
+    if (r.type === 'DISPOSAL' && r.status === 'PENDING_ADMIN') {
+        return "Duyệt tiêu hủy (Gửi Admin)";
+    }
+    if (r.type === 'DISPOSAL' && r.status === 'PENDING_STOCKTAKE') {
+        return "Xác nhận & Hoàn tất tiêu hủy";
     }
     if (r.type === 'IMPORT' && r.status === 'DRAFT' && isManager.value && !isAdmin.value) {
         return "Duyệt (Gửi Admin)";
@@ -334,7 +354,10 @@ async function loadData() {
       products.value = pData.content || pData
     }
     if (bRes.ok) branches.value = await bRes.json()
-    if (cRes.ok) customers.value = await cRes.json()
+    if (cRes.ok) {
+      const cData = await cRes.json()
+      customers.value = cData.content || cData
+    }
     if (catRes.ok) {
       const catData = await catRes.json()
       categories.value = catData.content || catData
@@ -786,8 +809,8 @@ const availableProducts = computed(() => {
   if (createForm.value.sourceBranchId) {
     let validInventories = sourceInventories.value.filter(inv => inv.quantity > 0)
     
-    // Ràng buộc cho phiếu tiêu hủy: Chỉ hàng sắp hết hạn (<= 14 ngày) hoặc đã hết hạn
-    if (t === 'ADJUST_OUT') {
+    // Ràng buộc cho phiếu tiêu hủy: Chỉ lọc hàng sắp hết hạn (<= 14 ngày) hoặc đã hết hạn nếu chọn lý do là Hàng hết hạn
+    if (t === 'DISPOSAL' && createForm.value.description === 'Hàng hết hạn') {
       const today = new Date().getTime()
       const fourteenDaysFromNow = today + 14 * 24 * 60 * 60 * 1000
       validInventories = validInventories.filter(inv => {
@@ -800,12 +823,18 @@ const availableProducts = computed(() => {
     const inStockIds = new Set(validInventories.map(inv => inv.productId))
     let result = products.value.filter(p => inStockIds.has(p.id))
     
-    // Ràng buộc phiếu tiêu hủy: Chỉ chọn hàng Sữa hoặc Hữu cơ
-    if (t === 'ADJUST_OUT') {
-      result = result.filter(p => {
-        const catName = categories.value.find(c => c.id === p.categoryId)?.name?.toLowerCase() || ''
-        return catName.includes('sữa') || catName.includes('hữu cơ')
-      })
+    // Ràng buộc phiếu tiêu hủy: 
+    if (t === 'DISPOSAL') {
+      if (createForm.value.description === 'Hàng hết hạn') {
+        // Nếu là hàng hết hạn, chỉ chọn hàng Sữa hoặc Hữu cơ (như logic cũ)
+        result = result.filter(p => {
+          const catName = categories.value.find(c => c.id === p.categoryId)?.name?.toLowerCase() || ''
+          return catName.includes('sữa') || catName.includes('hữu cơ')
+        })
+      } else {
+        // Với lý do khác (lỗi kĩ thuật, khác...), không giới hạn ngành hàng
+        // Nhưng ta có thể bỏ qua lọc, cho phép tất cả các sản phẩm có tồn kho
+      }
     }
     
     return result
@@ -925,14 +954,14 @@ function getBatchesForProduct(productId: number | string | null) {
   let batches = sourceInventories.value
     .filter(inv => {
       if (inv.productId !== Number(productId) || inv.quantity <= 0) return false;
-      if (createForm.value.type === 'DISPOSAL' && createForm.value.disposalReason === 'Hàng hết hạn sử dụng') {
+      if (createForm.value.type === 'DISPOSAL' && createForm.value.description === 'Hàng hết hạn') {
         const todayStr = new Date().toISOString().substring(0, 10);
         if (!inv.hasExpiry || !inv.expirationDate || inv.expirationDate.substring(0, 10) >= todayStr) return false;
       }
       return true;
     })
 
-  if (createForm.value.type === 'ADJUST_OUT') {
+  if (createForm.value.type === 'DISPOSAL' && createForm.value.description === 'Hàng hết hạn') {
     const today = new Date().getTime()
     const fourteenDaysFromNow = today + 14 * 24 * 60 * 60 * 1000
     batches = batches.filter(inv => {
@@ -1081,7 +1110,7 @@ async function submitCreateDraft() {
       return
     }
   }
-  if (f.type === 'ADJUST_OUT') {
+  if (f.type === 'DISPOSAL') {
     if (!f.description?.trim()) {
       toast.error('Vui lòng nhập lý do tiêu hủy.')
       return
@@ -1106,6 +1135,7 @@ async function submitCreateDraft() {
     customerPhone: f.customerPhone || null,
     paymentStatus: f.paymentStatus,
     description: f.description,
+    disposalReason: f.type === 'DISPOSAL' ? f.description : undefined,
     details: f.details.map(d => ({
       productId: Number(d.productId),
       batchCode: d.batchCode,
@@ -1382,7 +1412,10 @@ function canApproveShortfall(r: any) {
   if (r.status === 'PENDING_SHORTFALL_ADMIN') {
     if (isAdmin.value) return true;
   }
-  return false;
+      if (r.status === 'PENDING_STOCKTAKE') {
+        if (r.type === 'DISPOSAL' && isAdmin.value) return true;
+    }
+    return false;
 }
 
 async function approveShortfall(receipt: any, isApproved: boolean) {
@@ -1423,7 +1456,10 @@ function canCompensate(r: any) {
   if (r.status === 'PENDING_COMPENSATION') {
     if (isManager.value && r.sourceBranchId === user.value?.branchId) return true;
   }
-  return false;
+      if (r.status === 'PENDING_STOCKTAKE') {
+        if (r.type === 'DISPOSAL' && isAdmin.value) return true;
+    }
+    return false;
 }
 
 async function compensateShortfall(receipt: any) {
@@ -1510,7 +1546,7 @@ function statusLabel(r: any) {
       return 'Chờ Manager';
     }
     if (r?.type === 'DISPOSAL') {
-      return 'Chờ Quản lý duyệt';
+      return 'Chờ duyệt';
     }
     return 'Chờ Admin';
   }
@@ -1521,7 +1557,7 @@ function statusLabel(r: any) {
       }
       return 'Chờ kiểm kê';
     }
-    if (r?.type === 'DISPOSAL') return 'Chờ Admin duyệt cuối';
+    if (r?.type === 'DISPOSAL') return 'Chờ duyệt';
     return 'Chờ kiểm kê';
   }
   if (s === 'PENDING_SHORTFALL_MANAGER') return 'Thiếu hụt (Chờ Manager)';
@@ -2139,7 +2175,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
               <th class="px-5 py-3 text-left font-bold">Mã phiếu</th>
               <th v-if="!receiptType" class="px-5 py-3 text-left font-bold">Loại</th>
               <th class="px-5 py-3 text-center font-bold">Trạng thái</th>
-              <th class="px-5 py-3 text-left font-bold">Chênh lệch</th>
+              <th v-if="receiptType !== 'DISPOSAL'" class="px-5 py-3 text-left font-bold">Chênh lệch</th>
               <th class="px-5 py-3 text-left font-bold">Chi nhánh nguồn</th>
               <th class="px-5 py-3 text-left font-bold">{{ $route.path === '/invoices' ? 'Khách hàng' : 'Chi nhánh đích' }}</th>
               <th class="px-5 py-3 text-left font-bold">Người lập</th>
@@ -2174,7 +2210,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                   </span>
                 </div>
               </td>
-              <td class="px-5 py-4">
+              <td v-if="receiptType !== 'DISPOSAL'" class="px-5 py-4">
                 <div v-if="r.hasDeviation" class="flex flex-col max-w-[200px]" :title="r.deviationSummary">
                   <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-rose-50 text-rose-600 border border-rose-100 w-fit">
                     ⚠️ Lệch số lượng
@@ -2246,7 +2282,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
       </div>
 
       <!-- Pagination -->
-      <div v-if="totalPages > 1" class="px-6 py-4 border-t border-[#e2e8f0] flex flex-col sm:flex-row items-center justify-between bg-white rounded-b-2xl gap-4">
+      <div v-if="totalPages >= 1" class="px-6 py-4 border-t border-[#e2e8f0] flex flex-col sm:flex-row items-center justify-between bg-white rounded-b-2xl gap-4">
         <div class="text-sm text-[#8094ae]">
           Hiển thị <span class="font-bold text-[#364a63]">{{ (currentPage - 1) * itemsPerPage + 1 }}</span> - <span class="font-bold text-[#364a63]">{{ Math.min(currentPage * itemsPerPage, filteredReceipts.length) }}</span> trong số <span class="font-bold text-[#364a63]">{{ filteredReceipts.length }}</span> phiếu
         </div>
@@ -2315,7 +2351,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
 
             <div class="relative z-10 text-white drop-shadow-md">
               <div class="text-xs font-bold opacity-90 uppercase tracking-wider mb-1">
-                {{ selectedReceipt?.type === 'EXPORT' ? 'Chi tiết hóa đơn' : selectedReceipt?.type === 'TRANSFER' ? 'Chi tiết phiếu điều chuyển' : selectedReceipt?.type === 'ADJUST_OUT' ? 'Chi tiết phiếu tiêu hủy' : 'Chi tiết phiếu kho' }}
+                {{ selectedReceipt?.type === 'EXPORT' ? 'Chi tiết hóa đơn' : selectedReceipt?.type === 'TRANSFER' ? 'Chi tiết phiếu điều chuyển' : selectedReceipt?.type === 'DISPOSAL' ? 'Chi tiết phiếu tiêu hủy' : 'Chi tiết phiếu kho' }}
               </div>
               <div class="font-mono font-bold text-xl">{{ selectedReceipt?.code }}</div>
             </div>
@@ -2685,7 +2721,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
 
             <div class="relative z-10 text-white drop-shadow-md">
               <div class="text-xs font-bold opacity-90 uppercase tracking-wider mb-1">
-                {{ createForm.type === 'EXPORT' ? 'Lập hóa đơn' : createForm.type === 'TRANSFER' ? 'Lập phiếu điều chuyển' : createForm.type === 'ADJUST_OUT' ? 'Lập phiếu tiêu hủy' : 'Lập phiếu kho' }}
+                {{ createForm.type === 'EXPORT' ? 'Lập hóa đơn' : createForm.type === 'TRANSFER' ? 'Lập phiếu điều chuyển' : createForm.type === 'DISPOSAL' ? 'Lập phiếu tiêu hủy' : 'Lập phiếu kho' }}
               </div>
               <div class="font-bold text-xl">{{ createForm.type === 'TRANSFER' ? 'Tạo phiếu xin hàng (DRAFT)' : 'Tạo phiếu nháp (DRAFT)' }}</div>
             </div>
@@ -2707,6 +2743,12 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                     <option value="EXPORT">Xuất bán</option>
                     <option value="TRANSFER">Điều chuyển</option>
                   </select>
+                </div>
+                <div v-else>
+                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Loại phiếu</label>
+                  <input type="text" disabled
+                    :value="receiptType === 'IMPORT' ? '📥 Nhập kho' : receiptType === 'EXPORT' ? '📤 Hóa đơn' : receiptType === 'DISPOSAL' ? '🗑️ Tiêu hủy' : '🔄 Điều chuyển'"
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm bg-[#f1f5f9] text-[#8094ae] cursor-not-allowed" />
                 </div>
                 <div v-if="createForm.type === 'IMPORT'">
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh nguồn</label>
@@ -2771,13 +2813,24 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                 <div class="col-span-2">
                   <div class="flex justify-between items-center mb-1.5">
                     <label class="block text-xs font-bold text-[#8094ae] uppercase">
-                      {{ createForm.type === 'ADJUST_OUT' ? 'Lý do tiêu hủy' : 'Ghi chú' }}
-                      <span v-if="createForm.type === 'ADJUST_OUT'" class="text-red-500">*</span>
+                      {{ createForm.type === 'DISPOSAL' ? 'Lý do tiêu hủy' : 'Ghi chú' }}
+                      <span v-if="createForm.type === 'DISPOSAL'" class="text-red-500">*</span>
                     </label>
-                    <span class="text-[10px] text-[#8094ae]">{{ createForm.description?.length || 0 }}/500</span>
+                    <span v-if="createForm.type !== 'DISPOSAL'" class="text-[10px] text-[#8094ae]">{{ createForm.description?.length || 0 }}/500</span>
                   </div>
-                  <textarea v-model="createForm.description" maxlength="500" :placeholder="createForm.type === 'ADJUST_OUT' ? 'Nhập lý do tiêu hủy (bắt buộc)...' : 'Ghi chú (tuỳ chọn)...'"
-                    class="w-full h-20 p-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none resize-y"></textarea>
+                  <template v-if="createForm.type === 'DISPOSAL'">
+                    <select v-model="createForm.description" @change="onTypeChange"
+                      class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
+                      <option value="">-- Chọn lý do tiêu hủy --</option>
+                      <option value="Hàng hết hạn">Hàng hết hạn</option>
+                      <option value="Hàng lỗi kĩ thuật/hỏng">Hàng lỗi kĩ thuật/hỏng</option>
+                      <option value="Khác">Khác</option>
+                    </select>
+                  </template>
+                  <template v-else>
+                    <textarea v-model="createForm.description" maxlength="500" placeholder="Ghi chú (tuỳ chọn)..."
+                      class="w-full h-20 p-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none resize-y"></textarea>
+                  </template>
                 </div>
               </div>
 
@@ -2847,7 +2900,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                       <!-- Thông tin Số lượng, Tiền & NSX/HSD (Nhóm trong khung nền xám nhạt để dễ nhìn) -->
                       <div v-if="d.productId" class="p-4 bg-[#f8f9fa] rounded-xl border border-[#e2e8f0] space-y-4">
                         <!-- Row 1: Số lượng, Đơn giá, Thành tiền -->
-                        <div :class="(createForm.type === 'IMPORT' || createForm.type === 'TRANSFER') ? 'grid grid-cols-1' : 'grid grid-cols-3 gap-5'">
+                        <div :class="(createForm.type === 'IMPORT' || createForm.type === 'TRANSFER' || createForm.type === 'DISPOSAL') ? 'grid grid-cols-1' : 'grid grid-cols-3 gap-5'">
                           <div>
                             <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Số lượng <span class="text-red-500">*</span></label>
                             <div class="flex items-center h-10 bg-white border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-[#4361ee]/20 transition-colors"
@@ -2869,13 +2922,13 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                             </div>
                           </div>
                           
-                          <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
+                          <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER' && createForm.type !== 'DISPOSAL'">
                             <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Đơn giá</label>
                             <input v-model.number="d.price" type="number" min="0" readonly
                               class="w-full h-10 px-3 border border-[#e2e8f0] bg-gray-100 rounded-xl text-sm font-bold outline-none cursor-not-allowed text-[#8094ae]" />
                           </div>
                           
-                          <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
+                          <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER' && createForm.type !== 'DISPOSAL'">
                             <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Thành tiền</label>
                             <div class="w-full h-10 px-3 border border-transparent flex items-center text-sm font-bold text-[#4361ee] bg-[#eef2ff] rounded-xl overflow-x-auto whitespace-nowrap hide-scrollbar">
                               {{ formatVND(d.quantity * (d.price || 0)) }}
