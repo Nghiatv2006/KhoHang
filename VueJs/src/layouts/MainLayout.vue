@@ -186,8 +186,9 @@ const totalStocktakeBadge = computed(() => {
 
 const adminNavItems = computed(() => {
   const items: { label: string; to: string; icon: string }[] = []
+  const isHeadBranch = user.value?.branchName?.includes('Hà Nội') || user.value?.branch?.isHead === true;
   // @ts-ignore
-  if (!user.value || user.value.role !== 'ADMIN') {
+  if (!isHeadBranch && (!user.value || user.value.role !== 'ADMIN')) {
     items.push({ label: 'Đối tác', to: '/partners', icon: 'fas fa-handshake' })
   }
   if (isManagerOrAdmin.value) {
