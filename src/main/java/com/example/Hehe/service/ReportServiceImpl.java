@@ -632,7 +632,7 @@ public class ReportServiceImpl implements ReportService {
         result.put("deadStock", deadStockValue);
         return result;
     }
-    public byte[] exportRevenueReport(User currentUser) {
+    public byte[] exportRevenueReport(User currentUser, Integer branchId, java.time.LocalDate startDate, java.time.LocalDate endDate, String period) {
         if (currentUser.getRole() == UserRole.STAFF) {
             throw new AccessDeniedException("Staff không có quyền xuất báo cáo doanh thu.");
         }
@@ -645,8 +645,14 @@ public class ReportServiceImpl implements ReportService {
 
         List<Receipt> receipts;
         if (isAdmin) {
-            // Admin: get all EXPORT receipts across all branches
-            receipts = receiptRepository.findByTypeAndStatus(ReceiptType.EXPORT, ReceiptStatus.COMPLETED);
+            if (branchId != null) {
+                // Admin chọn lọc theo một chi nhánh cụ thể → chỉ lấy hoá đơn của chi nhánh đó
+                receipts = receiptRepository.findByTypeAndStatusAndSourceBranchId(
+                        ReceiptType.EXPORT, ReceiptStatus.COMPLETED, branchId);
+            } else {
+                // Admin xem toàn hệ thống
+                receipts = receiptRepository.findByTypeAndStatus(ReceiptType.EXPORT, ReceiptStatus.COMPLETED);
+            }
         } else if (isTransferReport) {
             // Head Branch Manager: get TRANSFER receipts where this branch is the source
             receipts = receiptRepository.findByTypeAndStatusAndSourceBranchId(
@@ -655,6 +661,31 @@ public class ReportServiceImpl implements ReportService {
             // Child Branch Manager: get EXPORT receipts for their branch
             receipts = receiptRepository.findByTypeAndStatusAndSourceBranchId(
                     ReceiptType.EXPORT, ReceiptStatus.COMPLETED, currentUser.getBranch().getId());
+        }
+
+        // Apply date filters if present
+        if (startDate != null || endDate != null) {
+            receipts = receipts.stream()
+                .filter(r -> {
+                    java.time.LocalDate rDate = r.getCreatedAt().toLocalDate();
+                    if (startDate != null && rDate.isBefore(startDate)) return false;
+                    if (endDate != null && rDate.isAfter(endDate)) return false;
+                    return true;
+                })
+                .collect(Collectors.toList());
+        }
+
+        // Xác định tên chi nhánh hiển thị trong file Excel
+        String branchDisplayName;
+        if (isAdmin) {
+            if (branchId != null) {
+                Branch selectedBranch = branchRepository.findById(branchId).orElse(null);
+                branchDisplayName = selectedBranch != null ? selectedBranch.getName() : "Chi nhánh #" + branchId;
+            } else {
+                branchDisplayName = "TOÀN HỆ THỐNG";
+            }
+        } else {
+            branchDisplayName = currentUser.getBranch() != null ? currentUser.getBranch().getName() : "N/A";
         }
 
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -742,31 +773,29 @@ public class ReportServiceImpl implements ReportService {
             DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
             String reportDate = LocalDateTime.now().format(dtf);
             String reporterName = currentUser.getFullName();
-            String branchName = isAdmin ? "TOÀN HỆ THỐNG" :
-                    (currentUser.getBranch() != null ? currentUser.getBranch().getName() : "N/A");
 
             if (isTransferReport) {
                 // ====== HEAD BRANCH: TRANSFER REPORT ======
-                buildTransferTimeSheets(workbook, receipts, reportDate, reporterName, branchName,
+                buildTransferTimeSheets(workbook, receipts, reportDate, reporterName, branchDisplayName, period, startDate, endDate,
                         titleStyle, boldStyle, boldCenterStyle, italicCenterStyle,
                         headerStyle, borderStyle, borderCenterStyle, moneyStyle,
                         totalRowStyle, totalRowMoneyStyle, totalRowCenterStyle, totalRowRightStyle);
 
-                buildTransferProductSheet(workbook, receipts, reportDate, reporterName, branchName,
+                buildTransferProductSheet(workbook, receipts, reportDate, reporterName, branchDisplayName,
                         titleStyle, boldStyle, boldCenterStyle, italicCenterStyle,
                         headerStyle, borderStyle, borderCenterStyle, moneyStyle,
                         totalRowStyle, totalRowMoneyStyle, totalRowCenterStyle, totalRowRightStyle);
             } else {
                 // ====== REVENUE REPORT (Admin or Child Branch Manager) ======
-                buildRevenueTimeSheets(workbook, receipts, isAdmin, reportDate, reporterName, branchName,
+                buildRevenueTimeSheets(workbook, receipts, isAdmin, reportDate, reporterName, branchDisplayName, period, startDate, endDate,
                         titleStyle, boldStyle, boldCenterStyle, italicCenterStyle,
                         headerStyle, borderStyle, borderCenterStyle, moneyStyle, percentStyle,
                         totalRowStyle, totalRowMoneyStyle, totalRowCenterStyle, totalRowPercentStyle, totalRowRightStyle);
 
-                buildRevenueProductSheet(workbook, receipts, isAdmin, reportDate, reporterName, branchName,
+                buildRevenueProductSheet(workbook, receipts, isAdmin, reportDate, reporterName, branchDisplayName,
                         titleStyle, boldStyle, boldCenterStyle, italicCenterStyle,
-                        headerStyle, borderStyle, borderCenterStyle, moneyStyle,
-                        totalRowStyle, totalRowMoneyStyle, totalRowCenterStyle, totalRowRightStyle);
+                        headerStyle, borderStyle, borderCenterStyle, moneyStyle, percentStyle,
+                        totalRowStyle, totalRowMoneyStyle, totalRowCenterStyle, totalRowPercentStyle, totalRowRightStyle);
             }
 
             workbook.write(out);
@@ -824,19 +853,32 @@ public class ReportServiceImpl implements ReportService {
     //  REVENUE TIME SHEETS (Tuần / Tháng / Quý / Năm)
     // ================================================================
     private void buildRevenueTimeSheets(Workbook workbook, List<Receipt> receipts, boolean isAdmin,
-            String reportDate, String reporterName, String branchName,
+            String reportDate, String reporterName, String branchName, String period,
+            java.time.LocalDate startDate, java.time.LocalDate endDate,
             CellStyle titleStyle, CellStyle boldStyle, CellStyle boldCenterStyle, CellStyle italicCenterStyle,
             CellStyle headerStyle, CellStyle borderStyle, CellStyle borderCenterStyle,
             CellStyle moneyStyle, CellStyle percentStyle,
             CellStyle totalRowStyle, CellStyle totalRowMoneyStyle, CellStyle totalRowCenterStyle,
             CellStyle totalRowPercentStyle, CellStyle totalRowRightStyle) {
 
-        String[][] sheetConfigs = {
-                {"Theo Tuần", "WEEK"},
-                {"Theo Tháng", "MONTH"},
-                {"Theo Quý", "QUARTER"},
-                {"Theo Năm", "YEAR"}
-        };
+        String[][] sheetConfigs;
+        if (period == null || period.isEmpty()) period = "month";
+        switch (period) {
+            case "today":
+            case "week":
+            case "month":
+            case "custom":
+                sheetConfigs = new String[][]{{"Theo Ngày", "DAY"}};
+                break;
+            case "quarter":
+                sheetConfigs = new String[][]{{"Theo Tháng", "MONTH"}};
+                break;
+            case "year":
+                sheetConfigs = new String[][]{{"Theo Tháng", "MONTH"}, {"Theo Quý", "QUARTER"}};
+                break;
+            default:
+                sheetConfigs = new String[][]{{"Theo Tháng", "MONTH"}};
+        }
 
         for (String[] config : sheetConfigs) {
             Sheet sheet = workbook.createSheet(config[0]);
@@ -849,21 +891,28 @@ public class ReportServiceImpl implements ReportService {
             String[] headers;
             if (isAdmin) {
                 headers = new String[]{"STT", "Thời gian", "Tên Chi nhánh", "Số lượng Đơn", "Tổng Sản phẩm",
-                        "Tổng Doanh thu (VNĐ)", "Giá vốn hàng ĐÃ BÁN (VNĐ)", "Lợi nhuận gộp (VNĐ)", "Tỷ suất LN"};
+                        "Tổng Doanh thu (VNĐ)", "Tổng Thực thu (VNĐ)", "Giá vốn hàng ĐÃ BÁN (VNĐ)", "Lợi nhuận gộp (VNĐ)", "Tỷ suất LN"};
             } else {
                 headers = new String[]{"STT", "Thời gian", "Số lượng Đơn", "Tổng Sản phẩm",
-                        "Tổng Doanh thu (VNĐ)", "Giá vốn hàng ĐÃ BÁN (VNĐ)", "Lợi nhuận gộp (VNĐ)", "Tỷ suất LN"};
+                        "Tổng Doanh thu (VNĐ)", "Tổng Thực thu (VNĐ)", "Giá vốn hàng ĐÃ BÁN (VNĐ)", "Lợi nhuận gộp (VNĐ)", "Tỷ suất LN"};
             }
 
-            int rowIdx = writeReportHeader(sheet, "BÁO CÁO DOANH THU & LỢI NHUẬN (" + config[0].toUpperCase() + ")",
+            String finalTitle = "BÁO CÁO DOANH THU & LỢI NHUẬN (" + config[0].toUpperCase() + ")";
+            if ("custom".equals(period) && startDate != null && endDate != null) {
+                java.time.format.DateTimeFormatter df = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                finalTitle = "BÁO CÁO DOANH THU (Từ " + startDate.format(df) + " đến " + endDate.format(df) + ")";
+            }
+
+            int rowIdx = writeReportHeader(sheet, finalTitle,
                     reportDate, reporterName, branchName, headers,
                     titleStyle, boldStyle, italicCenterStyle, headerStyle);
 
             // Add cell comments for clarity
             addCellComment(workbook, sheet, rowIdx - 1, isAdmin ? 5 : 4, "Công thức: Giá bán khách hàng × Số lượng bán ra");
-            addCellComment(workbook, sheet, rowIdx - 1, isAdmin ? 6 : 5, "Công thức: Giá nhập gốc × Số lượng đã bán ra\n(Chỉ tính cho hàng đã bán, không tính hàng tồn kho)");
-            addCellComment(workbook, sheet, rowIdx - 1, isAdmin ? 7 : 6, "Công thức: Tổng Doanh thu - Giá vốn hàng ĐÃ BÁN");
-            addCellComment(workbook, sheet, rowIdx - 1, isAdmin ? 8 : 7, "Công thức: (Lợi nhuận gộp / Tổng Doanh thu) × 100%");
+            addCellComment(workbook, sheet, rowIdx - 1, isAdmin ? 6 : 5, "Tổng tiền khách đã thanh toán cho các đơn hàng");
+            addCellComment(workbook, sheet, rowIdx - 1, isAdmin ? 7 : 6, "Công thức: Giá nhập gốc × Số lượng đã bán ra\n(Chỉ tính cho hàng đã bán, không tính hàng tồn kho)");
+            addCellComment(workbook, sheet, rowIdx - 1, isAdmin ? 8 : 7, "Công thức: Tổng Doanh thu - Giá vốn hàng ĐÃ BÁN");
+            addCellComment(workbook, sheet, rowIdx - 1, isAdmin ? 9 : 8, "Công thức: (Lợi nhuận gộp / Tổng Doanh thu) × 100%");
 
             // Freeze header row
             sheet.createFreezePane(0, rowIdx);
@@ -872,14 +921,15 @@ public class ReportServiceImpl implements ReportService {
             long grandTotalOrders = 0;
             long grandTotalItems = 0;
             BigDecimal grandTotalRevenue = BigDecimal.ZERO;
+            BigDecimal grandTotalCollected = BigDecimal.ZERO;
             BigDecimal grandTotalCost = BigDecimal.ZERO;
 
             // Sort time periods
             List<String> sortedPeriods = new java.util.ArrayList<>(groupedData.keySet());
             java.util.Collections.sort(sortedPeriods);
 
-            for (String period : sortedPeriods) {
-                Map<String, List<Receipt>> branchMap = groupedData.get(period);
+            for (String periodKey : sortedPeriods) {
+                Map<String, List<Receipt>> branchMap = groupedData.get(periodKey);
                 List<String> sortedBranches = new java.util.ArrayList<>(branchMap.keySet());
                 java.util.Collections.sort(sortedBranches);
 
@@ -893,6 +943,12 @@ public class ReportServiceImpl implements ReportService {
                             .sum();
 
                     BigDecimal totalRevenue = periodReceipts.stream()
+                            .flatMap(r -> r.getDetails().stream())
+                            .map(d -> d.getPrice().multiply(BigDecimal.valueOf(d.getQuantity())))
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                    BigDecimal totalCollected = periodReceipts.stream()
+                            .filter(r -> "PAID".equals(r.getPaymentStatus()) || "Đã thanh toán".equals(r.getPaymentStatus()))
                             .flatMap(r -> r.getDetails().stream())
                             .map(d -> d.getPrice().multiply(BigDecimal.valueOf(d.getQuantity())))
                             .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -913,18 +969,20 @@ public class ReportServiceImpl implements ReportService {
                     grandTotalOrders += orderCount;
                     grandTotalItems += totalItems;
                     grandTotalRevenue = grandTotalRevenue.add(totalRevenue);
+                    grandTotalCollected = grandTotalCollected.add(totalCollected);
                     grandTotalCost = grandTotalCost.add(totalCost);
 
                     Row row = sheet.createRow(rowIdx++);
                     int col = 0;
                     setCellValue(row, col++, stt++, borderCenterStyle);
-                    setCellValue(row, col++, period, borderStyle);
+                    setCellValue(row, col++, periodKey, borderStyle);
                     if (isAdmin) {
                         setCellValue(row, col++, branch, borderStyle);
                     }
                     setCellValue(row, col++, orderCount, borderCenterStyle);
                     setCellValue(row, col++, totalItems, borderCenterStyle);
                     setCellValue(row, col++, totalRevenue.doubleValue(), moneyStyle);
+                    setCellValue(row, col++, totalCollected.doubleValue(), moneyStyle);
                     setCellValue(row, col++, totalCost.doubleValue(), moneyStyle);
                     setCellValue(row, col++, profit.doubleValue(), moneyStyle);
                     setCellValue(row, col++, profitMargin, percentStyle);
@@ -948,6 +1006,7 @@ public class ReportServiceImpl implements ReportService {
             setCellValue(totalRow, col++, grandTotalOrders, totalRowCenterStyle);
             setCellValue(totalRow, col++, grandTotalItems, totalRowCenterStyle);
             setCellValue(totalRow, col++, grandTotalRevenue.doubleValue(), totalRowMoneyStyle);
+            setCellValue(totalRow, col++, grandTotalCollected.doubleValue(), totalRowMoneyStyle);
             setCellValue(totalRow, col++, grandTotalCost.doubleValue(), totalRowMoneyStyle);
             setCellValue(totalRow, col++, grandProfit.doubleValue(), totalRowMoneyStyle);
             setCellValue(totalRow, col++, grandProfitMargin, totalRowPercentStyle);
@@ -969,22 +1028,29 @@ public class ReportServiceImpl implements ReportService {
             String reportDate, String reporterName, String branchName,
             CellStyle titleStyle, CellStyle boldStyle, CellStyle boldCenterStyle, CellStyle italicCenterStyle,
             CellStyle headerStyle, CellStyle borderStyle, CellStyle borderCenterStyle, CellStyle moneyStyle,
-            CellStyle totalRowStyle, CellStyle totalRowMoneyStyle, CellStyle totalRowCenterStyle, CellStyle totalRowRightStyle) {
+            CellStyle percentStyle,
+            CellStyle totalRowStyle, CellStyle totalRowMoneyStyle, CellStyle totalRowCenterStyle,
+            CellStyle totalRowPercentStyle, CellStyle totalRowRightStyle) {
 
         Sheet sheet = workbook.createSheet("Chi tiết Hàng hóa");
 
         String[] headers;
         if (isAdmin) {
             headers = new String[]{"STT", "Tên Chi nhánh", "Tên Sản phẩm", "Danh mục", "Giá nhập gốc (VNĐ)",
-                    "Giá bán (VNĐ)", "SL Đã bán", "Tổng Doanh thu (VNĐ)", "Tổng Lợi nhuận (VNĐ)"};
+                    "Giá bán (VNĐ)", "SL Đã bán", "Tổng Doanh thu (VNĐ)", "Tổng Lợi nhuận (VNĐ)", "% Đóng góp LN"};
         } else {
             headers = new String[]{"STT", "Tên Sản phẩm", "Danh mục", "Giá nhập gốc (VNĐ)",
-                    "Giá bán (VNĐ)", "SL Đã bán", "Tổng Doanh thu (VNĐ)", "Tổng Lợi nhuận (VNĐ)"};
+                    "Giá bán (VNĐ)", "SL Đã bán", "Tổng Doanh thu (VNĐ)", "Tổng Lợi nhuận (VNĐ)", "% Đóng góp LN"};
         }
 
         int rowIdx = writeReportHeader(sheet, "BÁO CÁO CHI TIẾT BÁN HÀNG THEO SẢN PHẨM",
                 reportDate, reporterName, branchName, headers,
                 titleStyle, boldStyle, italicCenterStyle, headerStyle);
+
+        // Thêm ghi chú cho cột % Đóng góp LN
+        int profitContribColIdx = isAdmin ? 9 : 8;
+        addCellComment(workbook, sheet, rowIdx - 1, profitContribColIdx,
+                "Công thức: (Lợi nhuận sản phẩm / Tổng lợi nhuận toàn bộ) × 100%\n(Cho biết sản phẩm này đóng góp bao nhiêu % vào tổng lợi nhuận)");
 
         sheet.createFreezePane(0, rowIdx);
 
@@ -1023,6 +1089,14 @@ public class ReportServiceImpl implements ReportService {
             }
         }
 
+        // ── Tính tổng Lợi nhuận toàn bộ TRƯỚC để tính % Đóng góp ──
+        double grandTotalProfitDouble = 0;
+        for (Map<Integer, double[]> products : productStats.values()) {
+            for (double[] stats : products.values()) {
+                grandTotalProfitDouble += (stats[2] - stats[3]);
+            }
+        }
+
         int stt = 1;
         long grandTotalQty = 0;
         BigDecimal grandTotalRevenue = BigDecimal.ZERO;
@@ -1034,9 +1108,9 @@ public class ReportServiceImpl implements ReportService {
         for (String branch : sortedBranches) {
             Map<Integer, double[]> products = productStats.get(branch);
 
-            // Sort by total revenue descending (best sellers first)
+            // Sort by profit descending (most profitable first)
             List<Map.Entry<Integer, double[]>> sortedProducts = new java.util.ArrayList<>(products.entrySet());
-            sortedProducts.sort((a, b) -> Double.compare(b.getValue()[2], a.getValue()[2]));
+            sortedProducts.sort((a, b) -> Double.compare((b.getValue()[2] - b.getValue()[3]), (a.getValue()[2] - a.getValue()[3])));
 
             for (Map.Entry<Integer, double[]> entry : sortedProducts) {
                 int pid = entry.getKey();
@@ -1046,6 +1120,8 @@ public class ReportServiceImpl implements ReportService {
 
                 double avgPrice = stats[1] > 0 ? stats[0] / stats[1] : 0;
                 double profit = stats[2] - stats[3];
+                // % Đóng góp LN: tỷ lệ lợi nhuận sản phẩm này / tổng lợi nhuận toàn bộ
+                double profitContribution = grandTotalProfitDouble != 0 ? profit / grandTotalProfitDouble : 0;
 
                 grandTotalQty += (long) stats[1];
                 grandTotalRevenue = grandTotalRevenue.add(BigDecimal.valueOf(stats[2]));
@@ -1064,6 +1140,7 @@ public class ReportServiceImpl implements ReportService {
                 setCellValue(row, c++, (long) stats[1], borderCenterStyle); // SL đã bán
                 setCellValue(row, c++, stats[2], moneyStyle);       // Doanh thu
                 setCellValue(row, c++, profit, moneyStyle);         // Lợi nhuận
+                setCellValue(row, c++, profitContribution, percentStyle); // % Đóng góp LN
             }
         }
 
@@ -1080,29 +1157,45 @@ public class ReportServiceImpl implements ReportService {
         setCellValue(totalRow, c++, grandTotalQty, totalRowCenterStyle);
         setCellValue(totalRow, c++, grandTotalRevenue.doubleValue(), totalRowMoneyStyle);
         setCellValue(totalRow, c++, grandTotalProfit.doubleValue(), totalRowMoneyStyle);
+        // Tổng % Đóng góp luôn = 100%
+        setCellValue(totalRow, c++, 1.0, totalRowPercentStyle);
 
-        writeSignatureSection(sheet, rowIdx + 2, boldCenterStyle, italicCenterStyle, isAdmin ? 8 : 7);
+        writeSignatureSection(sheet, rowIdx + 2, boldCenterStyle, italicCenterStyle, isAdmin ? 9 : 8);
 
         for (int i = 0; i < headers.length; i++) {
             sheet.autoSizeColumn(i);
         }
     }
 
+
     // ================================================================
     //  TRANSFER TIME SHEETS (Head Branch)
     // ================================================================
     private void buildTransferTimeSheets(Workbook workbook, List<Receipt> receipts,
-            String reportDate, String reporterName, String branchName,
+            String reportDate, String reporterName, String branchName, String period,
+            java.time.LocalDate startDate, java.time.LocalDate endDate,
             CellStyle titleStyle, CellStyle boldStyle, CellStyle boldCenterStyle, CellStyle italicCenterStyle,
             CellStyle headerStyle, CellStyle borderStyle, CellStyle borderCenterStyle, CellStyle moneyStyle,
             CellStyle totalRowStyle, CellStyle totalRowMoneyStyle, CellStyle totalRowCenterStyle, CellStyle totalRowRightStyle) {
 
-        String[][] sheetConfigs = {
-                {"Theo Tuần", "WEEK"},
-                {"Theo Tháng", "MONTH"},
-                {"Theo Quý", "QUARTER"},
-                {"Theo Năm", "YEAR"}
-        };
+        String[][] sheetConfigs;
+        if (period == null || period.isEmpty()) period = "month";
+        switch (period) {
+            case "today":
+            case "week":
+            case "month":
+            case "custom":
+                sheetConfigs = new String[][]{{"Theo Ngày", "DAY"}};
+                break;
+            case "quarter":
+                sheetConfigs = new String[][]{{"Theo Tháng", "MONTH"}};
+                break;
+            case "year":
+                sheetConfigs = new String[][]{{"Theo Tháng", "MONTH"}, {"Theo Quý", "QUARTER"}};
+                break;
+            default:
+                sheetConfigs = new String[][]{{"Theo Tháng", "MONTH"}};
+        }
 
         for (String[] config : sheetConfigs) {
             Sheet sheet = workbook.createSheet(config[0]);
@@ -1112,7 +1205,13 @@ public class ReportServiceImpl implements ReportService {
             String[] headers = {"STT", "Thời gian", "Chi nhánh nhận", "Số lệnh Điều chuyển",
                     "Tổng SL Phân bổ", "Tổng Giá trị xuất kho (VNĐ)"};
 
-            int rowIdx = writeReportHeader(sheet, "BÁO CÁO LUÂN CHUYỂN NỘI BỘ (" + config[0].toUpperCase() + ")",
+            String finalTitle = "BÁO CÁO LUÂN CHUYỂN NỘI BỘ (" + config[0].toUpperCase() + ")";
+            if ("custom".equals(period) && startDate != null && endDate != null) {
+                java.time.format.DateTimeFormatter df = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                finalTitle = "BÁO CÁO LUÂN CHUYỂN (Từ " + startDate.format(df) + " đến " + endDate.format(df) + ")";
+            }
+
+            int rowIdx = writeReportHeader(sheet, finalTitle,
                     reportDate, reporterName, branchName, headers,
                     titleStyle, boldStyle, italicCenterStyle, headerStyle);
 
@@ -1128,8 +1227,8 @@ public class ReportServiceImpl implements ReportService {
             List<String> sortedPeriods = new java.util.ArrayList<>(groupedData.keySet());
             java.util.Collections.sort(sortedPeriods);
 
-            for (String period : sortedPeriods) {
-                Map<String, List<Receipt>> branchMap = groupedData.get(period);
+            for (String periodKey : sortedPeriods) {
+                Map<String, List<Receipt>> branchMap = groupedData.get(periodKey);
                 List<String> sortedBranches = new java.util.ArrayList<>(branchMap.keySet());
                 java.util.Collections.sort(sortedBranches);
 
@@ -1157,7 +1256,7 @@ public class ReportServiceImpl implements ReportService {
 
                     Row row = sheet.createRow(rowIdx++);
                     setCellValue(row, 0, stt++, borderCenterStyle);
-                    setCellValue(row, 1, period, borderStyle);
+                    setCellValue(row, 1, periodKey, borderStyle);
                     setCellValue(row, 2, destBranch, borderStyle);
                     setCellValue(row, 3, orderCount, borderCenterStyle);
                     setCellValue(row, 4, totalItems, borderCenterStyle);
@@ -1278,28 +1377,34 @@ public class ReportServiceImpl implements ReportService {
             if (receipt.getCreatedAt() == null) continue;
             LocalDateTime dt = receipt.getCreatedAt();
 
-            String period;
+            String periodStr;
             switch (groupType) {
+                case "RECEIPT":
+                    periodStr = String.format("Mã %05d (%02d:%02d)", receipt.getId(), dt.getHour(), dt.getMinute());
+                    break;
+                case "DAY":
+                    periodStr = String.format("Ngày %02d/%02d/%d", dt.getDayOfMonth(), dt.getMonthValue(), dt.getYear());
+                    break;
                 case "WEEK":
                     java.time.temporal.WeekFields weekFields = java.time.temporal.WeekFields.ISO;
                     int weekNum = dt.get(weekFields.weekOfWeekBasedYear());
                     int weekYear = dt.get(weekFields.weekBasedYear());
-                    period = String.format("Tuần %02d - %d", weekNum, weekYear);
+                    periodStr = String.format("Tuần %02d - %d", weekNum, weekYear);
                     break;
                 case "MONTH":
-                    period = String.format("Tháng %02d/%d", dt.getMonthValue(), dt.getYear());
+                    periodStr = String.format("Tháng %02d/%d", dt.getMonthValue(), dt.getYear());
                     break;
                 case "QUARTER":
                     int quarter = (dt.getMonthValue() - 1) / 3 + 1;
                     int startMonth = (quarter - 1) * 3 + 1;
                     int endMonth = startMonth + 2;
-                    period = String.format("Quý %d (T%d-T%d/%d)", quarter, startMonth, endMonth, dt.getYear());
+                    periodStr = String.format("Quý %d (T%d-T%d/%d)", quarter, startMonth, endMonth, dt.getYear());
                     break;
                 case "YEAR":
-                    period = String.format("Năm %d", dt.getYear());
+                    periodStr = String.format("Năm %d", dt.getYear());
                     break;
                 default:
-                    period = dt.toString();
+                    periodStr = dt.toString();
             }
 
             // For TRANSFER reports, use destBranch; for EXPORT, use sourceBranch
@@ -1314,7 +1419,7 @@ public class ReportServiceImpl implements ReportService {
                 branchLabel = "_ALL_";
             }
 
-            result.computeIfAbsent(period, k -> new java.util.TreeMap<>())
+            result.computeIfAbsent(periodStr, k -> new java.util.TreeMap<>())
                     .computeIfAbsent(branchLabel, k -> new java.util.ArrayList<>())
                     .add(receipt);
         }
@@ -1557,16 +1662,43 @@ public class ReportServiceImpl implements ReportService {
         BigDecimal quarterRevenue   = BigDecimal.ZERO;
         BigDecimal yearRevenue      = BigDecimal.ZERO;
 
+        // Lợi nhuận gộp theo kỳ (= Doanh thu - Giá vốn hàng ĐÃ BÁN)
+        BigDecimal weekProfit       = BigDecimal.ZERO;
+        BigDecimal monthProfit      = BigDecimal.ZERO;
+        BigDecimal quarterProfit    = BigDecimal.ZERO;
+        BigDecimal yearProfit       = BigDecimal.ZERO;
+
+        // Tổng thực thu (chỉ tính các phiếu đã thanh toán)
+        BigDecimal weekCollected       = BigDecimal.ZERO;
+        BigDecimal monthCollected      = BigDecimal.ZERO;
+        BigDecimal quarterCollected    = BigDecimal.ZERO;
+        BigDecimal yearCollected       = BigDecimal.ZERO;
+
         for (Receipt r : allExportReceipts) {
             if (r.getCreatedAt() == null) continue;
             java.time.LocalDate rDate = r.getCreatedAt().toLocalDate();
+
+            boolean isPaid = "PAID".equals(r.getPaymentStatus()) || "Đã thanh toán".equals(r.getPaymentStatus());
+
             BigDecimal amount = r.getDetails().stream()
                     .map(d -> d.getPrice().multiply(BigDecimal.valueOf(d.getQuantity())))
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+            BigDecimal cost = r.getDetails().stream()
+                    .map(d -> {
+                        BigDecimal ip = d.getProduct() != null && d.getProduct().getImportPrice() != null
+                                ? d.getProduct().getImportPrice() : BigDecimal.ZERO;
+                        return ip.multiply(BigDecimal.valueOf(d.getQuantity()));
+                    })
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            BigDecimal profit = amount.subtract(cost);
+
             // Tuần này
             if (!rDate.isBefore(thisWeekStart) && !rDate.isAfter(today)) {
                 weekRevenue = weekRevenue.add(amount);
+                weekProfit  = weekProfit.add(profit);
+                if (isPaid) weekCollected = weekCollected.add(amount);
             }
             // Tuần trước
             if (!rDate.isBefore(lastWeekStart) && !rDate.isAfter(lastWeekEnd)) {
@@ -1575,6 +1707,8 @@ public class ReportServiceImpl implements ReportService {
             // Tháng này
             if (!rDate.isBefore(thisMonthStart) && !rDate.isAfter(today)) {
                 monthRevenue = monthRevenue.add(amount);
+                monthProfit  = monthProfit.add(profit);
+                if (isPaid) monthCollected = monthCollected.add(amount);
             }
             // Tháng trước
             if (!rDate.isBefore(lastMonthStart) && !rDate.isAfter(lastMonthEnd)) {
@@ -1583,26 +1717,52 @@ public class ReportServiceImpl implements ReportService {
             // Quý này
             if (!rDate.isBefore(thisQuarterStart) && !rDate.isAfter(today)) {
                 quarterRevenue = quarterRevenue.add(amount);
+                quarterProfit  = quarterProfit.add(profit);
+                if (isPaid) quarterCollected = quarterCollected.add(amount);
             }
             // Năm nay
             if (!rDate.isBefore(thisYearStart) && !rDate.isAfter(today)) {
                 yearRevenue = yearRevenue.add(amount);
+                yearProfit  = yearProfit.add(profit);
+                if (isPaid) yearCollected = yearCollected.add(amount);
             }
         }
 
-        // Tính % thay đổi (null nếu không có dữ liệu kỳ trước)
+        // Tính % thay đổi doanh thu (null nếu không có dữ liệu kỳ trước)
         Double weekChangePct  = calcChangePct(weekRevenue,  lastWeekRevenue);
         Double monthChangePct = calcChangePct(monthRevenue, lastMonthRevenue);
+
+        // Tính Margin % = Lợi nhuận / Doanh thu (trả về null nếu doanh thu = 0 để FE ẩn đi)
+        Double weekMargin    = weekRevenue.compareTo(BigDecimal.ZERO)    > 0
+                ? weekProfit.doubleValue()    / weekRevenue.doubleValue()    * 100 : null;
+        Double monthMargin   = monthRevenue.compareTo(BigDecimal.ZERO)   > 0
+                ? monthProfit.doubleValue()   / monthRevenue.doubleValue()   * 100 : null;
+        Double quarterMargin = quarterRevenue.compareTo(BigDecimal.ZERO) > 0
+                ? quarterProfit.doubleValue() / quarterRevenue.doubleValue() * 100 : null;
+        Double yearMargin    = yearRevenue.compareTo(BigDecimal.ZERO)    > 0
+                ? yearProfit.doubleValue()    / yearRevenue.doubleValue()    * 100 : null;
 
         java.util.Map<String, Object> result = new java.util.HashMap<>();
         result.put("weekRevenue",      weekRevenue);
         result.put("lastWeekRevenue",  lastWeekRevenue);
         result.put("weekChangePct",    weekChangePct);
+        result.put("weekProfit",       weekProfit);
+        result.put("weekCollected",    weekCollected);
+        result.put("weekMargin",       weekMargin);
         result.put("monthRevenue",     monthRevenue);
         result.put("lastMonthRevenue", lastMonthRevenue);
         result.put("monthChangePct",   monthChangePct);
+        result.put("monthProfit",      monthProfit);
+        result.put("monthCollected",   monthCollected);
+        result.put("monthMargin",      monthMargin);
         result.put("quarterRevenue",   quarterRevenue);
+        result.put("quarterProfit",    quarterProfit);
+        result.put("quarterCollected", quarterCollected);
+        result.put("quarterMargin",    quarterMargin);
         result.put("yearRevenue",      yearRevenue);
+        result.put("yearProfit",       yearProfit);
+        result.put("yearCollected",    yearCollected);
+        result.put("yearMargin",       yearMargin);
         return result;
     }
 

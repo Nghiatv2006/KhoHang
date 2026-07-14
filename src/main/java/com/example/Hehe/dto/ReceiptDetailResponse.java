@@ -14,6 +14,7 @@ public class ReceiptDetailResponse {
     private LocalDate expirationDate;
     private Integer quantity;
     private BigDecimal price;
+    private BigDecimal importPrice;
     private String batchCode;
     private Integer receivedQuantity;
     private String shortfallReason;
@@ -32,6 +33,8 @@ public class ReceiptDetailResponse {
             this.productId = d.getProduct().getId();
             this.productName = d.getProduct().getName();
             this.productSku = d.getProduct().getSku();
+            this.importPrice = d.getProduct().getImportPrice() != null
+                    ? d.getProduct().getImportPrice() : java.math.BigDecimal.ZERO;
             if (d.getProduct().getCategory() != null) {
                 this.productCategory = d.getProduct().getCategory().getName();
             }
@@ -50,4 +53,5 @@ public class ReceiptDetailResponse {
     public LocalDate getExpirationDate() { return expirationDate; }
     public Integer getQuantity() { return quantity; }
     public BigDecimal getPrice() { return price; }
+    public BigDecimal getImportPrice() { return importPrice; }
 }

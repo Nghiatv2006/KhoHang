@@ -760,6 +760,17 @@ public class ReceiptServiceImpl implements ReceiptService {
                     }
                     if (r.getType() == ReceiptType.EXPORT) {
                         // Bỏ qua PENDING_ADMIN để chạy xuống cuối hàm và set COMPLETED
+                    } else if (r.getType() == ReceiptType.IMPORT && currentUser.getRole() == UserRole.ADMIN) {
+                        boolean isCrossBranch = (r.getSourceBranch() != null && r.getDestBranch() != null && !r.getSourceBranch().getId().equals(r.getDestBranch().getId()));
+                        if (isCrossBranch) {
+                            for (ReceiptDetail d : r.getDetails()) {
+                                addInventory(r.getSourceBranch(), d, -d.getQuantity());
+                            }
+                        }
+                        r.setStatus(ReceiptStatus.PENDING_STOCKTAKE);
+                        receiptRepository.save(r);
+                        auditLogService.logAction(currentUser, "APPROVE", "receipts", String.valueOf(r.getId()), "Duyệt phiếu " + translateType(r.getType()) + " " + r.getCode() + " -> " + translateStatus(r.getStatus()));
+                        return new ReceiptResponse(r);
                     } else {
                         if (r.getType() == ReceiptType.TRANSFER) {
                             // Manager nguồn duyệt xuất kho -> trừ tồn kho
@@ -909,8 +920,19 @@ public class ReceiptServiceImpl implements ReceiptService {
         }
 
         receiptRepository.save(r);
-        auditLogService.logAction(currentUser, "CONFIRM_STOCKTAKE", "receipts", String.valueOf(r.getId()),
-                "Xác nhận kiểm kê nhận hàng cho phiếu " + r.getCode() + ". Kết quả: " + (hasShortfall ? "Có hao hụt" : "Đầy đủ/Khớp"));
+        if (hasShortfall) {
+            java.util.List<String> shortfallDetails = new java.util.ArrayList<>();
+            for (ReceiptDetail d : r.getDetails()) {
+                if (d.getReceivedQuantity() != null && d.getReceivedQuantity() < d.getQuantity()) {
+                    int diff = d.getQuantity() - d.getReceivedQuantity();
+                    shortfallDetails.add("• " + d.getProduct().getName() + " (Thiếu " + diff + " " + d.getProduct().getUnit() + ")");
+                }
+            }
+            String detailMessage = "Xác nhận kiểm kê nhận hàng cho phiếu " + r.getCode() + ". Kết quả: Có hao hụt\n" + String.join("\n", shortfallDetails);
+            auditLogService.logAction(currentUser, "CONFIRM_STOCKTAKE", "receipts", String.valueOf(r.getId()), detailMessage);
+        } else {
+            auditLogService.logAction(currentUser, "CONFIRM_STOCKTAKE", "receipts", String.valueOf(r.getId()), "Xác nhận kiểm kê nhận hàng cho phiếu " + r.getCode() + ". Kết quả: Đầy đủ/Khớp");
+        }
         return new ReceiptResponse(r);
     }
 

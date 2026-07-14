@@ -34,18 +34,19 @@ public class AuditLogController {
      */
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    public ResponseEntity<List<AuditLogResponse>> getLogs(
+    public ResponseEntity<org.springframework.data.domain.Page<AuditLogResponse>> getLogs(
             @AuthenticationPrincipal User currentUser,
             @RequestParam(required = false) Integer userId,
             @RequestParam(required = false) String action,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
-            @RequestParam(required = false) String keyword
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
     ) {
-        List<AuditLog> logs = auditLogService.searchLogs(currentUser, userId, action, from, to, keyword);
-        List<AuditLogResponse> response = logs.stream()
-                .map(AuditLogResponse::new)
-                .collect(Collectors.toList());
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size);
+        org.springframework.data.domain.Page<AuditLog> logs = auditLogService.searchLogs(currentUser, userId, action, from, to, keyword, pageable);
+        org.springframework.data.domain.Page<AuditLogResponse> response = logs.map(AuditLogResponse::new);
         return ResponseEntity.ok(response);
     }
 }

@@ -396,6 +396,8 @@ public class ProductServiceImpl implements ProductService {
         int skippedCount = 0;
         List<String> errors = new ArrayList<>();
         List<Map<String, Object>> updateDetails = new ArrayList<>();
+        List<Map<String, Object>> newDetails = new ArrayList<>();
+        List<String> newNames = new ArrayList<>();
         Set<String> seenInExcel = new HashSet<>();
         List<Category> allCategories = categoryRepository.findAll();
 
@@ -553,6 +555,16 @@ public class ProductServiceImpl implements ProductService {
                         }
                         
                         newCount++;
+                        newNames.add(name);
+                        
+                        Map<String, Object> newDetailMap = new HashMap<>();
+                        newDetailMap.put("name", name);
+                        newDetailMap.put("category", category.getName());
+                        java.text.NumberFormat format = java.text.NumberFormat.getInstance(new java.util.Locale("vi", "VN"));
+                        newDetailMap.put("importPrice", format.format(importPrice) + " đ");
+                        newDetailMap.put("price", format.format(price) + " đ");
+                        newDetails.add(newDetailMap);
+
                         if (!preview) {
                             Product product = new Product();
                             if (sku.isEmpty()) {
@@ -589,14 +601,21 @@ public class ProductServiceImpl implements ProductService {
         result.put("skippedCount", skippedCount);
         result.put("errors", errors);
         result.put("updateDetails", updateDetails);
+        result.put("newDetails", newDetails);
         // Giữ lại successCount cho tương thích ngược (hoặc tổng của new + update)
         result.put("successCount", newCount + updateCount);
 
         // Ghi nhật ký hệ thống nếu import THẬT và có thành công ít nhất 1 sản phẩm
         if (!preview && (newCount > 0 || updateCount > 0)) {
-            String logDetails = String.format("Đã import Excel thành công. Thêm mới: %d, Cập nhật: %d. (Bỏ qua %d lỗi, %d không đổi)", 
-                                              newCount, updateCount, errors.size(), skippedCount);
-            auditLogService.logAction(currentUser, "IMPORT_EXCEL", "products", "Bulk", logDetails);
+            StringBuilder logDetails = new StringBuilder();
+            logDetails.append(String.format("Đã nhập tệp Excel thành công (Thêm: %d, Sửa: %d)", newCount, updateCount));
+            for (String newName : newNames) {
+                logDetails.append("\n[Mới] ").append(newName);
+            }
+            for (Map<String, Object> detail : updateDetails) {
+                logDetails.append("\n[Sửa] ").append(detail.get("name"));
+            }
+            auditLogService.logAction(currentUser, "IMPORT_EXCEL", "products", "Bulk", logDetails.toString());
         }
 
         return result;
