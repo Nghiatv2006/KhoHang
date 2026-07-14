@@ -1,38 +1,53 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <mxfile host="Electron" type="device">
-  <diagram id="23_tieu_huy-id" name="Use Case: Tiêu hủy (Admin)">
+  <diagram id="20_tieu_huy_admin-id" name="Use Case: Tiêu hủy (Admin)">
     <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" connect="1" arrows="1">
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
-        <mxCell id="system_boundary" value="Use Case: Tiêu hủy (Admin)" style="swimlane;whiteSpace=wrap;html=1;startSize=30;fillColor=#f8f9fa;strokeColor=#cccccc;fontStyle=1;align=center;" vertex="1" parent="1">
-          <mxGeometry x="220" y="50" width="650" height="380" as="geometry"/>
+        <mxCell id="system_boundary" value="Hệ thống Quản lý Kho - Tiêu hủy (Admin)" style="swimlane;whiteSpace=wrap;html=1;startSize=30;fillColor=#f8f9fa;strokeColor=#cccccc;fontStyle=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="220" y="30" width="700" height="420" as="geometry"/>
         </mxCell>
+        <!-- Actor -->
         <mxCell id="act_admin" value="Admin" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontColor=#1a1a1a;fontStyle=1;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="80" y="100" width="50" height="90" as="geometry"/>
+          <mxGeometry x="60" y="160" width="50" height="90" as="geometry"/>
         </mxCell>
-        <mxCell id="uc_view" value="Xem phiếu Tiêu hủy" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;" vertex="1" parent="1">
-          <mxGeometry x="260" y="100" width="185" height="60" as="geometry"/>
+        <!-- UC1: Xem toàn bộ phiếu Tiêu hủy -->
+        <mxCell id="uc_view" value="Xem toàn bộ phiếu Tiêu hủy&#xa;(Tất cả chi nhánh)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="280" y="70" width="220" height="70" as="geometry"/>
         </mxCell>
-        <mxCell id="uc_duyet_cuoi" value="Phê duyệt Tiêu hủy cuối cùng" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;" vertex="1" parent="1">
-          <mxGeometry x="260" y="200" width="185" height="60" as="geometry"/>
+        <!-- UC2: Phê duyệt cuối cùng -->
+        <mxCell id="uc_duyet_cuoi" value="Phê duyệt Tiêu hủy cuối cùng&#xa;(PENDING_STOCKTAKE → COMPLETED)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="280" y="180" width="250" height="70" as="geometry"/>
         </mxCell>
-        <mxCell id="uc_tru_ton" value="Trừ tồn kho vĩnh viễn" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;" vertex="1" parent="1">
-          <mxGeometry x="560" y="200" width="185" height="60" as="geometry"/>
+        <!-- UC3: Trừ tồn kho vĩnh viễn -->
+        <mxCell id="uc_tru_ton" value="Trừ tồn kho tại chi nhánh nguồn" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="630" y="130" width="200" height="60" as="geometry"/>
         </mxCell>
-        <mxCell id="uc_huy" value="Hủy phiếu Tiêu hủy (đã xử lý)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;" vertex="1" parent="1">
-          <mxGeometry x="260" y="300" width="185" height="60" as="geometry"/>
+        <!-- UC4: Ghi nhật ký kiểm toán -->
+        <mxCell id="uc_audit" value="Ghi nhật ký kiểm toán (Audit Log)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="630" y="230" width="200" height="60" as="geometry"/>
         </mxCell>
+        <!-- UC5: Hủy phiếu Tiêu hủy -->
+        <mxCell id="uc_huy" value="Hủy phiếu Tiêu hủy&#xa;(Chỉ khi chưa COMPLETED)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="280" y="320" width="220" height="60" as="geometry"/>
+        </mxCell>
+        <!-- Ghi chú: Code KHÔNG CHO PHÉP bất cứ ai (kể cả Admin) Hủy phiếu khi đã COMPLETED -->
+        <!-- Edges: Actor -> Use Cases -->
         <mxCell id="edge_0" value="" style="endArrow=none;html=1;rounded=0;strokeColor=#4a90d9;strokeWidth=1.5;" edge="1" parent="1" source="act_admin" target="uc_view">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="edge_1" value="" style="endArrow=none;html=1;rounded=0;strokeColor=#4a90d9;strokeWidth=1.5;" edge="1" parent="1" source="act_admin" target="uc_duyet_cuoi">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
+        <mxCell id="edge_5" value="" style="endArrow=none;html=1;rounded=0;strokeColor=#4a90d9;strokeWidth=1.5;" edge="1" parent="1" source="act_admin" target="uc_huy">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Edges: Include relationships -->
         <mxCell id="edge_2" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;strokeColor=#555555;strokeWidth=1.5;labelBackgroundColor=#ffffff;fontColor=#333333;fontSize=10;align=center;" edge="1" parent="1" source="uc_duyet_cuoi" target="uc_tru_ton">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="edge_3" value="" style="endArrow=none;html=1;rounded=0;strokeColor=#4a90d9;strokeWidth=1.5;" edge="1" parent="1" source="act_admin" target="uc_huy">
+        <mxCell id="edge_3" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;strokeColor=#555555;strokeWidth=1.5;labelBackgroundColor=#ffffff;fontColor=#333333;fontSize=10;align=center;" edge="1" parent="1" source="uc_duyet_cuoi" target="uc_audit">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
       </root>
