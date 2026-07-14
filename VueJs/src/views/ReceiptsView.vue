@@ -35,12 +35,6 @@ const pageConfig = computed(() => {
     },
     DISPOSAL: {
       title: 'Quản lý Tiêu Hủy',
-      desc: 'Theo dõi, lập và quản lý các phiếu tiêu hủy hàng hóa',
-      icon: 'fas fa-trash-alt',
-      btnLabel: 'Lập phiếu tiêu hủy'
-    },
-    DISPOSAL: {
-      title: 'Quản lý Tiêu Hủy',
       desc: 'Theo dõi, lập và phê duyệt các phiếu tiêu hủy hàng hóa',
       icon: 'fas fa-trash-alt',
       btnLabel: 'Lập phiếu tiêu hủy'
