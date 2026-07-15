@@ -112,4 +112,48 @@ public class UserController {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }
     }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<?> verifyEmail(@RequestBody Map<String, String> request) {
+        try {
+            String email = request.get("email");
+            if (email == null || email.trim().isEmpty()) {
+                throw new RuntimeException("Email không được để trống.");
+            }
+            
+            // Validate email via AbstractAPI
+            boolean exists = isEmailExistsViaAPI(email.trim());
+            if (!exists) {
+                throw new RuntimeException("Tài khoản email này không tồn tại thật trên hệ thống máy chủ (như Google).");
+            }
+            
+            return ResponseEntity.ok(Map.of("message", "Đã xác thực email thành công (Email có thật)."));
+        } catch (RuntimeException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+    }
+
+    private boolean isEmailExistsViaAPI(String email) {
+        String apiKey = System.getenv("ABSTRACT_API_KEY");
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            throw new RuntimeException("Chưa cấu hình ABSTRACT_API_KEY trong file .env");
+        }
+        
+        try {
+            org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
+            String url = "https://emailreputation.abstractapi.com/v1/?api_key=" + apiKey + "&email=" + email;
+            java.util.Map<String, Object> response = restTemplate.getForObject(url, java.util.Map.class);
+            
+            if (response != null && response.containsKey("email_deliverability")) {
+                java.util.Map<String, Object> deliverability = (java.util.Map<String, Object>) response.get("email_deliverability");
+                if (deliverability != null) {
+                    String status = (String) deliverability.get("status");
+                    return "deliverable".equalsIgnoreCase(status);
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi khi gọi AbstractAPI: " + e.getMessage());
+        }
+        return false;
+    }
 }
