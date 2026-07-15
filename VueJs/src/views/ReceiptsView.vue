@@ -1277,7 +1277,7 @@ async function submitCreateDraft() {
          }
          toast.success('Đã tạo và tự động chuyển trạng thái phiếu thành công!')
       } else {
-         toast.success('Tạo phiếu kho nháp thành công!')
+         toast.success('Tạo phiếu thành công!')
       }
       showCreateModal.value = false
       await loadData()
@@ -2872,7 +2872,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
               <div class="text-xs font-bold opacity-90 uppercase tracking-wider mb-1">
                 {{ createForm.type === 'EXPORT' ? 'Lưu phiếu xuất' : createForm.type === 'TRANSFER' ? 'Lưu phiếu điều chuyển' : createForm.type === 'DISPOSAL' ? 'Lưu phiếu tiêu hủy' : 'Lưu phiếu kho' }}
               </div>
-              <div class="font-bold text-xl">{{ createForm.type === 'TRANSFER' ? 'Tạo lệnh xuất hàng (DRAFT)' : 'Tạo phiếu nháp (DRAFT)' }}</div>
+              <div class="font-bold text-xl">{{ createForm.type === 'EXPORT' ? 'Tạo phiếu xuất' : createForm.type === 'TRANSFER' ? 'Tạo lệnh xuất hàng' : createForm.type === 'DISPOSAL' ? 'Tạo phiếu tiêu hủy' : 'Tạo phiếu nhập' }}</div>
             </div>
             <button @click="showCreateModal = false" class="relative z-10 w-9 h-9 flex items-center justify-center rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-sm transition-all shadow-sm border border-white/10">
               <i class="fas fa-times"></i>
@@ -3028,7 +3028,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                           <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Danh mục</label>
                           <select v-model="d.categoryId" @change="d.productId = ''; onProductChange(d)"
                             class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none bg-white">
-                            <option value="">-- Tất cả --</option>
+                            <option value="">-- Chọn danh mục --</option>
                             <option v-for="c in getAvailableCategoriesForRow(idx)" :key="c.id" :value="c.id">{{ c.name }}</option>
                           </select>
                         </div>
@@ -3141,7 +3141,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
               class="px-6 py-2.5 bg-[#4361ee] hover:bg-[#3a0ca3] text-white rounded-xl font-bold text-sm transition-all disabled:opacity-60 flex items-center gap-2">
               <i class="fas fa-spinner fa-spin" v-if="submittingCreate"></i>
               <i class="fas fa-save" v-else></i>
-              Lưu nháp
+              {{ createForm.type === 'EXPORT' ? 'Lưu phiếu xuất' : createForm.type === 'TRANSFER' ? 'Lưu lệnh điều chuyển' : createForm.type === 'DISPOSAL' ? 'Lưu phiếu tiêu hủy' : 'Lưu phiếu nhập' }}
             </button>
           </div>
         </div>
