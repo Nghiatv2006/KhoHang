@@ -99,12 +99,11 @@ function confirmDeleteC(c: any) { deletingC.value = c; showDeleteC.value = true 
 async function saveCustomer() {
   if (!cForm.name?.trim()) { toast.error('Tên khách hàng là bắt buộc.'); return }
 
-  if (cForm.email && cForm.email.trim() !== '') {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(cForm.email.trim())) {
-      toast.error('Email không hợp lệ.');
-      return;
-    }
+  if (!cForm.email?.trim()) { toast.error('Email khách hàng là bắt buộc.'); return }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(cForm.email.trim())) {
+    toast.error('Email không hợp lệ.');
+    return;
   }
 
   if (cForm.phone && cForm.phone.trim() !== '') {
@@ -352,7 +351,7 @@ function exportExcel() {
             <div v-if="cTab === 'info'" class="space-y-5">
               <div class="grid grid-cols-2 gap-5">
                 <div class="col-span-2"><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Tên khách hàng <span class="text-[#ea4f52]">*</span></label><input v-model="cForm.name" :disabled="!isManager" type="text" placeholder="Nguyễn Văn A..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all text-[#364a63] disabled:opacity-70 disabled:cursor-not-allowed" /></div>
-                <div><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Email</label><input v-model="cForm.email" :disabled="!isManager" type="email" placeholder="email@..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all text-[#364a63] disabled:opacity-70 disabled:cursor-not-allowed" /></div>
+                <div><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Email <span class="text-[#ea4f52]">*</span></label><input v-model="cForm.email" :disabled="!isManager" type="email" placeholder="email@..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all text-[#364a63] disabled:opacity-70 disabled:cursor-not-allowed" /></div>
                 <div><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số điện thoại</label><input v-model="cForm.phone" @input="cForm.phone = cForm.phone.replace(/\D/g, '')" maxlength="10" :disabled="!isManager" type="text" placeholder="0900..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all text-[#364a63] disabled:opacity-70 disabled:cursor-not-allowed" /></div>
                 <div><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Mã số thuế</label><input v-model="cForm.taxCode" :disabled="!isManager" type="text" placeholder="MST..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all font-mono text-[#364a63] disabled:opacity-70 disabled:cursor-not-allowed" /></div>
                 <div class="col-span-2"><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Địa chỉ</label><input v-model="cForm.address" :disabled="!isManager" type="text" placeholder="Địa chỉ..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all text-[#364a63] disabled:opacity-70 disabled:cursor-not-allowed" /></div>

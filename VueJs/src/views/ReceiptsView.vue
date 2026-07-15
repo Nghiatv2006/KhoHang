@@ -3,6 +3,9 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { api } from '../api'
 import { useToast } from '../utils/toast'
 import AppModal from '../components/AppModal.vue'
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
 
 const props = defineProps<{
   receiptType?: 'IMPORT' | 'EXPORT' | 'TRANSFER' | 'DISPOSAL'
@@ -19,31 +22,31 @@ const pageConfig = computed(() => {
       title: 'Quản lý Nhập Kho',
       desc: 'Theo dõi, lập và phê duyệt các phiếu nhập kho',
       icon: 'fas fa-download',
-      btnLabel: 'Lập phiếu nhập'
+      btnLabel: 'Lưu phiếu nhập'
     },
     EXPORT: {
-      title: 'Quản lý Hóa Đơn',
-      desc: 'Theo dõi, lập và quản lý các hóa đơn xuất bán',
-      icon: 'fas fa-file-invoice-dollar',
-      btnLabel: 'Lập hóa đơn'
+      title: 'Quản lý Xuất Kho',
+      desc: 'Theo dõi, lập và quản lý các phiếu xuất kho',
+      icon: 'fas fa-file-export',
+      btnLabel: 'Lưu phiếu xuất'
     },
     TRANSFER: {
       title: 'Quản lý Điều Chuyển',
       desc: 'Theo dõi, lập và phê duyệt các phiếu điều chuyển kho',
       icon: 'fas fa-exchange-alt',
-      btnLabel: 'Lập phiếu điều chuyển'
+      btnLabel: 'Lưu phiếu điều chuyển'
     },
     ADJUST_OUT: {
       title: 'Quản lý Tiêu Hủy',
       desc: 'Theo dõi, lập và quản lý các phiếu tiêu hủy hàng hóa',
       icon: 'fas fa-trash-alt',
-      btnLabel: 'Lập phiếu tiêu hủy'
+      btnLabel: 'Lưu phiếu tiêu hủy'
     },
     DISPOSAL: {
       title: 'Quản lý Tiêu Hủy',
       desc: 'Theo dõi, lập và phê duyệt các phiếu tiêu hủy hàng hóa',
       icon: 'fas fa-trash-alt',
-      btnLabel: 'Lập phiếu tiêu hủy'
+      btnLabel: 'Lưu phiếu tiêu hủy'
     }
   }
   return configs[props.receiptType || 'IMPORT'] || configs.IMPORT
@@ -398,9 +401,42 @@ async function loadData() {
     toast.error('Lỗi tải dữ liệu: ' + e.message)
   } finally {
     loading.value = false
+    if (route.query.highlight) {
+      setTimeout(() => highlightReceipt(route.query.highlight as string), 500)
+    }
   }
 }
+
+function highlightReceipt(code: string) {
+  setTimeout(() => {
+    const index = filteredReceipts.value.findIndex(r => r.code === code)
+    if (index !== -1) {
+      currentPage.value = Math.floor(index / itemsPerPage) + 1
+      setTimeout(() => {
+        const el = document.getElementById(`receipt-${code}`)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          
+          // Áp dụng class animation heartbeat
+          el.classList.add('animate-receipt-heartbeat')
+          
+          // Sau 3.5s thì xóa class để có thể chạy lại lần sau
+          setTimeout(() => {
+            el.classList.remove('animate-receipt-heartbeat')
+          }, 3500)
+        }
+      }, 100)
+    }
+  }, 100)
+}
+
 onMounted(loadData)
+
+watch(() => route.query.highlight, (newVal) => {
+  if (newVal) {
+    highlightReceipt(newVal as string)
+  }
+})
 
 // ──────────────────────────────────────────────────────────────
 // HEAD BRANCH
@@ -2285,6 +2321,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
           </thead>
           <tbody class="divide-y divide-[#f1f5f9]">
             <tr v-for="r in paginatedReceipts" :key="r.id"
+              :id="'receipt-' + r.code"
               @dblclick="openDetail(r)"
               :class="[
                 'receipt-row hover:bg-slate-50/60 cursor-pointer transition-colors group even:bg-slate-50/20',
@@ -2451,7 +2488,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
 
             <div class="relative z-10 text-white drop-shadow-md">
               <div class="text-xs font-bold opacity-90 uppercase tracking-wider mb-1">
-                {{ selectedReceipt?.type === 'EXPORT' ? 'Chi tiết hóa đơn' : selectedReceipt?.type === 'TRANSFER' ? 'Chi tiết phiếu điều chuyển' : selectedReceipt?.type === 'DISPOSAL' ? 'Chi tiết phiếu tiêu hủy' : 'Chi tiết phiếu kho' }}
+                {{ selectedReceipt?.type === 'EXPORT' ? 'Chi tiết phiếu xuất' : selectedReceipt?.type === 'TRANSFER' ? 'Chi tiết phiếu điều chuyển' : selectedReceipt?.type === 'DISPOSAL' ? 'Chi tiết phiếu tiêu hủy' : 'Chi tiết phiếu kho' }}
               </div>
               <div class="font-mono font-bold text-xl">{{ selectedReceipt?.code }}</div>
             </div>
@@ -2833,7 +2870,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
 
             <div class="relative z-10 text-white drop-shadow-md">
               <div class="text-xs font-bold opacity-90 uppercase tracking-wider mb-1">
-                {{ createForm.type === 'EXPORT' ? 'Lập hóa đơn' : createForm.type === 'TRANSFER' ? 'Lập phiếu điều chuyển' : createForm.type === 'DISPOSAL' ? 'Lập phiếu tiêu hủy' : 'Lập phiếu kho' }}
+                {{ createForm.type === 'EXPORT' ? 'Lưu phiếu xuất' : createForm.type === 'TRANSFER' ? 'Lưu phiếu điều chuyển' : createForm.type === 'DISPOSAL' ? 'Lưu phiếu tiêu hủy' : 'Lưu phiếu kho' }}
               </div>
               <div class="font-bold text-xl">{{ createForm.type === 'TRANSFER' ? 'Tạo lệnh xuất hàng (DRAFT)' : 'Tạo phiếu nháp (DRAFT)' }}</div>
             </div>

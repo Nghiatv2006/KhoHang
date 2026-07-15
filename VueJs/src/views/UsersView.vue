@@ -192,7 +192,8 @@ async function saveUser() {
   if (!userForm.fullName?.trim()) { toast.error('Họ tên là bắt buộc.'); return }
   if (!editingUser.value && !userForm.password) { toast.error('Mật khẩu là bắt buộc khi tạo mới.'); return }
   
-  if (userForm.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userForm.email.trim())) {
+  if (!userForm.email?.trim()) { toast.error('Email là bắt buộc.'); return }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userForm.email.trim())) {
     toast.error('Định dạng email không hợp lệ.')
     return
   }
@@ -512,7 +513,7 @@ onUnmounted(() => {
                 <input v-model="userForm.phone" type="text" :readonly="phoneReadonly" @focus="phoneReadonly = false" autocomplete="off" placeholder="Số điện thoại" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63]" />
               </div>
               <div>
-                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Email</label>
+                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Email <span class="text-[#ea4f52]">*</span></label>
                 <input v-model="userForm.email" type="email" :readonly="emailReadonly" @focus="emailReadonly = false" autocomplete="off" placeholder="Email" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63]" />
               </div>
               <div>

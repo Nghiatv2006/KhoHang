@@ -69,6 +69,7 @@ const badgeTransfer = ref(0)
 const badgeDisposal = ref(0)
 const badgeReceiptStocktake = ref(0)
 
+
 async function loadBadgeCounts() {
   try {
     const res = await api.get('/api/receipts')
@@ -81,7 +82,7 @@ async function loadBadgeCounts() {
     const isStaff = user.value?.role === 'STAFF';
 
     // Nhập kho
-    badgeImport.value = receipts.filter(r => {
+    const importReceipts = receipts.filter(r => {
       if (r.type !== 'IMPORT') return false;
       const isDest = myBranchId && Number(r.destBranchId) === Number(myBranchId);
       if (r.status === 'DRAFT') return (isManager && isDest) || isAdmin;
@@ -93,10 +94,11 @@ async function loadBadgeCounts() {
       const isSource = myBranchId && Number(r.sourceBranchId) === Number(myBranchId);
       if (r.status === 'PENDING_COMPENSATION') return (isManager && isSource) || isAdmin;
       return false;
-    }).length
+    })
+    badgeImport.value = importReceipts.length
 
     // Hóa đơn
-    badgeInvoice.value = receipts.filter(r => {
+    const invoiceReceipts = receipts.filter(r => {
       if (r.type !== 'EXPORT') return false;
       const isSource = myBranchId && Number(r.sourceBranchId) === Number(myBranchId);
       if (r.status === 'DRAFT') return (isManager && isSource) || isAdmin;
@@ -105,10 +107,11 @@ async function loadBadgeCounts() {
         return isSource;
       }
       return false;
-    }).length
+    })
+    badgeInvoice.value = invoiceReceipts.length
 
     // Điều chuyển (luồng mới: đích lập phiếu xin hàng)
-    badgeTransfer.value = receipts.filter(r => {
+    const transferReceipts = receipts.filter(r => {
       if (r.type !== 'TRANSFER') return false;
       const isSource = myBranchId && Number(r.sourceBranchId) === Number(myBranchId);
       const isDest = myBranchId && Number(r.destBranchId) === Number(myBranchId);
@@ -119,24 +122,69 @@ async function loadBadgeCounts() {
       // Staff đích kiểm kê nhận hàng
       if (r.status === 'PENDING_STOCKTAKE') return isStaff && isDest;
       return false;
-    }).length
+    })
+    badgeTransfer.value = transferReceipts.length
 
     // Tiêu hủy
-    badgeDisposal.value = receipts.filter(r => {
+    const disposalReceipts = receipts.filter(r => {
       if (r.type !== 'DISPOSAL') return false;
       const isSource = myBranchId && Number(r.sourceBranchId) === Number(myBranchId);
       if (r.status === 'DRAFT') return (isManager && isSource) || isAdmin;
       if (r.status === 'PENDING_ADMIN') return (isManager && isSource) || isAdmin;
       if (r.status === 'PENDING_STOCKTAKE') return isAdmin;
       return false;
-    }).length
+    })
+    badgeDisposal.value = disposalReceipts.length
 
     // Kiểm kê nhận hàng
-    badgeReceiptStocktake.value = receipts.filter(r => {
+    const stocktakeReceipts = receipts.filter(r => {
       if (r.status !== 'PENDING_STOCKTAKE') return false;
       if (isAdmin) return true;
       return myBranchId && Number(r.destBranchId) === Number(myBranchId);
-    }).length
+    })
+    badgeReceiptStocktake.value = stocktakeReceipts.length
+
+    // --- Notifications logic ---
+    const newNotifications = []
+    
+    const getNewestTime = (arr: any[]) => {
+      if (arr.length === 0) return null
+      return arr.reduce((max, r) => {
+        const time = new Date(r.createdAt || 0).getTime()
+        return time > max ? time : max
+      }, 0)
+    }
+
+    // Tách riêng các loại từ Nhập Kho
+    const shortfallReceipts = importReceipts.filter(r => r.status === 'PENDING_SHORTFALL_MANAGER' || r.status === 'PENDING_SHORTFALL_ADMIN')
+    const compensationReceipts = importReceipts.filter(r => r.status === 'PENDING_COMPENSATION')
+    const pureImportReceipts = importReceipts.filter(r => r.status !== 'PENDING_SHORTFALL_MANAGER' && r.status !== 'PENDING_SHORTFALL_ADMIN' && r.status !== 'PENDING_COMPENSATION')
+
+    if (pureImportReceipts.length > 0) {
+      newNotifications.push({ id: 'import', title: 'Nhập kho', desc: `Bạn có ${pureImportReceipts.length} phiếu Nhập kho cần xử lý`, link: '/imports', time: getNewestTime(pureImportReceipts), items: pureImportReceipts })
+    }
+    if (shortfallReceipts.length > 0) {
+      newNotifications.push({ id: 'shortfall', title: 'Báo thiếu hụt', desc: `Bạn có ${shortfallReceipts.length} báo thiếu hụt cần xử lý`, link: '/imports', time: getNewestTime(shortfallReceipts), items: shortfallReceipts })
+    }
+    if (compensationReceipts.length > 0) {
+      newNotifications.push({ id: 'compensation', title: 'Điều chuyển bù', desc: `Bạn có ${compensationReceipts.length} điều chuyển bù cần xử lý`, link: '/imports', time: getNewestTime(compensationReceipts), items: compensationReceipts })
+    }
+
+    if (badgeInvoice.value > 0) {
+      newNotifications.push({ id: 'invoice', title: 'Xuất kho', desc: `Bạn có ${badgeInvoice.value} phiếu Xuất kho cần xử lý`, link: '/invoices', time: getNewestTime(invoiceReceipts), items: invoiceReceipts })
+    }
+    if (badgeTransfer.value > 0) {
+      newNotifications.push({ id: 'transfer', title: 'Điều chuyển', desc: `Bạn có ${badgeTransfer.value} phiếu Điều chuyển cần xử lý`, link: '/transfers', time: getNewestTime(transferReceipts), items: transferReceipts })
+    }
+    if (badgeDisposal.value > 0) {
+      newNotifications.push({ id: 'disposal', title: 'Tiêu hủy', desc: `Bạn có ${badgeDisposal.value} phiếu Tiêu hủy cần xử lý`, link: '/disposals', time: getNewestTime(disposalReceipts), items: disposalReceipts })
+    }
+    const totalStocktake = draftStocktakeCount.value + badgeReceiptStocktake.value
+    if (totalStocktake > 0) {
+      newNotifications.push({ id: 'stocktake', title: 'Kiểm kê kho', desc: `Bạn có ${totalStocktake} phiếu Kiểm kê cần xử lý`, link: '/stocktakes', time: getNewestTime(stocktakeReceipts) || new Date().getTime(), items: stocktakeReceipts })
+    }
+
+    // Notifications logic removed
   } catch (e) {
     // silent fail
   }
@@ -152,7 +200,7 @@ const mainNavItems = computed(() => {
   
   const isHeadBranch = user.value?.branchName?.includes('Hà Nội') || user.value?.branch?.isHead === true;
   if (!isHeadBranch) {
-    items.push({ label: 'Hóa đơn', to: '/invoices', icon: 'fas fa-file-invoice-dollar', badge: badgeInvoice.value })
+    items.push({ label: 'Xuất kho', to: '/invoices', icon: 'fas fa-file-export', badge: badgeInvoice.value })
   }
   items.push({ label: 'Điều chuyển', to: '/transfers', icon: 'fas fa-exchange-alt', badge: badgeTransfer.value })
   
@@ -210,6 +258,7 @@ async function logout() {
     console.error('Logout API failed', e)
   }
   localStorage.removeItem('wh_user')
+  sessionStorage.removeItem('welcome_notif_shown')
   showLogoutDialog.value = false
   router.push('/login')
 }
@@ -240,7 +289,7 @@ onMounted(() => {
   }
   // Load badge counts
   loadBadgeCounts()
-  badgeTimer = setInterval(loadBadgeCounts, 3000) // Refresh mỗi 3 giây
+  badgeTimer = setInterval(loadBadgeCounts, 2000) // Refresh mỗi 2 giây
 })
 
 function handleNavClick(to: string) {
@@ -365,6 +414,9 @@ onUnmounted(() => {
         </div>
         
         <div class="flex items-center gap-4">
+          
+
+
           <!-- Day/Night Theme Toggle -->
           <div class="theme-toggle-wrapper">
             <input type="checkbox" id="theme-toggle-checkbox" :checked="isDark" @change="toggleTheme">
@@ -413,6 +465,8 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
+
+
   </div>
 </template>
 
@@ -489,6 +543,24 @@ onUnmounted(() => {
 }
 .animate-badge-pop {
   animation: badge-pop 0.4s ease-out;
+}
+
+@keyframes modal-pop {
+  0% { transform: scale(0.95); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-modal-pop {
+  animation: modal-pop 0.15s ease-out forwards;
+}
+
+@keyframes ping-slow {
+  75%, 100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+.animate-ping-slow {
+  animation: ping-slow 2s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
 /* ── Day/Night Theme Toggle (Compact for Topbar) ─────────── */
