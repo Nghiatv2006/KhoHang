@@ -12,7 +12,7 @@ CREATE TYPE user_role AS ENUM ('ADMIN', 'MANAGER', 'STAFF');
 CREATE TYPE user_status AS ENUM ('ACTIVE', 'LOCKED');
 CREATE TYPE receipt_type AS ENUM ('IMPORT', 'EXPORT', 'TRANSFER', 'ADJUST_IN', 'ADJUST_OUT', 'DISPOSAL');
 CREATE TYPE receipt_status AS ENUM ('DRAFT', 'PENDING_STAFF_CONFIRM', 'COMPLETED', 'CANCELLED', 'PENDING_ADMIN', 'PENDING_STOCKTAKE', 'PENDING_SHORTFALL_MANAGER', 'PENDING_SHORTFALL_ADMIN', 'RETURN');
-CREATE TYPE stocktake_status AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED');
+CREATE TYPE stocktake_status AS ENUM ('DRAFT', 'PENDING_APPROVAL', 'COMPLETED', 'CANCELLED');
 
 -- Bảng Chi nhánh (Branches)
 -- Lưu ý quy ước vận hành: Chi nhánh có id = 1 mặc định được xem là Kho Tổng (Main Branch).

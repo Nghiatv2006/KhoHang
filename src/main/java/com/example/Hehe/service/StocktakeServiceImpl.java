@@ -48,6 +48,12 @@ public class StocktakeServiceImpl implements StocktakeService {
     public List<StocktakeResponse> getAllStocktakes(User currentUser) {
         Integer branchId = getUserBranchId(currentUser);
         return stocktakeRepository.findByBranchIdOrderByCreatedAtDesc(branchId).stream()
+                .filter(s -> {
+                    if ("STAFF".equals(currentUser.getRole().name())) {
+                        return s.getCreatedBy() != null && s.getCreatedBy().getId().equals(currentUser.getId());
+                    }
+                    return true;
+                })
                 .map(StocktakeResponse::new)
                 .collect(Collectors.toList());
     }
@@ -62,11 +68,21 @@ public class StocktakeServiceImpl implements StocktakeService {
         if (!s.getBranch().getId().equals(branchId)) {
             throw new RuntimeException("Bạn không có quyền xem thông tin kiểm kê của chi nhánh khác.");
         }
+        
+        if ("STAFF".equals(currentUser.getRole().name())) {
+            if (s.getCreatedBy() == null || !s.getCreatedBy().getId().equals(currentUser.getId())) {
+                throw new RuntimeException("Bạn chỉ được xem phiếu kiểm kê do chính mình tạo.");
+            }
+        }
         return new StocktakeResponse(s);
     }
 
     @Override
     public StocktakeResponse createStocktake(StocktakeSaveRequest request, User currentUser) {
+        if (!"STAFF".equals(currentUser.getRole().name())) {
+            throw new RuntimeException("Chỉ nhân viên kho (STAFF) mới có quyền khởi tạo đợt kiểm kê.");
+        }
+
         Integer branchId = getUserBranchId(currentUser);
         Branch branch = branchRepository.findById(branchId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh với ID: " + branchId));
@@ -113,13 +129,25 @@ public class StocktakeServiceImpl implements StocktakeService {
         Stocktake s = stocktakeRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy phiên kiểm kê với ID: " + id));
 
-        if (s.getStatus() != StocktakeStatus.DRAFT) {
-            throw new RuntimeException("Chỉ có thể chỉnh sửa số liệu phiên kiểm kê ở trạng thái DRAFT.");
+        if (s.getStatus() != StocktakeStatus.DRAFT && s.getStatus() != StocktakeStatus.PENDING_APPROVAL) {
+            throw new RuntimeException("Chỉ có thể chỉnh sửa số liệu phiên kiểm kê ở trạng thái DRAFT hoặc PENDING_APPROVAL.");
+        }
+
+        if (s.getStatus() == StocktakeStatus.PENDING_APPROVAL) {
+            if (currentUser.getRole() != UserRole.MANAGER && currentUser.getRole() != UserRole.ADMIN) {
+                throw new RuntimeException("Chỉ Quản lý hoặc Admin mới có quyền chỉnh sửa số liệu khi chờ duyệt.");
+            }
         }
 
         Integer branchId = getUserBranchId(currentUser);
         if (!s.getBranch().getId().equals(branchId)) {
             throw new RuntimeException("Bạn không có quyền chỉnh sửa phiên kiểm kê của chi nhánh này.");
+        }
+
+        if ("STAFF".equals(currentUser.getRole().name())) {
+            if (s.getCreatedBy() == null || !s.getCreatedBy().getId().equals(currentUser.getId())) {
+                throw new RuntimeException("Bạn chỉ được chỉnh sửa phiếu kiểm kê do chính mình tạo.");
+            }
         }
 
         s.setNotes(request.getNotes());
@@ -168,16 +196,18 @@ public class StocktakeServiceImpl implements StocktakeService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy phiên kiểm kê với ID: " + id));
 
         if (s.getStatus() != StocktakeStatus.DRAFT) {
-            throw new RuntimeException("Chỉ có thể hoàn tất phiên kiểm kê đang ở trạng thái DRAFT.");
-        }
-
-        if (currentUser.getRole() != UserRole.MANAGER && currentUser.getRole() != UserRole.ADMIN) {
-            throw new RuntimeException("Chỉ Quản lý hoặc Admin mới có quyền hoàn tất kiểm kê kho.");
+            throw new RuntimeException("Chỉ có thể nộp phiên kiểm kê đang ở trạng thái DRAFT.");
         }
 
         Integer branchId = getUserBranchId(currentUser);
         if (!s.getBranch().getId().equals(branchId)) {
-            throw new RuntimeException("Bạn không có quyền duyệt hoàn tất phiên kiểm kê của chi nhánh này.");
+            throw new RuntimeException("Bạn không có quyền nộp phiên kiểm kê của chi nhánh này.");
+        }
+
+        if ("STAFF".equals(currentUser.getRole().name())) {
+            if (s.getCreatedBy() == null || !s.getCreatedBy().getId().equals(currentUser.getId())) {
+                throw new RuntimeException("Bạn chỉ được nộp phiếu kiểm kê do chính mình tạo.");
+            }
         }
 
         Branch branch = s.getBranch();
@@ -192,6 +222,59 @@ public class StocktakeServiceImpl implements StocktakeService {
         }
 
         // 2. Identify differences
+        boolean hasDeviation = false;
+        for (StocktakeDetail d : s.getDetails()) {
+            if (!d.getActualQuantity().equals(d.getExpectedQuantity())) {
+                hasDeviation = true;
+                break;
+            }
+        }
+
+        if (hasDeviation) {
+            s.setStatus(StocktakeStatus.PENDING_APPROVAL);
+            s = stocktakeRepository.save(s);
+            logAudit(currentUser, "SUBMIT_STOCKTAKE", "stocktakes", s.getId().toString(),
+                    "Phiếu kiểm kê " + s.getCode() + " có chênh lệch, được chuyển sang trạng thái chờ duyệt.");
+        } else {
+            s.setStatus(StocktakeStatus.COMPLETED);
+            s = stocktakeRepository.save(s);
+            logAudit(currentUser, "COMPLETE_STOCKTAKE", "stocktakes", s.getId().toString(),
+                    "Hoàn tất phiên kiểm kê " + s.getCode() + ". Số lượng thực tế khớp với hệ thống.");
+        }
+
+        return new StocktakeResponse(s);
+    }
+
+    @Override
+    public StocktakeResponse approveStocktake(Integer id, com.example.Hehe.dto.StocktakeApproveRequest request, User currentUser) {
+        Stocktake s = stocktakeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy phiên kiểm kê với ID: " + id));
+
+        if (s.getStatus() != StocktakeStatus.PENDING_APPROVAL) {
+            throw new RuntimeException("Chỉ có thể duyệt phiên kiểm kê đang ở trạng thái PENDING_APPROVAL.");
+        }
+
+        if (currentUser.getRole() != UserRole.MANAGER && currentUser.getRole() != UserRole.ADMIN) {
+            throw new RuntimeException("Chỉ Quản lý hoặc Admin mới có quyền duyệt kiểm kê kho.");
+        }
+
+        Integer branchId = getUserBranchId(currentUser);
+        if (!s.getBranch().getId().equals(branchId)) {
+            throw new RuntimeException("Bạn không có quyền duyệt phiên kiểm kê của chi nhánh này.");
+        }
+
+        Branch branch = s.getBranch();
+
+        // Optional: Recalculate expected quantities in real time again just in case
+        for (StocktakeDetail d : s.getDetails()) {
+            Optional<Inventory> opt = inventoryRepository.findByBranchIdAndProductIdAndBatchCode(
+                    branch.getId(), d.getProduct().getId(), d.getBatchCode());
+            int latestExpected = opt.map(Inventory::getQuantity).orElse(0);
+            d.setExpectedQuantity(latestExpected);
+            stocktakeDetailRepository.save(d);
+        }
+
+        // Identify differences
         List<StocktakeDetail> surplusList = new ArrayList<>();
         List<StocktakeDetail> deficitList = new ArrayList<>();
 
@@ -203,7 +286,11 @@ public class StocktakeServiceImpl implements StocktakeService {
             }
         }
 
-        // 3. Generate ADJUST_IN if there are surplus items
+        String reason = request.getReason() != null ? request.getReason() : "Không có lý do";
+        String responsibleStr = request.getResponsiblePersonName() != null ? request.getResponsiblePersonName() : "Hệ thống tự xử lý";
+        String additionalInfo = " | Lý do: " + reason + " | Trách nhiệm: " + responsibleStr;
+
+        // Generate ADJUST_IN if there are surplus items
         if (!surplusList.isEmpty()) {
             Receipt receiptIn = new Receipt();
             receiptIn.setCode("AI" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase());
@@ -212,7 +299,7 @@ public class StocktakeServiceImpl implements StocktakeService {
             receiptIn.setPaymentStatus("PAID");
             receiptIn.setDestBranch(branch);
             receiptIn.setCreatedBy(currentUser);
-            receiptIn.setDescription("Hệ thống tự động sinh khi duyệt kiểm kê " + s.getCode() + " (Số lượng thừa)");
+            receiptIn.setDescription("Hệ thống tự động sinh khi duyệt kiểm kê " + s.getCode() + " (Số lượng thừa)" + additionalInfo);
             receiptIn = receiptRepository.save(receiptIn);
 
             for (StocktakeDetail d : surplusList) {
@@ -238,7 +325,7 @@ public class StocktakeServiceImpl implements StocktakeService {
             receiptRepository.save(receiptIn);
         }
 
-        // 4. Generate ADJUST_OUT if there are deficit items
+        // Generate ADJUST_OUT if there are deficit items
         if (!deficitList.isEmpty()) {
             Receipt receiptOut = new Receipt();
             receiptOut.setCode("AO" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase());
@@ -247,7 +334,7 @@ public class StocktakeServiceImpl implements StocktakeService {
             receiptOut.setPaymentStatus("PAID");
             receiptOut.setSourceBranch(branch);
             receiptOut.setCreatedBy(currentUser);
-            receiptOut.setDescription("Hệ thống tự động sinh khi duyệt kiểm kê " + s.getCode() + " (Số lượng thiếu)");
+            receiptOut.setDescription("Hệ thống tự động sinh khi duyệt kiểm kê " + s.getCode() + " (Số lượng thiếu)" + additionalInfo);
             receiptOut = receiptRepository.save(receiptOut);
 
             for (StocktakeDetail d : deficitList) {
@@ -273,16 +360,19 @@ public class StocktakeServiceImpl implements StocktakeService {
             receiptRepository.save(receiptOut);
         }
 
-        // 5. Complete stocktake
+        // Complete stocktake
         s.setStatus(StocktakeStatus.COMPLETED);
+        
+        // Append reason and responsible person to notes
+        String existingNotes = s.getNotes() == null ? "" : s.getNotes() + "\n";
+        s.setNotes(existingNotes + "Đã duyệt: " + additionalInfo);
+        
         s = stocktakeRepository.save(s);
 
         String roleStr = currentUser.getRole() == UserRole.ADMIN ? "Admin" : "Quản lý";
-        boolean hasDeviation = !surplusList.isEmpty() || !deficitList.isEmpty();
-        String resultStr = hasDeviation ? "Đã cân bằng tồn kho thực tế." : "Số lượng thực tế khớp với hệ thống, không có chênh lệch.";
-
-        logAudit(currentUser, "COMPLETE_STOCKTAKE", "stocktakes", s.getId().toString(),
-                roleStr + " duyệt hoàn tất phiên kiểm kê " + s.getCode() + ". " + resultStr);
+        
+        logAudit(currentUser, "APPROVE_STOCKTAKE", "stocktakes", s.getId().toString(),
+                roleStr + " duyệt hoàn tất phiên kiểm kê " + s.getCode() + additionalInfo);
 
         return new StocktakeResponse(s);
     }
@@ -305,11 +395,45 @@ public class StocktakeServiceImpl implements StocktakeService {
             throw new RuntimeException("Bạn không có quyền hủy phiên kiểm kê của chi nhánh này.");
         }
 
+        if ("STAFF".equals(currentUser.getRole().name())) {
+            if (s.getCreatedBy() == null || !s.getCreatedBy().getId().equals(currentUser.getId())) {
+                throw new RuntimeException("Bạn chỉ được hủy phiếu kiểm kê do chính mình tạo.");
+            }
+        }
+
         s.setStatus(StocktakeStatus.CANCELLED);
         s = stocktakeRepository.save(s);
 
         logAudit(currentUser, "CANCEL_STOCKTAKE", "stocktakes", s.getId().toString(),
                 "Hủy bỏ phiên kiểm kê " + s.getCode());
+
+        return new StocktakeResponse(s);
+    }
+
+    @Override
+    @Transactional
+    public StocktakeResponse rejectStocktake(Integer id, User currentUser) {
+        Stocktake s = stocktakeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đợt kiểm kê"));
+
+        if (!List.of("ADMIN", "MANAGER").contains(currentUser.getRole().name())) {
+            throw new RuntimeException("Chỉ Quản lý hoặc Admin mới có quyền yêu cầu đếm lại.");
+        }
+
+        if (s.getStatus() != StocktakeStatus.PENDING_APPROVAL) {
+            throw new RuntimeException("Chỉ có thể từ chối phiếu đang chờ duyệt.");
+        }
+
+        Integer branchId = getUserBranchId(currentUser);
+        if (!s.getBranch().getId().equals(branchId)) {
+            throw new RuntimeException("Bạn không có quyền quản lý chi nhánh này.");
+        }
+
+        s.setStatus(StocktakeStatus.DRAFT);
+        s = stocktakeRepository.save(s);
+
+        logAudit(currentUser, "REJECT_STOCKTAKE", "stocktakes", s.getId().toString(),
+                "Yêu cầu đếm lại phiên kiểm kê " + s.getCode());
 
         return new StocktakeResponse(s);
     }

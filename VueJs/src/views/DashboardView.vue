@@ -104,23 +104,7 @@ const isHeadBranchUser = computed(() => {
   return !bId || Number(bId) === 1 || user.value?.role === 'ADMIN'
 })
 
-const totalHeadBranchImport30Days = computed(() => {
-  let sum = 0
-  const startStr = toLocalISODate(dateRange.value.start)
-  const endStr = toLocalISODate(dateRange.value.end)
-  
-  receipts.value.forEach(r => {
-    if (r.status !== 'COMPLETED' || !r.createdAt) return
-    const receiptDateStr = r.createdAt.substring(0, 10)
-    if (receiptDateStr >= startStr && receiptDateStr <= endStr) {
-      if (r.type === 'IMPORT' && r.destBranchId === 1) {
-        const val = (r.details || []).reduce((s: number, det: any) => s + (det.quantity * det.price), 0)
-        sum += val
-      }
-    }
-  })
-  return sum
-})
+
 
 const receipts = ref<any[]>([])
 const inventories = ref<any[]>([])
