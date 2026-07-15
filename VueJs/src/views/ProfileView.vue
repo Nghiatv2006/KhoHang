@@ -103,7 +103,7 @@ const pwStrengthWidth = computed(() => {
 })
 
 const roleColors: Record<string, string> = {
-  ADMIN: 'from-[#4361ee] to-[#3a0ca3]',
+  ADMIN: 'from-[var(--accent-500)] to-[var(--accent-700)]',
   MANAGER: 'from-[#05b171] to-[#04935e]',
   STAFF: 'from-[#8094ae] to-[#526484]',
 }
@@ -120,14 +120,14 @@ onMounted(refreshUser)
     </div>
 
     <!-- Profile Card -->
-    <div class="bg-white rounded-[16px] shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-[#f1f5f9] overflow-hidden">
+    <div class="bg-white rounded-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-[#f1f5f9] overflow-hidden">
       <!-- Cover gradient -->
       <div :class="['h-28 bg-gradient-to-r', roleColors[user?.role] || 'from-[#8094ae] to-[#526484]']" />
 
       <!-- Avatar + Info -->
       <div class="px-8 pb-8 relative">
         <div class="flex flex-col sm:flex-row sm:items-end gap-5 mb-8">
-          <div class="w-24 h-24 -mt-12 rounded-2xl bg-white border-4 border-white shadow-md flex items-center justify-center text-4xl font-bold text-[#4361ee] flex-shrink-0 z-10 relative">
+          <div class="w-24 h-24 -mt-12 rounded-2xl bg-white border-4 border-white shadow-md flex items-center justify-center text-4xl font-bold text-[var(--accent-500)] flex-shrink-0 z-10 relative">
             {{ user?.fullName?.charAt(0) || '?' }}
           </div>
           <div class="pt-2 sm:pt-0 pb-1">
@@ -148,7 +148,7 @@ onMounted(refreshUser)
           <div class="bg-[#f8f9fa] rounded-xl px-5 py-4 border border-[#f1f5f9] sm:col-span-2">
             <div class="text-[11px] font-bold text-[#8094ae] uppercase tracking-wider mb-2">Chi nhánh trực thuộc</div>
             <div class="flex items-center gap-3 text-sm font-bold text-[#364a63]">
-              <div class="w-8 h-8 rounded-lg bg-[#eef2ff] text-[#4361ee] flex items-center justify-center">
+              <div class="w-8 h-8 rounded-lg bg-[#eef2ff] text-[var(--accent-500)] flex items-center justify-center">
                 <i class="fas fa-store"></i>
               </div>
               {{ user?.branchName || 'Chưa phân công chi nhánh' }}
@@ -159,9 +159,9 @@ onMounted(refreshUser)
     </div>
 
     <!-- Change Password -->
-    <div class="bg-white rounded-[16px] shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-[#f1f5f9] p-8">
+    <div class="bg-white rounded-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-[#f1f5f9] p-8">
       <h3 class="text-lg font-bold text-[#364a63] mb-6 flex items-center gap-2 pb-4 border-b border-[#f1f5f9]">
-        <i class="fas fa-lock text-[#4361ee]"></i>
+        <i class="fas fa-lock text-[var(--accent-500)]"></i>
         Bảo mật & Mật khẩu
       </h3>
 
@@ -175,7 +175,7 @@ onMounted(refreshUser)
               v-model="pwForm.currentPassword"
               :type="showPwds.current ? 'text' : 'password'"
               placeholder="Nhập mật khẩu hiện tại..."
-              class="w-full h-11 pl-11 pr-11 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] transition-all"
+              class="w-full h-11 pl-11 pr-11 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63] transition-all"
               :class="{ 'border-[#ea4f52] focus:border-[#ea4f52] focus:ring-[#ea4f52]/20': pwError }"
             />
             <button type="button" class="absolute right-4 top-1/2 -translate-y-1/2 text-[#8094ae] hover:text-[#364a63] transition-colors cursor-pointer" @click="showPwds.current = !showPwds.current">
@@ -193,7 +193,7 @@ onMounted(refreshUser)
               v-model="pwForm.newPassword"
               :type="showPwds.new ? 'text' : 'password'"
               placeholder="Tối thiểu 8 ký tự..."
-              class="w-full h-11 pl-11 pr-11 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] transition-all"
+              class="w-full h-11 pl-11 pr-11 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63] transition-all"
             />
             <button type="button" class="absolute right-4 top-1/2 -translate-y-1/2 text-[#8094ae] hover:text-[#364a63] transition-colors cursor-pointer" @click="showPwds.new = !showPwds.new">
               <i :class="['fas', showPwds.new ? 'fa-eye-slash' : 'fa-eye']"></i>
@@ -239,7 +239,7 @@ onMounted(refreshUser)
               v-model="pwForm.confirmPassword"
               :type="showPwds.confirm ? 'text' : 'password'"
               placeholder="Nhập lại mật khẩu mới..."
-              class="w-full h-11 pl-11 pr-11 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] transition-all"
+              class="w-full h-11 pl-11 pr-11 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63] transition-all"
               :class="{ 'border-[#ea4f52] focus:border-[#ea4f52] focus:ring-[#ea4f52]/20': pwForm.confirmPassword && pwForm.newPassword !== pwForm.confirmPassword }"
             />
             <button type="button" class="absolute right-4 top-1/2 -translate-y-1/2 text-[#8094ae] hover:text-[#364a63] transition-colors cursor-pointer" @click="showPwds.confirm = !showPwds.confirm">
@@ -260,7 +260,7 @@ onMounted(refreshUser)
         <!-- Submit -->
         <div class="pt-2">
           <button
-            class="h-11 px-6 bg-[#4361ee] hover:bg-[#3a0ca3] text-white rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md hover:-translate-y-0.5"
+            class="h-11 px-6 bg-[var(--accent-500)] hover:bg-[var(--accent-700)] text-white rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md hover:-translate-y-0.5"
             :disabled="pwSaving"
             :style="pwSaving ? 'opacity:0.7;cursor:not-allowed;transform:none' : ''"
             @click="prepareChangePassword"

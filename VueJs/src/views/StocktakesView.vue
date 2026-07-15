@@ -574,7 +574,7 @@ onUnmounted(() => {
           :key="tab.key"
           :class="[
             'flex items-center gap-2 pb-3 px-1 text-sm font-bold transition-colors relative',
-            activeTab === tab.key ? 'text-[#4361ee]' : 'text-[#8094ae] hover:text-[#364a63]'
+            activeTab === tab.key ? 'text-[var(--accent-500)]' : 'text-[#8094ae] hover:text-[#364a63]'
           ]"
           @click="activeTab = tab.key as any"
         >
@@ -584,7 +584,7 @@ onUnmounted(() => {
             v-if="(tab as any).badge > 0"
             class="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-purple-500 text-white"
           >{{ (tab as any).badge }}</span>
-          <div v-if="activeTab === tab.key" class="absolute bottom-[-1px] left-0 w-full h-[2px] bg-[#4361ee] rounded-t-full"></div>
+          <div v-if="activeTab === tab.key" class="absolute bottom-[-1px] left-0 w-full h-[2px] bg-[var(--accent-500)] rounded-t-full"></div>
         </button>
       </div>
     </div>
@@ -595,13 +595,13 @@ onUnmounted(() => {
     <template v-if="activeTab === 'periodic'">
 
     <!-- Toolbar: Filter + Khởi tạo -->
-    <div :class="['bg-indigo-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden', isInitialLoad ? 'accordion-filter-expand' : '']">
+    <div :class="['bg-indigo-50 rounded-[10px] border border-[#f1f5f9] border-t-4 border-t-[var(--accent-500)] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden', isInitialLoad ? 'accordion-filter-expand' : '']">
       <div class="p-5 border-b border-[#f1f5f9] bg-white/60 space-y-4">
         <div class="flex flex-col md:flex-row gap-3">
           <div class="relative flex-1">
             <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae]"></i>
             <input v-model="searchKeyword" type="text" placeholder="Tìm theo mã kiểm kê hoặc ghi chú..."
-              class="w-full h-11 pl-11 pr-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
+              class="w-full h-11 pl-11 pr-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63]" />
           </div>
           <select v-model="selectedStatus" class="h-11 px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm text-[#364a63] font-medium outline-none">
             <option value="">Tất cả trạng thái</option>
@@ -615,7 +615,7 @@ onUnmounted(() => {
             <option value="no">Khớp số lượng</option>
           </select>
           <button @click="createStocktake"
-            class="h-11 px-5 bg-gradient-to-r from-[#4361ee] to-[#4cc9f0] hover:from-[#3a0ca3] hover:to-[#4361ee] text-white rounded-xl font-bold transition-all shadow-md flex items-center gap-2 whitespace-nowrap">
+            class="h-11 px-5 bg-gradient-to-r from-[var(--accent-500)] to-[var(--accent-300)] hover:from-[var(--accent-700)] hover:to-[var(--accent-500)] text-white rounded-xl font-bold transition-all shadow-md flex items-center gap-2 whitespace-nowrap">
             <i class="fas fa-plus"></i> Khởi tạo kiểm kê
           </button>
         </div>
@@ -652,9 +652,9 @@ onUnmounted(() => {
     </div><!-- end bg-indigo-50 filter card -->
 
     <!-- STOCKTAKE TABLE -->
-    <div :class="['bg-white rounded-[16px] shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-[#f1f5f9] overflow-hidden', isInitialLoad ? 'accordion-table-expand' : '']">
+    <div :class="['bg-white rounded-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-[#f1f5f9] overflow-hidden', isInitialLoad ? 'accordion-table-expand' : '']">
       <div v-if="loading" class="flex flex-col items-center justify-center py-16">
-        <i class="fas fa-spinner fa-spin text-3xl text-[#4361ee] mb-4"></i>
+        <i class="fas fa-spinner fa-spin text-3xl text-[var(--accent-500)] mb-4"></i>
         <span class="text-sm text-[#8094ae]">Đang tải danh sách...</span>
       </div>
 
@@ -692,7 +692,7 @@ onUnmounted(() => {
               :style="isInitialLoad ? { '--row-delay': `${90 + index * 20}ms` } : {}"
               @dblclick="openDetail(st)"
             >
-              <td class="p-4 pl-8 font-mono font-bold text-[#4361ee]"><div>{{ st.code }}</div></td>
+              <td class="p-4 pl-8 font-mono font-bold text-[var(--accent-500)]"><div>{{ st.code }}</div></td>
               <td class="p-4 text-sm font-semibold text-[#364a63]"><div>{{ st.branchName }}</div></td>
               <td class="p-4 text-sm text-[#364a63]"><div>{{ st.createdByName }}</div></td>
               <td class="p-4 text-sm text-[#8094ae] font-mono"><div>{{ formatDateTime(st.createdAt) }}</div></td>
@@ -721,7 +721,7 @@ onUnmounted(() => {
               <td class="p-4 pr-8 text-right">
                 <button
                   @click="openDetail(st)"
-                  class="h-8 px-4 bg-slate-100 hover:bg-[#4361ee] hover:text-white text-slate-700 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 inline-flex"
+                  class="h-8 px-4 bg-slate-100 hover:bg-[var(--accent-500)] hover:text-white text-slate-700 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 inline-flex"
                 >
                   <i class="fas" :class="st.status === 'DRAFT' ? 'fa-pen' : 'fa-eye'"></i>
                   {{ st.status === 'DRAFT' ? 'Kiểm đếm' : 'Xem chi tiết' }}
@@ -829,7 +829,7 @@ onUnmounted(() => {
               :disabled="selectedStocktake.status !== 'DRAFT'"
               rows="2"
               placeholder="Nhập ghi chú hoặc lý do kiểm kê đợt này..."
-              class="w-full p-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] disabled:opacity-75 disabled:cursor-not-allowed"
+              class="w-full p-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63] disabled:opacity-75 disabled:cursor-not-allowed"
             ></textarea>
           </div>
 
@@ -898,7 +898,7 @@ onUnmounted(() => {
                         v-model.number="d.actualQuantity"
                         type="number"
                         min="0"
-                        class="w-20 h-9 border border-[#e2e8f0] bg-white rounded-lg text-center font-mono font-bold text-[#364a63] focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none"
+                        class="w-20 h-9 border border-[#e2e8f0] bg-white rounded-lg text-center font-mono font-bold text-[#364a63] focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none"
                       />
                       <span v-else class="font-mono font-bold text-[#364a63]">{{ d.actualQuantity }}</span>
                     </td>
@@ -921,7 +921,7 @@ onUnmounted(() => {
                       <button
                         v-if="d.adjustmentReceiptId"
                         @click="viewReceipt(d.adjustmentReceiptId)"
-                        class="text-xs font-mono font-bold text-[#4361ee] hover:underline"
+                        class="text-xs font-mono font-bold text-[var(--accent-500)] hover:underline"
                       >
                         {{ d.adjustmentReceiptCode }}
                       </button>
@@ -949,7 +949,7 @@ onUnmounted(() => {
             <button
               @click="saveDraft"
               :disabled="savingDraft"
-              class="px-6 h-11 bg-slate-100 hover:bg-[#4361ee]/10 text-[#4361ee] rounded-xl font-bold transition-all text-sm flex items-center gap-2"
+              class="px-6 h-11 bg-slate-100 hover:bg-[var(--accent-500)]/10 text-[var(--accent-500)] rounded-xl font-bold transition-all text-sm flex items-center gap-2"
             >
               <i v-if="savingDraft" class="fas fa-spinner fa-spin"></i>
               <i v-else class="fas fa-save"></i>
@@ -985,7 +985,7 @@ onUnmounted(() => {
          TAB 2: KIỂM KÊ NHẬN HÀNG (PENDING_STOCKTAKE)
     ════════════════════════════════════════════════════ -->
     <template v-if="activeTab === 'receipt'">
-    <div :class="['bg-purple-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-purple-500 shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden', isInitialLoad ? 'accordion-filter-expand' : '']">
+    <div :class="['bg-purple-50 rounded-[10px] border border-[#f1f5f9] border-t-4 border-t-purple-500 shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden', isInitialLoad ? 'accordion-filter-expand' : '']">
       <!-- Toolbar -->
       <div class="p-5 border-b border-[#f1f5f9] bg-white/60 flex flex-col md:flex-row gap-3 items-center">
         <div class="relative flex-1">
@@ -1181,7 +1181,7 @@ onUnmounted(() => {
                     <input v-model.number="item.actualQuantity" type="number" :min="0" :max="item.sentQty"
                       :disabled="selectedRsReceipt.status !== 'PENDING_STOCKTAKE'"
                       class="w-20 h-9 border rounded-lg text-center font-mono font-bold text-[#364a63] outline-none focus:ring-2 disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-200"
-                      :class="item.actualQuantity < item.sentQty ? 'border-amber-400 focus:ring-amber-200' : 'border-[#e2e8f0] focus:ring-[#4361ee]/20'" />
+                      :class="item.actualQuantity < item.sentQty ? 'border-amber-400 focus:ring-amber-200' : 'border-[#e2e8f0] focus:ring-[var(--accent-500)]/20'" />
                   </td>
                   <td class="p-3">
                     <textarea v-if="selectedRsReceipt.status === 'PENDING_STOCKTAKE' && item.actualQuantity < item.sentQty" v-model="item.shortfallReason"
@@ -1223,7 +1223,7 @@ onUnmounted(() => {
       @close="showReceiptModal = false"
     >
       <div v-if="receiptLoading" class="flex flex-col items-center justify-center py-16">
-        <i class="fas fa-spinner fa-spin text-2xl text-[#4361ee] mb-3"></i>
+        <i class="fas fa-spinner fa-spin text-2xl text-[var(--accent-500)] mb-3"></i>
         <span class="text-sm text-[#8094ae]">Đang tải dữ liệu phiếu...</span>
       </div>
 

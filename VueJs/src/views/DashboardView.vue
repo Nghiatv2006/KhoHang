@@ -778,7 +778,7 @@ function formatVND(val: number) {
 </script>
 <template>
   <div v-if="loading" class="text-center p-12 text-[#8094ae]">
-    <i class="fas fa-spinner fa-spin text-3xl mb-4 text-[#4361ee]"></i>
+    <i class="fas fa-spinner fa-spin text-3xl mb-4 text-[var(--accent-500)]"></i>
     <p>Đang tải dữ liệu...</p>
   </div>
   
@@ -799,11 +799,11 @@ function formatVND(val: number) {
     <div class="space-y-6">
 
       <!-- Line Chart (Trend) -->
-      <div data-reveal-id="trend" class="scroll-reveal-card bg-white rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col relative">
+      <div data-reveal-id="trend" class="scroll-reveal-card bg-white rounded-[10px] border border-[#f1f5f9] border-t-4 border-t-[var(--accent-500)] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col relative">
         <div class="p-6 border-b border-[#f1f5f9] flex justify-between items-center bg-[#f8f9fa]/50">
           <div>
             <h6 class="font-bold text-[#364a63] m-0">
-              <i class="fas fa-chart-line text-[#4361ee] mr-2"></i>Xu hướng Nhập - Xuất kho (30 ngày gần nhất)
+              <i class="fas fa-chart-line text-[var(--accent-500)] mr-2"></i>Xu hướng Nhập - Xuất kho (30 ngày gần nhất)
             </h6>
             <div class="mt-2 text-sm">
               <span class="text-[#8094ae] mr-2">Ước tính lợi nhuận gộp:</span>
@@ -825,7 +825,7 @@ function formatVND(val: number) {
       <!-- Branch Sales & Category Sales Revenue Share -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Branch Sales -->
-        <div data-reveal-id="branch" class="scroll-reveal-card bg-violet-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#8b5cf6] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col" style="transition-delay: 100ms">
+        <div data-reveal-id="branch" class="scroll-reveal-card bg-violet-50 rounded-[10px] border border-[#f1f5f9] border-t-4 border-t-[#8b5cf6] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col" style="transition-delay: 100ms">
           <div class="p-6 border-b border-[#f1f5f9]">
             <h6 class="font-bold text-[#364a63] m-0"><i class="fas fa-store text-[#8b5cf6] mr-2"></i>Doanh thu xuất bán theo Chi nhánh (30 ngày)</h6>
           </div>
@@ -835,7 +835,7 @@ function formatVND(val: number) {
         </div>
 
         <!-- Category Sales Share -->
-        <div data-reveal-id="cat" class="scroll-reveal-card bg-emerald-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#10b981] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col" style="transition-delay: 200ms">
+        <div data-reveal-id="cat" class="scroll-reveal-card bg-emerald-50 rounded-[10px] border border-[#f1f5f9] border-t-4 border-t-[#10b981] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col" style="transition-delay: 200ms">
           <div class="p-6 border-b border-[#f1f5f9]">
             <h6 class="font-bold text-[#364a63] m-0"><i class="fas fa-chart-pie text-[#10b981] mr-2"></i>Tỷ trọng doanh thu theo Danh mục (30 ngày)</h6>
           </div>
@@ -846,7 +846,7 @@ function formatVND(val: number) {
       </div>
 
       <!-- Top 5 Bán Chạy -->
-      <div data-reveal-id="top" class="scroll-reveal-card bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] rounded-[16px] border border-indigo-100/50 border-t-4 border-t-indigo-500 shadow-[0_8px_30px_rgba(0,0,0,0.04)] overflow-hidden flex flex-col relative group/card" style="transition-delay: 300ms">
+      <div data-reveal-id="top" class="scroll-reveal-card bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] rounded-[10px] border border-indigo-100/50 border-t-4 border-t-indigo-500 shadow-[0_8px_30px_rgba(0,0,0,0.04)] overflow-hidden flex flex-col relative group/card" style="transition-delay: 300ms">
         <div class="absolute -top-24 -right-24 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
         <div class="absolute -bottom-24 -left-24 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
         <div class="p-6 border-b border-indigo-50/50 flex justify-between items-center bg-white/60 backdrop-blur-sm relative z-10">
@@ -863,7 +863,7 @@ function formatVND(val: number) {
       </div>
 
       <!-- Xu hướng Nhập kho Chi nhánh Tổng (Chỉ hiển thị cho chi nhánh tổng) -->
-      <div v-if="isHeadBranchUser" data-reveal-id="head-import" class="scroll-reveal-card bg-white rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#10b981] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col relative" style="transition-delay: 400ms">
+      <div v-if="isHeadBranchUser" data-reveal-id="head-import" class="scroll-reveal-card bg-white rounded-[10px] border border-[#f1f5f9] border-t-4 border-t-[#10b981] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col relative" style="transition-delay: 400ms">
         <div class="p-6 border-b border-[#f1f5f9] flex justify-between items-center bg-[#f8f9fa]/50">
           <div>
             <h6 class="font-bold text-[#364a63] m-0">

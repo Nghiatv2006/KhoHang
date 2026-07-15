@@ -356,7 +356,7 @@ function formatCurrency(val: any) {
 
     <!-- ── PRODUCTS TAB ── -->
     <Transition name="fade" mode="out-in">
-      <div v-if="activeTab === 'products'" class="bg-white dark:bg-slate-800/40 rounded-[16px] border border-slate-100 dark:border-slate-700/50 border-t-4 border-t-indigo-500 shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden transition-colors">
+      <div v-if="activeTab === 'products'" class="bg-white dark:bg-slate-800/40 rounded-[10px] border border-slate-100 dark:border-slate-700/50 border-t-4 border-t-indigo-500 shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden transition-colors">
         <!-- Toolbar -->
         <div class="p-5 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between flex-wrap gap-4 bg-slate-50 dark:bg-slate-800/80 transition-colors">
           <div class="flex items-center gap-3 flex-1 min-w-[300px]">
@@ -510,7 +510,7 @@ function formatCurrency(val: any) {
 
     <!-- ── CATEGORIES TAB ── -->
     <Transition name="fade" mode="out-in">
-      <div v-if="activeTab === 'categories'" class="bg-white dark:bg-slate-800/40 rounded-[16px] border border-slate-100 dark:border-slate-700/50 border-t-4 border-t-sky-500 shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden transition-colors">
+      <div v-if="activeTab === 'categories'" class="bg-white dark:bg-slate-800/40 rounded-[10px] border border-slate-100 dark:border-slate-700/50 border-t-4 border-t-sky-500 shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden transition-colors">
         <!-- Toolbar -->
         <div class="p-5 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between flex-wrap gap-4 bg-slate-50 dark:bg-slate-800/80 transition-colors">
           <div class="flex items-center gap-3 flex-1 min-w-[300px]">

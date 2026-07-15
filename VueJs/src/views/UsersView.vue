@@ -297,29 +297,29 @@ onUnmounted(() => {
     </div>
 
     <!-- USERS TAB -->
-    <div :class="['bg-indigo-50 rounded-[16px] border border-[#f1f5f9] shadow-[0_2px_10px_rgba(0,0,0,0.02)] container-animate overflow-hidden', isInitialLoad ? 'overflow-visible' : 'overflow-hidden']">
+    <div :class="['bg-indigo-50 rounded-[10px] border border-[#f1f5f9] shadow-[0_2px_10px_rgba(0,0,0,0.02)] container-animate overflow-hidden', isInitialLoad ? 'overflow-visible' : 'overflow-hidden']">
       <!-- Neon Liquid Gradient Top Line -->
-      <div class="h-[4px] w-full bg-gradient-to-r from-[#4361ee] via-[#f72585] to-[#4cc9f0] bg-[length:200%_auto] animate-neon-sweep rounded-t-[16px]"></div>
+      <div class="h-[4px] w-full bg-gradient-to-r from-[var(--accent-600)] to-[var(--accent-300)] rounded-t-[16px]"></div>
       <!-- Toolbar -->
       <div class="p-5 border-b border-[#f1f5f9] flex items-center justify-between flex-wrap gap-4 bg-[#f8f9fa]/50 toolbar-animate">
         <div class="flex items-center gap-3 flex-1 min-w-[300px]">
           <div class="relative w-[250px]">
             <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae]"></i>
-            <input v-model="uSearch" type="text" placeholder="Tìm theo tên, username..." class="w-full h-[42px] pl-11 pr-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
+            <input v-model="uSearch" type="text" placeholder="Tìm theo tên, username..." class="w-full h-[42px] pl-11 pr-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63]" />
           </div>
-          <select v-if="isAdmin" v-model="uRoleFilter" class="h-[42px] px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] cursor-pointer">
+          <select v-if="isAdmin" v-model="uRoleFilter" class="h-[42px] px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63] cursor-pointer">
             <option value="">Tất cả vai trò</option>
             <option value="ADMIN">Admin</option>
             <option value="MANAGER">Manager</option>
             <option value="STAFF">Nhân viên</option>
           </select>
-          <select v-model="uStatusFilter" class="h-[42px] px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] cursor-pointer">
+          <select v-model="uStatusFilter" class="h-[42px] px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63] cursor-pointer">
             <option value="">Tất cả trạng thái</option>
             <option value="ACTIVE">Hoạt động</option>
             <option value="INACTIVE">Ngừng HĐ</option>
           </select>
         </div>
-        <button v-if="isAdmin || isManager" class="bg-[#4361ee] text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-sm flex items-center gap-2 btn-shimmer" @click="openAddUser">
+        <button v-if="isAdmin || isManager" class="bg-[var(--accent-500)] text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-sm flex items-center gap-2 btn-shimmer" @click="openAddUser">
           <i class="fas fa-user-plus"></i> Thêm nhân viên
         </button>
       </div>
@@ -343,7 +343,7 @@ onUnmounted(() => {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(u, index) in paginatedUsers" :key="u.id" :class="['border-b border-[#f1f5f9] hover:border-transparent hover:shadow-sm transition-all duration-300 cursor-pointer group', u.id === lastActiveUserId ? 'bg-[#4361ee]/5 font-semibold' : '', isInitialLoad ? (index % 2 === 0 ? 'fly-in-left-anim' : 'fly-in-right-anim') : '', `role-row-${u.role}`]" :style="isInitialLoad ? { '--delay': `${index * 30}ms` } : {}" @dblclick="isAdmin || isManager ? openEditUser(u) : null">
+            <tr v-for="(u, index) in paginatedUsers" :key="u.id" :class="['border-b border-[#f1f5f9] hover:border-transparent hover:shadow-sm transition-all duration-300 cursor-pointer group', u.id === lastActiveUserId ? 'bg-[var(--accent-500)]/5 font-semibold' : '', isInitialLoad ? (index % 2 === 0 ? 'fly-in-left-anim' : 'fly-in-right-anim') : '', `role-row-${u.role}`]" :style="isInitialLoad ? { '--delay': `${index * 30}ms` } : {}" @dblclick="isAdmin || isManager ? openEditUser(u) : null">
               <td class="p-4 first:rounded-l-xl last:rounded-r-xl">
                 <div class="flex items-center gap-3">
                   <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 user-avatar group-hover:rotate-[360deg] group-hover:scale-110 group-hover:shadow-md transition-all duration-700 ease-out">
@@ -408,7 +408,7 @@ onUnmounted(() => {
                   :class="[
                     'w-8 h-8 rounded-lg border flex items-center justify-center transition-all cursor-pointer font-bold',
                     currentPage === p 
-                      ? 'bg-[#4361ee] border-[#4361ee] text-white shadow-sm shadow-[#4361ee]/20' 
+                      ? 'bg-[var(--accent-500)] border-[var(--accent-500)] text-white shadow-sm shadow-[var(--accent-500)]/20' 
                       : 'bg-white border-[#e2e8f0] hover:bg-[#e2e8f0]/40 text-[#364a63]'
                   ]"
                 >
@@ -497,40 +497,40 @@ onUnmounted(() => {
             <div class="grid grid-cols-2 gap-5">
               <div>
                 <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Tên đăng nhập <span class="text-[#ea4f52]">*</span></label>
-                <input v-model="userForm.username" type="text" :disabled="!!editingUser" :readonly="usernameReadonly && !editingUser" @focus="usernameReadonly = false" autocomplete="off" placeholder="username" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] font-mono disabled:opacity-60 disabled:cursor-not-allowed text-[#364a63]" />
+                <input v-model="userForm.username" type="text" :disabled="!!editingUser" :readonly="usernameReadonly && !editingUser" @focus="usernameReadonly = false" autocomplete="off" placeholder="username" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] font-mono disabled:opacity-60 disabled:cursor-not-allowed text-[#364a63]" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Họ và tên <span class="text-[#ea4f52]">*</span></label>
-                <input v-model="userForm.fullName" type="text" :readonly="fullNameReadonly" @focus="fullNameReadonly = false" autocomplete="off" placeholder="Họ tên đầy đủ" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63]" />
+                <input v-model="userForm.fullName" type="text" :readonly="fullNameReadonly" @focus="fullNameReadonly = false" autocomplete="off" placeholder="Họ tên đầy đủ" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63]" />
               </div>
               <div class="col-span-2">
                 <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Mật khẩu <span v-if="!editingUser" class="text-[#ea4f52]">*</span></label>
-                <input v-model="userForm.password" type="password" :readonly="passwordReadonly" @focus="passwordReadonly = false" autocomplete="new-password" :placeholder="editingUser ? 'Để trống nếu không đổi' : 'Nhập mật khẩu'" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63]" />
+                <input v-model="userForm.password" type="password" :readonly="passwordReadonly" @focus="passwordReadonly = false" autocomplete="new-password" :placeholder="editingUser ? 'Để trống nếu không đổi' : 'Nhập mật khẩu'" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63]" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số điện thoại</label>
-                <input v-model="userForm.phone" type="text" :readonly="phoneReadonly" @focus="phoneReadonly = false" autocomplete="off" placeholder="Số điện thoại" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63]" />
+                <input v-model="userForm.phone" type="text" :readonly="phoneReadonly" @focus="phoneReadonly = false" autocomplete="off" placeholder="Số điện thoại" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63]" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Email</label>
-                <input v-model="userForm.email" type="email" :readonly="emailReadonly" @focus="emailReadonly = false" autocomplete="off" placeholder="Email" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63]" />
+                <input v-model="userForm.email" type="email" :readonly="emailReadonly" @focus="emailReadonly = false" autocomplete="off" placeholder="Email" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63]" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Chi nhánh</label>
-                <select v-model="userForm.branchId" :disabled="isManager" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
+                <select v-model="userForm.branchId" :disabled="isManager" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
                   <option value="">-- Chọn chi nhánh --</option>
                   <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
                 </select>
               </div>
               <div>
                 <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Vai trò</label>
-                <select v-model="userForm.role" :disabled="selectableRoles.length <= 1" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
+                <select v-model="userForm.role" :disabled="selectableRoles.length <= 1" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
                   <option v-for="r in selectableRoles" :key="r.value" :value="r.value">{{ r.label }}</option>
                 </select>
               </div>
               <div class="col-span-2">
                 <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Trạng thái</label>
-                <select v-model="userForm.status" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] cursor-pointer">
+                <select v-model="userForm.status" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63] cursor-pointer">
                   <option value="ACTIVE">Hoạt động</option>
                   <option value="INACTIVE">Ngừng hoạt động</option>
                 </select>
@@ -541,7 +541,7 @@ onUnmounted(() => {
           <!-- Footer -->
           <div class="p-6 border-t border-[#f1f5f9] bg-[#f8fafc] flex gap-3">
             <button class="flex-1 h-11 bg-white border border-[#e2e8f0] hover:bg-[#f8f9fa] text-[#364a63] rounded-xl text-sm font-bold transition-colors shadow-sm" @click="showUserModal = false">Hủy bỏ</button>
-            <button class="flex-1 h-11 bg-[#4361ee] hover:bg-[#3a0ca3] text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2" :disabled="uSaving" @click="saveUser">
+            <button class="flex-1 h-11 bg-[var(--accent-500)] hover:bg-[var(--accent-700)] text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2" :disabled="uSaving" @click="saveUser">
               <i v-if="uSaving" class="fas fa-spinner fa-spin"></i>
               {{ uSaving ? 'Đang lưu...' : 'Lưu thông tin' }}
             </button>
@@ -746,13 +746,13 @@ tbody tr td:first-child {
 .role-row-MANAGER .user-avatar {
   background-color: #f0f2ff;
   border: 1px solid #c7d2fe;
-  color: #4361ee;
+  color: var(--accent-500);
 }
 .role-row-MANAGER:hover {
-  background: linear-gradient(to right, rgba(67, 97, 238, 0.08), rgba(114, 9, 183, 0.08)) !important;
+  background: linear-gradient(to right, rgba(20, 184, 166, 0.08), rgba(114, 9, 183, 0.08)) !important;
 }
 .role-row-MANAGER:hover td:first-child {
-  box-shadow: inset 4px 0 0 0 #4361ee !important;
+  box-shadow: inset 4px 0 0 0 var(--accent-500) !important;
 }
 
 .role-row-STAFF .user-avatar {
@@ -779,7 +779,7 @@ html.dark-mode .role-row-ADMIN:hover {
 
 html.dark-mode .role-row-MANAGER .user-avatar {
   background-color: rgba(30, 27, 75, 0.4) !important;
-  border-color: rgba(67, 97, 238, 0.5) !important;
+  border-color: rgba(20, 184, 166, 0.5) !important;
   color: #818cf8 !important;
 }
 html.dark-mode .role-row-MANAGER:hover {
@@ -811,9 +811,9 @@ html.dark-mode .role-row-STAFF:hover {
   100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
 }
 @keyframes rolePulseManager {
-  0% { box-shadow: 0 0 0 0 rgba(67, 97, 238, 0.4); }
-  70% { box-shadow: 0 0 0 6px rgba(67, 97, 238, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(67, 97, 238, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(20, 184, 166, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(20, 184, 166, 0); }
 }
 @keyframes rolePulseStaff {
   0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }

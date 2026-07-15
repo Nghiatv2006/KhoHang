@@ -3,22 +3,47 @@
 @import "tailwindcss";
 
 :root {
-  /* Clean Light Theme */
-  --bg-body: #f9fafb; /* Gray 50 */
+  /* ── Accent Palette (Teal, saturation ~55%) ── */
+  --accent-50:  #f0fdfa;
+  --accent-100: #ccfbf1;
+  --accent-200: #99f6e4;
+  --accent-300: #5eead4;
+  --accent-400: #2dd4bf;
+  --accent-500: #14b8a6;
+  --accent-600: #0d9488;
+  --accent-700: #0f766e;
+  --accent-800: #115e59;
+  --accent-900: #134e4a;
+
+  /* ── Neutral Palette (Slate) ── */
+  --n-50:  #f8fafc;
+  --n-100: #f1f5f9;
+  --n-200: #e2e8f0;
+  --n-300: #cbd5e1;
+  --n-400: #94a3b8;
+  --n-500: #64748b;
+  --n-600: #475569;
+  --n-700: #334155;
+  --n-800: #1e293b;
+  --n-900: #0f172a;
+  --n-950: #020617;
+
+  /* ── Semantic Tokens ── */
+  --bg-body: var(--n-50);
   --bg-card: #ffffff;
-  --bg-hover: #f3f4f6; /* Gray 100 */
-  --bg-active: #eff6ff; /* Blue 50 */
-  
-  --border-light: #e5e7eb; /* Gray 200 */
-  --border-medium: #d1d5db; /* Gray 300 */
-  
-  --text-main: #111827; /* Gray 900 */
-  --text-body: #374151; /* Gray 700 */
-  --text-muted: #6b7280; /* Gray 500 */
-  
-  --primary: #2563eb; /* Blue 600 */
-  --primary-hover: #1d4ed8; /* Blue 700 */
-  
+  --bg-hover: var(--n-100);
+  --bg-active: var(--accent-50);
+
+  --border-light: var(--n-200);
+  --border-medium: var(--n-300);
+
+  --text-main: #111827;
+  --text-body: #374151;
+  --text-muted: var(--n-500);
+
+  --primary: var(--accent-500);
+  --primary-hover: var(--accent-600);
+
   --success-bg: #f0fdf4;
   --success-text: #16a34a;
   --success-border: #bbf7d0;
@@ -26,7 +51,7 @@
   --danger-bg: #fef2f2;
   --danger-text: #dc2626;
   --danger-border: #fecaca;
-  
+
   --warning-bg: #fffbeb;
   --warning-text: #d97706;
   --warning-border: #fde68a;
@@ -41,20 +66,23 @@
 
 /* ── Dark Theme Variables (only via toggle, NOT OS preference) ── */
 html.dark-mode {
-  --bg-body: #0f172a;
-  --bg-card: #1e293b;
-  --bg-hover: #334155;
+  --accent-500: #2dd4bf;
+  --accent-600: #14b8a6;
+
+  --bg-body: var(--n-900);
+  --bg-card: var(--n-800);
+  --bg-hover: var(--n-700);
   --bg-active: #1e3a5f;
 
-  --border-light: #334155;
-  --border-medium: #475569;
+  --border-light: var(--n-700);
+  --border-medium: var(--n-600);
 
   --text-main: #f8fafc;
   --text-body: #e2e8f0;
   --text-muted: #b8c5d4;
 
-  --primary: #3b82f6;
-  --primary-hover: #60a5fa;
+  --primary: var(--accent-400);
+  --primary-hover: var(--accent-300);
 
   --success-bg: #064e3b;
   --success-text: #34d399;
@@ -74,7 +102,7 @@ html.dark-mode {
 }
 
 @theme {
-  --font-sans: 'Plus Jakarta Sans', sans-serif;
+  --font-sans: 'DM Sans', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
 
@@ -101,7 +129,7 @@ html, body {
 .clean-card {
   background: var(--bg-card);
   border: 1px solid var(--border-light);
-  border-radius: 12px;
+  border-radius: 10px;
   box-shadow: var(--shadow-sm);
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }

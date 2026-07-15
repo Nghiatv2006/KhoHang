@@ -313,7 +313,7 @@ watch(currentPage, () => {
     </div>
 
     <!-- Main Card -->
-    <div class="bg-indigo-50/50 dark:bg-slate-800/40 rounded-[16px] border border-slate-100 dark:border-slate-700/50 border-t-4 border-t-indigo-500 shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden transition-colors relative" ref="tableTopRef">
+    <div class="bg-indigo-50/50 dark:bg-slate-800/40 rounded-[10px] border border-slate-100 dark:border-slate-700/50 border-t-4 border-t-indigo-500 shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden transition-colors relative" ref="tableTopRef">
       
       <!-- Toolbar (Filters) -->
       <div class="p-5 border-b border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-slate-800/80 transition-colors">

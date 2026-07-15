@@ -262,7 +262,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div data-section="layout-root" class="flex min-h-screen bg-[#f5f6fa] font-['Inter',sans-serif] text-[0.95rem] overflow-x-hidden text-[#364a63]">
+  <div data-section="layout-root" class="flex min-h-screen bg-gradient-to-b from-[#eef2ff] to-[#e0e7ff] font-['Inter',sans-serif] text-[0.95rem] overflow-x-hidden text-[#364a63]">
     
     <!-- LEFT SIDEBAR -->
     <nav 
@@ -271,7 +271,7 @@ onUnmounted(() => {
       :class="isCollapsed ? 'w-[80px] -ml-[80px]' : 'w-[280px]'"
       style="box-shadow: 0 0 15px rgba(0,0,0,0.05);"
     >
-      <div class="flex flex-col justify-between h-full overflow-y-auto pb-4">
+      <div class="flex flex-col justify-between h-full overflow-y-auto pb-4 sidebar-scroll">
         <div>
           <!-- Sidebar Header -->
           <div class="flex items-center h-[90px] px-7 mb-4">
@@ -1137,6 +1137,20 @@ html.dark-mode .action-btn--delete {
   background: rgba(239, 68, 68, 0.15) !important;
   color: #f87171 !important;
   border-color: rgba(239, 68, 68, 0.3) !important;
+}
+
+/* ── Sidebar Scrollbar ────────────────────────────────────────────────── */
+.sidebar-scroll {
+  scrollbar-color: transparent transparent; /* Firefox */
+}
+.sidebar-scroll:hover {
+  scrollbar-color: #cbd5e1 transparent;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+.sidebar-scroll:hover::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
 }
 </style>
 

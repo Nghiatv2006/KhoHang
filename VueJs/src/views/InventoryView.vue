@@ -462,7 +462,7 @@ function formatDateTime(dateTimeStr: string) {
           Quản lý Tồn kho
           <!-- Tooltip Legend -->
           <div class="relative group/legend inline-flex items-center">
-            <i class="fas fa-question-circle text-[#8094ae] text-lg cursor-pointer hover:text-[#4361ee] transition-colors"></i>
+            <i class="fas fa-question-circle text-[#8094ae] text-lg cursor-pointer hover:text-[var(--accent-500)] transition-colors"></i>
             
             <!-- Legend Popup -->
             <div class="absolute left-0 sm:left-1/2 sm:-translate-x-1/2 top-full mt-3 w-64 bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.12)] border border-[#e2e8f0] p-4 opacity-0 translate-y-2 invisible group-hover/legend:opacity-100 group-hover/legend:translate-y-0 group-hover/legend:visible transition-all duration-300 z-50 pointer-events-none">
@@ -510,7 +510,7 @@ function formatDateTime(dateTimeStr: string) {
           <select 
             v-if="isAdmin"
             v-model="selectedSubBranchId" 
-            class="h-[42px] px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] shadow-sm font-semibold"
+            class="h-[42px] px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63] shadow-sm font-semibold"
           >
             <option value="">Tất cả Chi nhánh con</option>
             <option v-for="b in subBranches" :key="b.id" :value="b.id">
@@ -518,12 +518,12 @@ function formatDateTime(dateTimeStr: string) {
             </option>
           </select>
           
-          <div v-else class="h-[42px] px-4 bg-[#eef2ff] border border-[#dbeafe] rounded-xl text-sm flex items-center gap-2 font-bold text-[#4361ee] shadow-sm">
+          <div v-else class="h-[42px] px-4 bg-[#eef2ff] border border-[#dbeafe] rounded-xl text-sm flex items-center gap-2 font-bold text-[var(--accent-500)] shadow-sm">
             <i class="fas fa-store"></i> {{ user.branchName }}
           </div>
         </div>
 
-        <div v-if="activeTab === 'head' && !isAdmin" class="h-[42px] px-4 bg-[#eef2ff] border border-[#dbeafe] rounded-xl text-sm flex items-center gap-2 font-bold text-[#4361ee] shadow-sm">
+        <div v-if="activeTab === 'head' && !isAdmin" class="h-[42px] px-4 bg-[#eef2ff] border border-[#dbeafe] rounded-xl text-sm flex items-center gap-2 font-bold text-[var(--accent-500)] shadow-sm">
           <i class="fas fa-crown text-[#f59e0b]"></i> {{ headBranch?.name || 'Kho Tổng' }}
         </div>
 
@@ -546,14 +546,14 @@ function formatDateTime(dateTimeStr: string) {
       <button 
         @click="activeTab = 'head'"
         :class="['px-6 py-3 font-bold text-sm transition-all border-b-2 -mb-[2px] cursor-pointer flex items-center gap-2',
-                 activeTab === 'head' ? 'border-[#4361ee] text-[#4361ee]' : 'border-transparent text-[#8094ae] hover:text-[#364a63]']"
+                 activeTab === 'head' ? 'border-[var(--accent-500)] text-[var(--accent-500)]' : 'border-transparent text-[#8094ae] hover:text-[#364a63]']"
       >
         <i class="fas fa-crown text-[#f59e0b]"></i> KHO TỔNG
       </button>
       <button 
         @click="activeTab = 'sub'"
         :class="['px-6 py-3 font-bold text-sm transition-all border-b-2 -mb-[2px] cursor-pointer flex items-center gap-2',
-                 activeTab === 'sub' ? 'border-[#4361ee] text-[#4361ee]' : 'border-transparent text-[#8094ae] hover:text-[#364a63]']"
+                 activeTab === 'sub' ? 'border-[var(--accent-500)] text-[var(--accent-500)]' : 'border-transparent text-[#8094ae] hover:text-[#364a63]']"
       >
         <i class="fas fa-store"></i> CHI NHÁNH CON
       </button>
@@ -568,16 +568,16 @@ function formatDateTime(dateTimeStr: string) {
         :style="isInitialLoad ? { '--card-delay': '20ms' } : {}"
       >
         <!-- Custom Tooltip Bubble -->
-        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-blue-200 text-[#4361ee] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(67,97,238,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
+        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3.5 py-2 bg-white border border-blue-200 text-[var(--accent-500)] text-xs font-bold rounded-xl shadow-[0_8px_24px_rgba(20, 184, 166,0.12)] opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-200 pointer-events-none z-50 whitespace-nowrap flex flex-col items-center">
           <span>Xem tất cả {{ totalDistinctProducts }} mặt hàng</span>
           <div class="w-2.5 h-2.5 bg-white border-r border-b border-blue-200 rotate-45 absolute -bottom-[5.5px] left-1/2 -translate-x-1/2"></div>
         </div>
 
         <div class="min-w-0">
           <div class="text-[0.75rem] font-bold text-[#8094ae] uppercase tracking-wider mb-1 truncate">Mặt hàng tồn kho</div>
-          <div class="text-2xl font-extrabold text-[#364a63] group-hover:text-[#4361ee] transition-colors truncate">{{ totalDistinctProducts }}</div>
+          <div class="text-2xl font-extrabold text-[#364a63] group-hover:text-[var(--accent-500)] transition-colors truncate">{{ totalDistinctProducts }}</div>
         </div>
-        <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-blue-50 text-[#4361ee] flex items-center justify-center text-xl shadow-sm group-hover:scale-110 transition-transform">
+        <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-blue-50 text-[var(--accent-500)] flex items-center justify-center text-xl shadow-sm group-hover:scale-110 transition-transform">
           <i class="fas fa-box"></i>
         </div>
       </div>
@@ -668,7 +668,7 @@ function formatDateTime(dateTimeStr: string) {
     </div>
 
     <!-- INVENTORY TAB (Combined Toolbar & Table) -->
-    <div :key="`table-${activeTab}-${selectedSubBranchId}`" :class="['bg-indigo-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden', isInitialLoad ? 'table-card-conveyor' : '']">
+    <div :key="`table-${activeTab}-${selectedSubBranchId}`" :class="['bg-indigo-50 rounded-[10px] border border-[#f1f5f9] border-t-4 border-t-[var(--accent-500)] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden', isInitialLoad ? 'table-card-conveyor' : '']">
       
       <!-- Search & Filters Toolbar -->
       <div class="p-5 border-b border-[#f1f5f9] flex flex-col lg:flex-row items-center justify-between gap-4 bg-[#f8f9fa]/50">
@@ -679,12 +679,12 @@ function formatDateTime(dateTimeStr: string) {
             v-model="searchKeyword" 
             type="text" 
             placeholder="Tìm theo tên sản phẩm hoặc lô sản xuất..." 
-            class="w-full h-[42px] pl-11 pr-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] shadow-sm font-semibold"
+            class="w-full h-[42px] pl-11 pr-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63] shadow-sm font-semibold"
           />
         </div>
         <select 
           v-model="selectedCategoryId"
-          class="w-full sm:w-[200px] h-[42px] px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] shadow-sm font-semibold"
+          class="w-full sm:w-[200px] h-[42px] px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63] shadow-sm font-semibold"
         >
           <option value="">Tất cả danh mục</option>
           <option v-for="c in categories" :key="c.id" :value="c.id">
@@ -698,7 +698,7 @@ function formatDateTime(dateTimeStr: string) {
           <input 
             v-model="onlyWarning" 
             type="checkbox" 
-            class="w-5 h-5 accent-[#4361ee] cursor-pointer rounded-md border-slate-300"
+            class="w-5 h-5 accent-[var(--accent-500)] cursor-pointer rounded-md border-slate-300"
             @change="onWarningChange"
           />
           Chỉ xem cảnh báo tồn thấp
@@ -708,7 +708,7 @@ function formatDateTime(dateTimeStr: string) {
           <input 
             v-model="onlyExpired" 
             type="checkbox" 
-            class="w-5 h-5 accent-[#4361ee] cursor-pointer rounded-md border-slate-300"
+            class="w-5 h-5 accent-[var(--accent-500)] cursor-pointer rounded-md border-slate-300"
             @change="onExpiredChange"
           />
           Chỉ xem lô hết hạn
@@ -719,7 +719,7 @@ function formatDateTime(dateTimeStr: string) {
       <!-- Inventory Table -->
       <div class="bg-white overflow-hidden">
         <div v-if="loading" class="text-center p-20 text-[#8094ae]">
-          <i class="fas fa-spinner fa-spin text-3xl mb-4 text-[#4361ee]"></i>
+          <i class="fas fa-spinner fa-spin text-3xl mb-4 text-[var(--accent-500)]"></i>
           <p>Đang tải dữ liệu tồn kho...</p>
         </div>
 
@@ -745,7 +745,7 @@ function formatDateTime(dateTimeStr: string) {
               <tr 
                 v-for="(inv, index) in paginatedInventories" 
                 :key="inv.id" 
-                :class="['border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer select-none group hover:-translate-y-[1px]', isInitialLoad ? 'inventory-row-anim' : '']"
+                :class="['border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[var(--accent-500)]/15 hover:to-[var(--accent-300)]/15 hover:shadow-sm transition-all duration-300 cursor-pointer select-none group hover:-translate-y-[1px]', isInitialLoad ? 'inventory-row-anim' : '']"
                 :style="isInitialLoad ? { '--row-delay': `${200 + index * 15}ms` } : {}"
                 @dblclick="openDetails(inv)"
               >
@@ -767,7 +767,7 @@ function formatDateTime(dateTimeStr: string) {
                     class="w-2.5 h-2.5 rounded-full bg-orange-500 flex-shrink-0 animate-pulse shadow-sm shadow-orange-200"
                     title="Lô hàng sắp hết hạn sử dụng"
                   ></span>
-                  <div class="font-bold text-[#364a63] group-hover:text-[#4361ee] transition-colors">{{ inv.productName }}</div>
+                  <div class="font-bold text-[#364a63] group-hover:text-[var(--accent-500)] transition-colors">{{ inv.productName }}</div>
                 </div>
               </td>
 
@@ -828,7 +828,7 @@ function formatDateTime(dateTimeStr: string) {
               :class="[
                 'w-8 h-8 rounded-lg border flex items-center justify-center transition-all cursor-pointer font-bold',
                 currentPage === p 
-                  ? 'bg-[#4361ee] border-[#4361ee] text-white shadow-sm shadow-[#4361ee]/20' 
+                  ? 'bg-[var(--accent-500)] border-[var(--accent-500)] text-white shadow-sm shadow-[var(--accent-500)]/20' 
                   : 'bg-white border-[#e2e8f0] hover:bg-[#e2e8f0]/40 text-[#364a63]'
               ]"
             >
@@ -863,7 +863,7 @@ function formatDateTime(dateTimeStr: string) {
             v-model="thresholdForm" 
             type="number" 
             min="0" 
-            class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
+            class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63] font-semibold transition-all" 
           />
           <p class="text-[11px] text-[#8094ae] mt-2 italic">
             <i class="fas fa-info-circle mr-1"></i>
@@ -879,7 +879,7 @@ function formatDateTime(dateTimeStr: string) {
             Hủy bỏ
           </button>
           <button 
-            class="flex-1 h-11 bg-[#4361ee] hover:bg-[#3a0ca3] text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all" 
+            class="flex-1 h-11 bg-[var(--accent-500)] hover:bg-[var(--accent-700)] text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all" 
             @click="saveThreshold"
           >
             Lưu cài đặt
@@ -1020,7 +1020,7 @@ function formatDateTime(dateTimeStr: string) {
               <div v-if="selectedInv.hasExpiry" class="flex justify-between py-1 items-center group/warning">
                 <span class="text-[#8094ae] font-semibold flex items-center gap-1">
                   Cảnh báo hết hạn trước
-                  <i v-if="user?.role !== 'STAFF'" class="fas fa-pen text-[10px] text-slate-300 group-hover/warning:text-[#4361ee] transition-colors"></i>
+                  <i v-if="user?.role !== 'STAFF'" class="fas fa-pen text-[10px] text-slate-300 group-hover/warning:text-[var(--accent-500)] transition-colors"></i>
                 </span>
                 <div class="flex items-center gap-1.5">
                   <input 
@@ -1030,7 +1030,7 @@ function formatDateTime(dateTimeStr: string) {
                     :disabled="user?.role === 'STAFF'"
                     @blur="updateExpiryWarning(selectedInv)"
                     @keyup.enter="($event.target as any).blur()"
-                    class="w-14 h-7 px-1 text-right border border-[#e2e8f0] bg-[#f8f9fa] hover:bg-white focus:bg-white rounded text-sm font-bold text-[#4361ee] focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                    class="w-14 h-7 px-1 text-right border border-[#e2e8f0] bg-[#f8f9fa] hover:bg-white focus:bg-white rounded text-sm font-bold text-[var(--accent-500)] focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                   <span class="text-xs font-bold text-[#364a63]">ngày</span>
                 </div>

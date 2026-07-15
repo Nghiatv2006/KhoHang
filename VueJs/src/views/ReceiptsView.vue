@@ -2063,7 +2063,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
     <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
       <div>
         <h2 class="text-2xl font-bold text-[#364a63] m-0 flex items-center gap-3">
-          <i :class="pageConfig.icon" class="text-[#4361ee]"></i>
+          <i :class="pageConfig.icon" class="text-[var(--accent-500)]"></i>
           {{ pageConfig.title }}
         </h2>
         <p class="text-[#8094ae] text-sm mt-1">{{ pageConfig.desc }}</p>
@@ -2082,7 +2082,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
         <button
           v-if="user?.role === 'STAFF' && !(receiptType === 'TRANSFER' && isHeadBranch)"
           @click="openCreateModal"
-          class="h-[42px] bg-[#4361ee] hover:bg-[#3a0ca3] text-white px-5 rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-2"
+          class="h-[42px] bg-[var(--accent-500)] hover:bg-[var(--accent-700)] text-white px-5 rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-2"
         >
           <i class="fas fa-plus"></i> {{ pageConfig.btnLabel }}
         </button>
@@ -2149,7 +2149,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
     </div>
 
     <!-- TABLE CARD -->
-    <div class="bg-white rounded-2xl border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-[#f1f5f9] border-t-4 border-t-[var(--accent-500)] shadow-sm overflow-hidden">
       <!-- Toolbar -->
       <div class="p-5 border-b border-[#f1f5f9]">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" :class="receiptType ? 'lg:grid-cols-4' : 'lg:grid-cols-5'">
@@ -2157,12 +2157,12 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
           <div class="relative" :class="receiptType === 'DISPOSAL' ? 'lg:col-span-3' : 'lg:col-span-2'">
             <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae] text-sm"></i>
             <input v-model="searchKeyword" type="text" placeholder="Tìm kiếm theo mã phiếu..."
-              class="w-full h-11 pl-10 pr-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all" />
+              class="w-full h-11 pl-10 pr-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all" />
           </div>
           <!-- Lọc loại phiếu (chỉ hiện khi không có receiptType prop) -->
           <div v-if="!receiptType">
             <select v-model="filterType"
-              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]">
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63]">
               <option value="">-- Tất cả loại phiếu --</option>
               <option value="IMPORT">Nhập kho</option>
               <option value="EXPORT">Xuất bán</option>
@@ -2172,7 +2172,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
           <!-- Lọc trạng thái -->
           <div>
             <select v-model="filterStatus"
-              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]">
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63]">
               <option value="">-- Tất cả trạng thái --</option>
               <option value="DRAFT">Chờ duyệt</option>
               <option value="COMPLETED">Đã duyệt</option>
@@ -2183,7 +2183,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
           <!-- Lọc hao hụt / chênh lệch -->
           <div v-if="receiptType !== 'DISPOSAL'">
             <select v-model="filterDeviation"
-              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]">
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63]">
               <option value="">-- Tất cả chênh lệch --</option>
               <option value="yes">Có chênh lệch / Hao hụt</option>
               <option value="no">Khớp số lượng</option>
@@ -2193,7 +2193,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
           <div class="lg:col-span-4 grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div>
               <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-1.5">Thời gian</label>
-              <select v-model="filterTimeRange" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]">
+              <select v-model="filterTimeRange" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63]">
                 <option value="today">Hôm nay</option>
                 <option value="week">7 ngày qua</option>
                 <option value="month">30 ngày qua</option>
@@ -2208,13 +2208,13 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
             <div>
               <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-1.5">Từ ngày</label>
               <input v-model="filterStartDate" type="date" @click="filterTimeRange = 'custom'" @input="filterTimeRange = 'custom'"
-                class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
+                class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63]" />
             </div>
             <!-- Đến ngày -->
             <div>
               <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-1.5">Đến ngày</label>
               <input v-model="filterEndDate" type="date" @click="filterTimeRange = 'custom'" @input="filterTimeRange = 'custom'"
-                class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
+                class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63]" />
             </div>
             <!-- Nút Xóa lọc -->
             <div class="flex items-end">
@@ -2265,7 +2265,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                 r.hasDeviation && (r.status === 'PENDING_SHORTFALL_MANAGER' || r.status === 'PENDING_SHORTFALL_ADMIN') ? 'bg-rose-50/40 hover:bg-rose-100/40' : ''
               ]">
               <td class="px-5 py-4">
-                <span class="font-mono font-bold text-[#4361ee] text-xs">{{ r.code }}</span>
+                <span class="font-mono font-bold text-[var(--accent-500)] text-xs">{{ r.code }}</span>
               </td>
               <td v-if="!receiptType" class="px-5 py-4">
                 <span :class="['inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold', typeClass(r.type)]">
@@ -2318,7 +2318,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
               <td class="px-5 py-4">
                 <div class="flex items-center justify-center gap-2">
                   <button @click.stop="openDetail(r)"
-                    class="w-8 h-8 flex items-center justify-center rounded-lg bg-[#f1f5f9] hover:bg-[#4361ee] hover:text-white text-[#8094ae] transition-all"
+                    class="w-8 h-8 flex items-center justify-center rounded-lg bg-[#f1f5f9] hover:bg-[var(--accent-500)] hover:text-white text-[#8094ae] transition-all"
                     title="Xem chi tiết">
                     <i class="fas fa-eye text-xs"></i>
                   </button>
@@ -2545,7 +2545,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                         <div class="text-[10px] text-[#8094ae] uppercase tracking-wider mb-0.5 font-bold" v-if="d.productCategory">{{ d.productCategory }}</div>
                         <div class="font-semibold text-[#364a63]">{{ d.productName }}</div>
                         <div class="text-[11px] text-[#8094ae] mt-1" v-if="d.batchCode">
-                          <i class="fas fa-box-open mr-1 opacity-70"></i> Lô: <span class="font-bold text-[#4361ee]">{{ d.batchCode }}</span>
+                          <i class="fas fa-box-open mr-1 opacity-70"></i> Lô: <span class="font-bold text-[var(--accent-500)]">{{ d.batchCode }}</span>
                         </div>
                       </td>
                       <td class="px-4 py-3 text-center text-[#8094ae]">{{ formatDate(d.manufacturingDate) }}</td>
@@ -2559,13 +2559,13 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                       </td>
                       <td class="px-4 py-3 text-right font-bold" v-else>{{ d.quantity }}</td>
                       <td class="px-4 py-3 text-right" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER' && selectedReceipt.type !== 'DISPOSAL'">{{ formatVND(d.price) }}</td>
-<td class="px-4 py-3 text-right font-bold text-[#4361ee]" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER' && selectedReceipt.type !== 'DISPOSAL'">{{ formatVND(d.quantity * d.price) }}</td>
+<td class="px-4 py-3 text-right font-bold text-[var(--accent-500)]" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER' && selectedReceipt.type !== 'DISPOSAL'">{{ formatVND(d.quantity * d.price) }}</td>
                     </tr>
                   </tbody>
                   <tfoot v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER' && selectedReceipt.type !== 'DISPOSAL'">
                     <tr class="bg-[#f8f9fa]">
                       <td :colspan="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null) ? 6 : 5" class="px-4 py-2.5 text-right font-bold text-[#8094ae] text-xs uppercase">Tổng cộng</td>
-                      <td class="px-4 py-2.5 text-right font-extrabold text-[#4361ee]">
+                      <td class="px-4 py-2.5 text-right font-extrabold text-[var(--accent-500)]">
                         {{ formatVND((selectedReceipt.details || []).reduce((s: number, d: any) => s + d.quantity * d.price, 0)) }}
                       </td>
                     </tr>
@@ -2600,7 +2600,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
               <!-- Nút Sửa phiếu (Staff) -->
               <button v-if="canStaffEdit(selectedReceipt)"
                 @click="openEditModal('staff')"
-                class="h-9 px-4 bg-[#eef2ff] hover:bg-[#4361ee] hover:text-white text-[#4361ee] border border-[#4361ee]/30 rounded-xl text-xs font-bold transition-all flex items-center gap-2">
+                class="h-9 px-4 bg-[#eef2ff] hover:bg-[var(--accent-500)] hover:text-white text-[var(--accent-500)] border border-[var(--accent-500)]/30 rounded-xl text-xs font-bold transition-all flex items-center gap-2">
                 <i class="fas fa-pen"></i> Sửa phiếu
               </button>
               <!-- Nút Sửa + Gửi xuống (Manager khi DRAFT) -->
@@ -2824,7 +2824,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                 <div v-if="!receiptType">
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Loại phiếu <span class="text-red-500">*</span></label>
                   <select v-model="createForm.type" @change="onTypeChange"
-                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none">
                     <option value="IMPORT">Nhập kho</option>
                     <option value="EXPORT">Xuất bán</option>
                     <option value="TRANSFER">Điều chuyển</option>
@@ -2833,7 +2833,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                 <div v-if="createForm.type === 'IMPORT'">
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh nguồn</label>
                   <select v-model="createForm.sourceBranchId" disabled
-                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-[#f1f5f9] disabled:text-[#8094ae] cursor-not-allowed">
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none disabled:bg-[#f1f5f9] disabled:text-[#8094ae] cursor-not-allowed">
                     <option v-if="isHeadBranch" value="">-- Bên ngoài hệ thống --</option>
                     <option v-if="!isHeadBranch && headBranch" :value="headBranch.id">{{ headBranch.name }}</option>
                   </select>
@@ -2848,7 +2848,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                 <div v-if="createForm.type === 'IMPORT' || createForm.type === 'TRANSFER' || createForm.type === 'ADJUST_IN'">
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh đích</label>
                   <select v-model="createForm.destBranchId" :disabled="createForm.type === 'IMPORT'"
-                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-[#f1f5f9] disabled:text-[#8094ae]">
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none disabled:bg-[#f1f5f9] disabled:text-[#8094ae]">
                     <option value="">-- Chọn chi nhánh --</option>
                     <option v-for="b in branches.filter(x => x.id !== createForm.sourceBranchId)" :key="b.id" :value="b.id">{{ b.name }}</option>
                   </select>
@@ -2857,7 +2857,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Khách hàng <span class="text-red-500">*</span></label>
                   <div class="relative">
                     <input v-model="createForm.customerName" @focus="showCustomerDropdown = true" @blur="hideCustomerDropdown" @input="onCustomerInput" type="text" placeholder="Nhập tên khách hàng..."
-                      class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
+                      class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none" />
                     <div v-if="showCustomerDropdown && filteredCustomers.length > 0" class="absolute z-10 w-full mt-1 bg-white border border-[#e2e8f0] rounded-xl shadow-lg max-h-48 overflow-y-auto">
                        <div v-for="c in filteredCustomers" :key="c.id" @mousedown.prevent="selectCustomer(c)" class="px-3 py-2.5 hover:bg-[#f8f9fa] cursor-pointer text-sm border-b border-[#f1f5f9] last:border-0">
                           <div class="font-bold text-[#364a63]">{{ c.name }}</div>
@@ -2869,7 +2869,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                 <div v-if="createForm.type === 'EXPORT'">
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Số điện thoại <span class="text-red-500">*</span></label>
                   <input v-model="createForm.customerPhone" @input="createForm.customerId = ''" type="text" placeholder="Nhập số điện thoại..."
-                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none" />
                 </div>
               </div>
 
@@ -2877,7 +2877,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                 <div v-if="createForm.type === 'EXPORT'" class="col-span-2 sm:col-span-1">
                   <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Trạng thái thanh toán</label>
                   <select v-model="createForm.paymentStatus"
-                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none">
                     <option value="UNPAID">Chưa thanh toán</option>
                     <option value="PAID">Đã thanh toán</option>
                   </select>
@@ -2892,7 +2892,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                   </div>
                   <template v-if="createForm.type === 'DISPOSAL'">
                     <select v-model="createForm.description" @change="onTypeChange"
-                      class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
+                      class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none">
                       <option value="">-- Chọn lý do tiêu hủy --</option>
                       <option value="Hàng hết hạn">Hàng hết hạn</option>
                       <option value="Hàng lỗi kĩ thuật/hỏng">Hàng lỗi kĩ thuật/hỏng</option>
@@ -2901,7 +2901,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                   </template>
                   <template v-else>
                     <textarea v-model="createForm.description" maxlength="500" placeholder="Ghi chú (tuỳ chọn)..."
-                      class="w-full h-20 p-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none resize-y"></textarea>
+                      class="w-full h-20 p-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none resize-y"></textarea>
                   </template>
                 </div>
 
@@ -2909,7 +2909,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                   <div class="col-span-2 sm:col-span-1">
                     <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Phương pháp tiêu hủy <span class="text-red-500">*</span></label>
                     <select v-model="createForm.disposalMethod"
-                      class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
+                      class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none">
                       <option value="">-- Chọn phương pháp --</option>
                       <option value="Thiêu đốt">Thiêu đốt</option>
                       <option value="Chôn lấp">Chôn lấp</option>
@@ -2922,9 +2922,9 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                     <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Biên bản tiêu hủy</label>
                     <div class="relative flex items-center">
                       <input v-model="createForm.attachmentUrl" type="text" placeholder="Dán link hoặc đính kèm file..."
-                        class="w-full h-10 px-3 pr-10 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" :disabled="uploadingAttachment" />
+                        class="w-full h-10 px-3 pr-10 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none" :disabled="uploadingAttachment" />
                       <input type="file" ref="fileInput" class="hidden" @change="onAttachmentSelected" />
-                      <button @click="fileInput.click()" type="button" class="absolute right-2 text-[#8094ae] hover:text-[#4361ee] transition-colors w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100" title="Tải file lên">
+                      <button @click="fileInput.click()" type="button" class="absolute right-2 text-[#8094ae] hover:text-[var(--accent-500)] transition-colors w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100" title="Tải file lên">
                         <i class="fas fa-spinner fa-spin" v-if="uploadingAttachment"></i>
                         <i class="fas fa-paperclip" v-else></i>
                       </button>
@@ -2938,7 +2938,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                 <div class="flex items-center justify-between mb-3">
                   <div class="text-xs font-bold text-[#8094ae] uppercase">Danh sách hàng hóa</div>
                   <button @click="addDetailRow"
-                    class="h-8 px-3 bg-[#eef2ff] hover:bg-[#4361ee] hover:text-white text-[#4361ee] rounded-lg text-xs font-bold transition-all flex items-center gap-1">
+                    class="h-8 px-3 bg-[#eef2ff] hover:bg-[var(--accent-500)] hover:text-white text-[var(--accent-500)] rounded-lg text-xs font-bold transition-all flex items-center gap-1">
                     <i class="fas fa-plus"></i> Thêm dòng
                   </button>
                 </div>
@@ -2964,7 +2964,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                         <div class="col-span-12 lg:col-span-3">
                           <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Danh mục</label>
                           <select v-model="d.categoryId" @change="d.productId = ''; onProductChange(d)"
-                            class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none bg-white">
+                            class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none bg-white">
                             <option value="">-- Tất cả --</option>
                             <option v-for="c in getAvailableCategoriesForRow(idx)" :key="c.id" :value="c.id">{{ c.name }}</option>
                           </select>
@@ -2972,7 +2972,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                         <div class="col-span-12 lg:col-span-4">
                           <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Sản phẩm <span class="text-red-500">*</span></label>
                             <select v-if="getAvailableProductsForRow(idx).length > 0" v-model="d.productId" @change="onProductChange(d)"
-                              class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none bg-white">
+                              class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none bg-white">
                               <option value="">-- Chọn sản phẩm --</option>
                               <option v-for="p in getAvailableProductsForRow(idx)" :key="p.id" :value="p.id">{{ p.name }} ({{ p.sku }})</option>
                             </select>
@@ -2985,18 +2985,18 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                           <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Lô sản xuất <span class="text-red-500">*</span></label>
                           <div class="flex gap-2">
                             <select v-if="!d.isNewBatch" v-model="d.batchCode" @change="onBatchChange(d)"
-                              class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none bg-white">
+                              class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none bg-white">
                               <option value="">-- Chọn lô --</option>
                               <option v-for="b in getBatchesForProduct(d.productId)" :key="b.batchCode" :value="b.batchCode">
                                 {{ b.batchCode }} (Tồn: {{ b.quantity }})
                               </option>
                             </select>
                             <input v-else v-model="d.batchCode" type="text" placeholder="Nhập mã lô mới..."
-                              class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium outline-none focus:border-[#4361ee]" />
+                              class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium outline-none focus:border-[var(--accent-500)]" />
                             
                             <button v-if="(createForm.type === 'IMPORT' && !createForm.sourceBranchId) || createForm.type === 'ADJUST_IN'" @click="d.isNewBatch = !d.isNewBatch; d.batchCode = ''" 
                                     class="px-3 h-10 border border-[#e2e8f0] rounded-xl text-xs font-bold bg-white hover:bg-gray-50 whitespace-nowrap shadow-sm transition-all text-[#364a63]">
-                              <i :class="d.isNewBatch ? 'fas fa-list text-[#4361ee] mr-1' : 'fas fa-plus text-[#10b981] mr-1'"></i> {{ d.isNewBatch ? 'Chọn lô có sẵn' : 'Tạo lô mới' }}
+                              <i :class="d.isNewBatch ? 'fas fa-list text-[var(--accent-500)] mr-1' : 'fas fa-plus text-[#10b981] mr-1'"></i> {{ d.isNewBatch ? 'Chọn lô có sẵn' : 'Tạo lô mới' }}
                             </button>
                           </div>
                         </div>
@@ -3008,8 +3008,8 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                         <div :class="(createForm.type === 'IMPORT' || createForm.type === 'TRANSFER' || createForm.type === 'DISPOSAL') ? 'grid grid-cols-1' : 'grid grid-cols-3 gap-5'">
                           <div>
                             <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Số lượng <span class="text-red-500">*</span></label>
-                            <div class="flex items-center h-10 bg-white border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-[#4361ee]/20 transition-colors"
-                              :class="getMaxQuantity(d) !== null && d.quantity > getMaxQuantity(d)! ? 'border-red-400 focus-within:border-red-400' : 'border-[#e2e8f0] focus-within:border-[#4361ee]'">
+                            <div class="flex items-center h-10 bg-white border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-[var(--accent-500)]/20 transition-colors"
+                              :class="getMaxQuantity(d) !== null && d.quantity > getMaxQuantity(d)! ? 'border-red-400 focus-within:border-red-400' : 'border-[#e2e8f0] focus-within:border-[var(--accent-500)]'">
                               <input v-model.number="d.quantity" type="number" min="1"
                                 :max="getMaxQuantity(d) !== null ? getMaxQuantity(d)! : undefined"
                                 @input="constrainQuantity(d)" @blur="onQuantityBlur(d)"
@@ -3035,7 +3035,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                           
                           <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER' && createForm.type !== 'DISPOSAL'">
                             <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Thành tiền</label>
-                            <div class="w-full h-10 px-3 border border-transparent flex items-center text-sm font-bold text-[#4361ee] bg-[#eef2ff] rounded-xl overflow-x-auto whitespace-nowrap hide-scrollbar">
+                            <div class="w-full h-10 px-3 border border-transparent flex items-center text-sm font-bold text-[var(--accent-500)] bg-[#eef2ff] rounded-xl overflow-x-auto whitespace-nowrap hide-scrollbar">
                               {{ formatVND(d.quantity * (d.price || 0)) }}
                             </div>
                           </div>
@@ -3046,15 +3046,15 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                           <div>
                             <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Ngày sản xuất</label>
                             <input v-model="d.manufacturingDate" type="date" :disabled="!d.isNewBatch"
-                              class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-gray-100 disabled:text-gray-500" />
+                              class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none disabled:bg-gray-100 disabled:text-gray-500" />
                           </div>
                           <div>
                             <label class="flex items-center gap-2 text-xs font-bold text-[#8094ae] uppercase mb-1.5" :class="d.isNewBatch ? 'cursor-pointer' : ''">
-                              <input type="checkbox" v-model="d.hasExpiryDate" class="w-3.5 h-3.5 rounded border-gray-300 text-[#4361ee] focus:ring-[#4361ee]" :disabled="!d.isNewBatch" />
+                              <input type="checkbox" v-model="d.hasExpiryDate" class="w-3.5 h-3.5 rounded border-gray-300 text-[var(--accent-500)] focus:ring-[var(--accent-500)]" :disabled="!d.isNewBatch" />
                               Hạn sử dụng
                             </label>
                             <input v-if="d.hasExpiryDate" v-model="d.expirationDate" type="date" :disabled="!d.isNewBatch"
-                              class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-gray-100 disabled:text-gray-500" />
+                              class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none disabled:bg-gray-100 disabled:text-gray-500" />
                             <div v-else class="w-full h-10 px-3 border border-dashed border-[#cbd5e1] bg-[#f8fafc] rounded-xl text-sm text-[#94a3b8] flex items-center italic" :class="{'opacity-50 cursor-not-allowed': !d.isNewBatch}">
                               Không quản lý HSD
                             </div>
@@ -3075,7 +3075,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
               Hủy
             </button>
             <button @click="submitCreateDraft" :disabled="submittingCreate"
-              class="px-6 py-2.5 bg-[#4361ee] hover:bg-[#3a0ca3] text-white rounded-xl font-bold text-sm transition-all disabled:opacity-60 flex items-center gap-2">
+              class="px-6 py-2.5 bg-[var(--accent-500)] hover:bg-[var(--accent-700)] text-white rounded-xl font-bold text-sm transition-all disabled:opacity-60 flex items-center gap-2">
               <i class="fas fa-spinner fa-spin" v-if="submittingCreate"></i>
               <i class="fas fa-save" v-else></i>
               Lưu nháp
@@ -3239,7 +3239,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
           <select 
             v-model="directImportForm.categoryId" 
             @change="directImportForm.productId = ''; directImportForm.manufacturingDate = ''; directImportForm.expirationDate = ''"
-            class="w-full h-11 px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all shadow-sm"
+            class="w-full h-11 px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63] font-semibold transition-all shadow-sm"
           >
             <option value="">-- Chọn danh mục --</option>
             <option v-for="c in categories" :key="c.id" :value="c.id">
@@ -3254,7 +3254,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
           <select 
             v-model="directImportForm.productId" 
             :disabled="!directImportForm.categoryId"
-            class="w-full h-11 px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all shadow-sm disabled:bg-[#f1f5f9] disabled:text-slate-400"
+            class="w-full h-11 px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63] font-semibold transition-all shadow-sm disabled:bg-[#f1f5f9] disabled:text-slate-400"
           >
             <option value="">-- Chọn sản phẩm --</option>
             <option v-for="p in filteredProductsForDirectImport" :key="p.id" :value="p.id">
@@ -3271,7 +3271,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
               :value="selectedProductInDirectImport ? selectedProductInDirectImport.unit : '-'" 
               type="text" 
               disabled 
-              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#eef2ff] text-[#4361ee] rounded-xl text-sm outline-none font-extrabold transition-all" 
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#eef2ff] text-[var(--accent-500)] rounded-xl text-sm outline-none font-extrabold transition-all" 
             />
           </div>
           <div>
@@ -3302,7 +3302,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
             <div class="flex gap-2">
               <select v-if="!directImportForm.isNewBatch && directImportBatches.length > 0" 
                 v-model="directImportForm.batchCode" 
-                class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all">
+                class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63] font-semibold transition-all">
                 <option value="">-- Chọn lô --</option>
                 <option v-for="b in directImportBatches" :key="b.batchCode" :value="b.batchCode">
                   {{ b.batchCode }} (Tồn: {{ b.quantity }})
@@ -3312,10 +3312,10 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                 v-model="directImportForm.batchCode" 
                 type="text" 
                 placeholder="Ví dụ: BATCH-01, MILK-2026..." 
-                class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
+                class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63] font-semibold transition-all" 
               />
               <button @click="directImportForm.isNewBatch = !directImportForm.isNewBatch; directImportForm.batchCode = ''" 
-                class="px-3 rounded-xl border border-[#e2e8f0] bg-[#f8f9fa] text-[#4361ee] hover:bg-[#eef2ff] transition-all flex items-center justify-center font-bold text-xs"
+                class="px-3 rounded-xl border border-[#e2e8f0] bg-[#f8f9fa] text-[var(--accent-500)] hover:bg-[#eef2ff] transition-all flex items-center justify-center font-bold text-xs"
                 title="Chuyển đổi nhập lô mới/cũ">
                 <i class="fas fa-sync-alt"></i>
               </button>
@@ -3327,7 +3327,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
               v-model.number="directImportForm.quantity" 
               type="number" 
               min="1" 
-              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63] font-semibold transition-all" 
             />
           </div>
         </div>
@@ -3339,7 +3339,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
             v-model="directImportForm.manufacturingDate" 
             type="date" 
             :disabled="isMfgDateLocked"
-            class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed" 
+            class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63] font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed" 
           />
         </div>
         <!-- Checkbox quản lý theo hạn dùng -->
@@ -3349,7 +3349,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
             v-model="directImportForm.hasExpiry" 
             type="checkbox" 
             :disabled="isExpDateLocked"
-            class="w-5 h-5 accent-[#4361ee] cursor-pointer rounded-md border-slate-300 disabled:opacity-60 disabled:cursor-not-allowed" 
+            class="w-5 h-5 accent-[var(--accent-500)] cursor-pointer rounded-md border-slate-300 disabled:opacity-60 disabled:cursor-not-allowed" 
           />
           <label for="directImportHasExpiry" class="cursor-pointer select-none font-bold text-xs text-[#8094ae] uppercase tracking-wider">
             Sản phẩm quản lý theo hạn dùng
@@ -3366,7 +3366,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                   v-model="directImportForm.expirationDate" 
                   type="date" 
                   :disabled="isExpDateLocked"
-                  class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed" 
+                  class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63] font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed" 
                 />
               </div>
               <div>
@@ -3376,7 +3376,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                   type="number" 
                   min="1"
                   placeholder="Mặc định: 30" 
-                  class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
+                  class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63] font-semibold transition-all" 
                 />
               </div>
             </div>
@@ -3391,7 +3391,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
             Hủy bỏ
           </button>
           <button 
-            class="flex-1 h-11 bg-[#4361ee] hover:bg-[#3a0ca3] text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2" 
+            class="flex-1 h-11 bg-[var(--accent-500)] hover:bg-[var(--accent-700)] text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2" 
             :disabled="submittingDirectImport"
             @click="submitDirectImport"
           >
@@ -3413,13 +3413,13 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
             <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Tên khách hàng</label>
             <input v-model="editForm.customerName" type="text"
               placeholder="Tên khách hàng..."
-              class="w-full px-4 h-11 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl text-sm focus:ring-0 focus:border-[#4361ee] dark:focus:border-blue-500 outline-none transition-colors" />
+              class="w-full px-4 h-11 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl text-sm focus:ring-0 focus:border-[var(--accent-500)] dark:focus:border-blue-500 outline-none transition-colors" />
           </div>
           <div>
             <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Số điện thoại</label>
             <input v-model="editForm.customerPhone" type="text"
               placeholder="Số điện thoại..."
-              class="w-full px-4 h-11 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl text-sm focus:ring-0 focus:border-[#4361ee] dark:focus:border-blue-500 outline-none transition-colors" />
+              class="w-full px-4 h-11 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl text-sm focus:ring-0 focus:border-[var(--accent-500)] dark:focus:border-blue-500 outline-none transition-colors" />
           </div>
         </div>
 
@@ -3428,7 +3428,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
           <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Lý do chỉnh sửa <span class="text-red-500">*</span></label>
           <textarea v-model="editForm.editReason" rows="2"
             placeholder="Nhập lý do chỉnh sửa (bắt buộc)..."
-            class="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl text-sm focus:ring-0 focus:border-[#4361ee] dark:focus:border-blue-500 outline-none resize-none transition-colors leading-relaxed"
+            class="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl text-sm focus:ring-0 focus:border-[var(--accent-500)] dark:focus:border-blue-500 outline-none resize-none transition-colors leading-relaxed"
           ></textarea>
         </div>
 
@@ -3437,7 +3437,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
           <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Ghi chú phiếu</label>
           <textarea v-model="editForm.description" rows="2"
             placeholder="Ghi chú phiếu (tuỳ chọn)..."
-            class="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl text-sm focus:ring-0 focus:border-[#4361ee] dark:focus:border-blue-500 outline-none resize-none transition-colors leading-relaxed"
+            class="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl text-sm focus:ring-0 focus:border-[var(--accent-500)] dark:focus:border-blue-500 outline-none resize-none transition-colors leading-relaxed"
           ></textarea>
         </div>
 
@@ -3458,7 +3458,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                   <td class="px-5 py-3.5 text-sm text-slate-700 dark:text-slate-300 font-semibold">{{ d.productName }}</td>
                   <td class="px-5 py-3.5 text-center font-medium text-slate-500 dark:text-slate-400">{{ d.originalQty }}</td>
                   <td class="px-5 py-3.5">
-                    <div class="flex items-center h-10 bg-white dark:bg-slate-900 border-2 rounded-lg overflow-hidden focus-within:border-[#4361ee] dark:focus-within:border-blue-500 transition-colors"
+                    <div class="flex items-center h-10 bg-white dark:bg-slate-900 border-2 rounded-lg overflow-hidden focus-within:border-[var(--accent-500)] dark:focus-within:border-blue-500 transition-colors"
                       :class="d.maxQty !== null && d.quantity > d.maxQty ? 'border-red-400 focus-within:border-red-400' : (d.quantity !== d.originalQty ? 'border-amber-400 focus-within:border-amber-400 dark:border-amber-500 dark:bg-amber-900/20 bg-amber-50' : 'border-slate-200 dark:border-slate-700')">
                       <input v-model.number="d.quantity" type="number" min="1"
                         :max="d.maxQty !== null ? d.maxQty : undefined"
@@ -3491,7 +3491,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
             Hủy
           </button>
           <button @click="submitEditReceipt()" :disabled="submittingEdit"
-            class="h-10 px-6 bg-[#4361ee] hover:bg-[#3a0ca3] text-white rounded-xl text-sm font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2 disabled:opacity-60">
+            class="h-10 px-6 bg-[var(--accent-500)] hover:bg-[var(--accent-700)] text-white rounded-xl text-sm font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2 disabled:opacity-60">
             <i class="fas fa-save" v-if="!submittingEdit"></i>
             <i class="fas fa-spinner fa-spin" v-else></i>
             {{ editMode === 'manager' && selectedReceipt?.status === 'DRAFT' ? 'Lưu & Gửi xuống Staff' : 'Lưu thay đổi' }}

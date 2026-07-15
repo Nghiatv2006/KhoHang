@@ -448,7 +448,7 @@ async function exportExcel() {
       <div class="flex items-center gap-3">
         <button
           @click="showLegend = true"
-          class="h-[42px] px-4 border border-[#e2e8f0] bg-white hover:bg-[#f8f9fa] text-[#4361ee] rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-2"
+          class="h-[42px] px-4 border border-[#e2e8f0] bg-white hover:bg-[#f8f9fa] text-[var(--accent-500)] rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-2"
         >
           <i class="fas fa-info-circle"></i>
           <span>Chú giải</span>
@@ -458,7 +458,7 @@ async function exportExcel() {
         <div v-if="isAdmin" class="flex items-center gap-2">
           <select
             v-model="selectedBranchId"
-            class="h-[42px] px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm font-semibold focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]"
+            class="h-[42px] px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm font-semibold focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63]"
           >
             <option :value="null">Toàn hệ thống</option>
             <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
@@ -580,7 +580,7 @@ async function exportExcel() {
       <!-- ══════════════════════════════════════════════════════
            PHẦN 2: BẢNG CHI TIẾT
            ══════════════════════════════════════════════════════ -->
-      <div class="bg-white rounded-2xl border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-sm overflow-hidden mt-6">
+      <div class="bg-white rounded-2xl border border-[#f1f5f9] border-t-4 border-t-[var(--accent-500)] shadow-sm overflow-hidden mt-6">
         
         <!-- Toolbar -->
         <div class="p-5 border-b border-[#f1f5f9]">
@@ -589,13 +589,13 @@ async function exportExcel() {
             <div class="flex bg-[#f8f9fa] p-1 rounded-xl border border-[#e2e8f0] self-start">
               <button
                 @click="activeTab = 0"
-                :class="['px-5 py-2 text-sm font-bold rounded-lg transition-all', activeTab === 0 ? 'bg-white text-[#4361ee] shadow-sm' : 'text-[#8094ae] hover:text-slate-700']"
+                :class="['px-5 py-2 text-sm font-bold rounded-lg transition-all', activeTab === 0 ? 'bg-white text-[var(--accent-500)] shadow-sm' : 'text-[#8094ae] hover:text-slate-700']"
               >
                 Theo Hoá đơn
               </button>
               <button
                 @click="activeTab = 1"
-                :class="['px-5 py-2 text-sm font-bold rounded-lg transition-all', activeTab === 1 ? 'bg-white text-[#4361ee] shadow-sm' : 'text-[#8094ae] hover:text-slate-700']"
+                :class="['px-5 py-2 text-sm font-bold rounded-lg transition-all', activeTab === 1 ? 'bg-white text-[var(--accent-500)] shadow-sm' : 'text-[#8094ae] hover:text-slate-700']"
               >
                 Theo Sản phẩm
               </button>
@@ -606,7 +606,7 @@ async function exportExcel() {
               <select
                 v-if="activeTab === 0"
                 v-model="filterPaymentStatus"
-                class="h-[38px] px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] shadow-sm font-semibold cursor-pointer"
+                class="h-[38px] px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63] shadow-sm font-semibold cursor-pointer"
               >
                 <option value="">Tất cả trạng thái</option>
                 <option value="PAID">Đã thanh toán</option>
@@ -615,7 +615,7 @@ async function exportExcel() {
               
               <select
                 v-model="activePeriod"
-                class="h-[38px] px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] shadow-sm font-semibold cursor-pointer"
+                class="h-[38px] px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63] shadow-sm font-semibold cursor-pointer"
               >
                 <option v-for="opt in periodOptions" :key="opt.key" :value="opt.key">
                   {{ opt.label }}
@@ -628,7 +628,7 @@ async function exportExcel() {
                   v-model="customDateFrom" 
                   @change="onCustomDateChange"
                   :max="todayStr"
-                  :class="['h-[38px] px-3 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]', activePeriod === 'custom' ? '!border-[#4361ee] !bg-blue-50 !text-[#4361ee]' : '']" 
+                  :class="['h-[38px] px-3 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63]', activePeriod === 'custom' ? '!border-[var(--accent-500)] !bg-blue-50 !text-[var(--accent-500)]' : '']" 
                 />
                 <span class="text-[#8094ae] text-sm">—</span>
                 <input 
@@ -636,7 +636,7 @@ async function exportExcel() {
                   v-model="customDateTo" 
                   @change="onCustomDateChange"
                   :max="todayStr"
-                  :class="['h-[38px] px-3 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]', activePeriod === 'custom' ? '!border-[#4361ee] !bg-blue-50 !text-[#4361ee]' : '']" 
+                  :class="['h-[38px] px-3 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63]', activePeriod === 'custom' ? '!border-[var(--accent-500)] !bg-blue-50 !text-[var(--accent-500)]' : '']" 
                 />
               </div>
             </div>
@@ -650,12 +650,12 @@ async function exportExcel() {
                 type="text" 
                 v-model="filterSearch" 
                 placeholder="Tìm tên hoặc mã sản phẩm..." 
-                class="w-full pl-10 pr-4 h-[38px] border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all"
+                class="w-full pl-10 pr-4 h-[38px] border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all"
               />
             </div>
             <select 
               v-model="filterCategory"
-              class="w-full sm:w-[250px] h-[38px] px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all cursor-pointer"
+              class="w-full sm:w-[250px] h-[38px] px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all cursor-pointer"
             >
               <option value="">Tất cả danh mục</option>
               <option v-for="c in uniqueCategories" :key="c" :value="c">{{ c }}</option>
@@ -667,13 +667,13 @@ async function exportExcel() {
             <template v-if="activeTab === 0">
               <span class="text-xs text-[#8094ae] uppercase tracking-wide font-bold">
                 {{ filteredReceipts.length }} hóa đơn &mdash; Tổng tiền:
-                <span class="font-extrabold text-[#4361ee] text-sm ml-1">{{ formatVNDFull(filteredTotal) }}</span>
+                <span class="font-extrabold text-[var(--accent-500)] text-sm ml-1">{{ formatVNDFull(filteredTotal) }}</span>
               </span>
             </template>
             <template v-else>
               <span class="text-xs text-[#8094ae] uppercase tracking-wide font-bold">
                 {{ sortedProductStats.length }} sản phẩm &mdash; Doanh thu:
-                <span class="font-extrabold text-[#4361ee] text-sm ml-1 mr-3">{{ formatVNDFull(totalRevenueForProducts) }}</span>
+                <span class="font-extrabold text-[var(--accent-500)] text-sm ml-1 mr-3">{{ formatVNDFull(totalRevenueForProducts) }}</span>
                 Lợi nhuận:
                 <span class="font-extrabold text-emerald-600 text-sm ml-1">{{ formatVNDFull(totalProfitForProducts) }}</span>
               </span>
@@ -720,7 +720,7 @@ async function exportExcel() {
                   {{ getBranchName(r.sourceBranchId) }}
                 </td>
                 <td class="px-5 py-4">
-                  <div class="font-bold text-[#4361ee] text-[11px] tracking-wide uppercase">{{ r.createdByName || '—' }}</div>
+                  <div class="font-bold text-[var(--accent-500)] text-[11px] tracking-wide uppercase">{{ r.createdByName || '—' }}</div>
                   <div class="text-sm font-semibold text-slate-700 mt-0.5">{{ r.customerName || 'Khách lẻ' }}</div>
                 </td>
                 <td class="px-5 py-4 text-sm font-extrabold text-slate-800 whitespace-nowrap">
@@ -757,8 +757,8 @@ async function exportExcel() {
               <div class="flex items-center gap-1">
                 <button @click="currentPageReceipts--" :disabled="currentPageReceipts === 1" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 transition-colors" title="Trang trước"><i class="fas fa-chevron-left text-[10px]"></i></button>
                 <template v-for="(p, idx) in getPaginationArray(currentPageReceipts, totalPagesReceipts)" :key="idx">
-                  <button v-if="p !== '...'" @click="currentPageReceipts = Number(p)" :class="['min-w-[32px] h-8 px-2 flex items-center justify-center rounded-lg text-xs font-bold transition-colors', currentPageReceipts === p ? 'bg-[#4361ee] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900']">{{ p }}</button>
-                  <button v-else @click="handleJumpPage('receipts')" class="min-w-[32px] h-8 px-1 flex items-center justify-center text-slate-400 hover:text-[#4361ee] hover:bg-blue-50 rounded-lg transition-colors font-bold" title="Nhấn để chuyển trang">...</button>
+                  <button v-if="p !== '...'" @click="currentPageReceipts = Number(p)" :class="['min-w-[32px] h-8 px-2 flex items-center justify-center rounded-lg text-xs font-bold transition-colors', currentPageReceipts === p ? 'bg-[var(--accent-500)] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900']">{{ p }}</button>
+                  <button v-else @click="handleJumpPage('receipts')" class="min-w-[32px] h-8 px-1 flex items-center justify-center text-slate-400 hover:text-[var(--accent-500)] hover:bg-blue-50 rounded-lg transition-colors font-bold" title="Nhấn để chuyển trang">...</button>
                 </template>
                 <button @click="currentPageReceipts++" :disabled="currentPageReceipts === totalPagesReceipts" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 transition-colors" title="Trang sau"><i class="fas fa-chevron-right text-[10px]"></i></button>
               </div>
@@ -810,8 +810,8 @@ async function exportExcel() {
               <div class="flex items-center gap-1">
                 <button @click="currentPageProducts--" :disabled="currentPageProducts === 1" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 transition-colors" title="Trang trước"><i class="fas fa-chevron-left text-[10px]"></i></button>
                 <template v-for="(p, idx) in getPaginationArray(currentPageProducts, totalPagesProducts)" :key="idx">
-                  <button v-if="p !== '...'" @click="currentPageProducts = Number(p)" :class="['min-w-[32px] h-8 px-2 flex items-center justify-center rounded-lg text-xs font-bold transition-colors', currentPageProducts === p ? 'bg-[#4361ee] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900']">{{ p }}</button>
-                  <button v-else @click="handleJumpPage('products')" class="min-w-[32px] h-8 px-1 flex items-center justify-center text-slate-400 hover:text-[#4361ee] hover:bg-blue-50 rounded-lg transition-colors font-bold" title="Nhấn để chuyển trang">...</button>
+                  <button v-if="p !== '...'" @click="currentPageProducts = Number(p)" :class="['min-w-[32px] h-8 px-2 flex items-center justify-center rounded-lg text-xs font-bold transition-colors', currentPageProducts === p ? 'bg-[var(--accent-500)] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900']">{{ p }}</button>
+                  <button v-else @click="handleJumpPage('products')" class="min-w-[32px] h-8 px-1 flex items-center justify-center text-slate-400 hover:text-[var(--accent-500)] hover:bg-blue-50 rounded-lg transition-colors font-bold" title="Nhấn để chuyển trang">...</button>
                 </template>
                 <button @click="currentPageProducts++" :disabled="currentPageProducts === totalPagesProducts" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 transition-colors" title="Trang sau"><i class="fas fa-chevron-right text-[10px]"></i></button>
               </div>
@@ -835,7 +835,7 @@ async function exportExcel() {
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[85vh] overflow-hidden" @click.stop>
           <div class="flex items-center justify-between p-5 border-b border-[#f1f5f9] shrink-0">
             <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <i class="fas fa-book text-[#4361ee]"></i> Chú giải Thuật ngữ
+              <i class="fas fa-book text-[var(--accent-500)]"></i> Chú giải Thuật ngữ
             </h3>
             <button @click="showLegend = false" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors">
               <i class="fas fa-times"></i>
@@ -843,7 +843,7 @@ async function exportExcel() {
           </div>
           <div class="p-6 space-y-5 text-sm text-slate-600 overflow-y-auto custom-scrollbar">
             <div class="space-y-1">
-              <div class="font-bold text-slate-800 text-[15px]"><span class="text-[#4361ee] mr-1">1.</span>Tổng tiền (Tổng doanh thu)</div>
+              <div class="font-bold text-slate-800 text-[15px]"><span class="text-[var(--accent-500)] mr-1">1.</span>Tổng tiền (Tổng doanh thu)</div>
               <p class="leading-relaxed">Tính bằng <strong class="text-slate-700">Số lượng bán × Giá bán</strong>. Ghi nhận doanh thu của tất cả các hóa đơn bán hàng thành công (Bao gồm cả khách đã thanh toán và khách đang nợ).</p>
             </div>
             

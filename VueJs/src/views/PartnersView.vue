@@ -214,15 +214,15 @@ function exportExcel() {
 
     <!-- CUSTOMERS -->
     <!-- CUSTOMERS -->
-    <div class="bg-slate-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#f4bd0e] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden">
+    <div class="bg-slate-50 rounded-[10px] border border-[#f1f5f9] border-t-4 border-t-[#f4bd0e] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden">
       <!-- Toolbar -->
       <div class="p-5 border-b border-[#f1f5f9] flex items-center justify-between flex-wrap gap-4 bg-[#f8f9fa]/50">
         <div class="flex items-center gap-3 w-full md:w-auto flex-1">
           <div class="relative min-w-[300px] flex-1 md:flex-none">
             <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae]"></i>
-            <input v-model="cSearch" type="text" placeholder="Tìm kiếm khách hàng..." class="w-full h-[42px] pl-11 pr-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]" />
+            <input v-model="cSearch" type="text" placeholder="Tìm kiếm khách hàng..." class="w-full h-[42px] pl-11 pr-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63]" />
           </div>
-          <select v-model="cStatusFilter" class="h-[42px] px-3 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]">
+          <select v-model="cStatusFilter" class="h-[42px] px-3 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63]">
             <option value="">Tất cả trạng thái</option>
             <option value="ACTIVE">Hoạt động</option>
             <option value="INACTIVE">Ngừng hoạt động</option>
@@ -232,7 +232,7 @@ function exportExcel() {
           <button v-if="isManager" class="bg-white border border-[#e2e8f0] text-[#107c41] hover:bg-green-50 px-5 py-2.5 rounded-xl font-semibold shadow-sm transition-all text-sm flex items-center gap-2" @click="exportExcel">
             <i class="fas fa-file-excel"></i> Xuất Excel
           </button>
-          <button v-if="isManager" class="bg-[#4361ee] text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-sm flex items-center gap-2" @click="openAddC">
+          <button v-if="isManager" class="bg-[var(--accent-500)] text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-sm flex items-center gap-2" @click="openAddC">
             <i class="fas fa-plus"></i> Thêm Khách hàng
           </button>
         </div>
@@ -256,7 +256,7 @@ function exportExcel() {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="c in paginatedCustomers" :key="c.id" class="border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer group hover:-translate-y-[1px]" @dblclick="isManager ? openEditC(c) : null">
+            <tr v-for="c in paginatedCustomers" :key="c.id" class="border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[var(--accent-500)]/15 hover:to-[var(--accent-300)]/15 hover:shadow-sm transition-all duration-300 cursor-pointer group hover:-translate-y-[1px]" @dblclick="isManager ? openEditC(c) : null">
               <td class="p-4 first:rounded-l-xl last:rounded-r-xl">
                 <div class="font-bold text-[#364a63]">{{ c.name }}</div>
                 <div class="text-xs text-[#8094ae] font-mono mt-0.5">MST: {{ c.taxCode || '—' }}</div>
@@ -305,7 +305,7 @@ function exportExcel() {
             <i class="fas fa-chevron-left text-xs"></i>
           </button>
           <div class="flex items-center gap-1">
-            <span class="font-semibold text-sm text-[#4361ee] bg-[#4361ee]/10 w-9 h-9 flex items-center justify-center rounded-xl">{{ currentPage }}</span>
+            <span class="font-semibold text-sm text-[var(--accent-500)] bg-[var(--accent-500)]/10 w-9 h-9 flex items-center justify-center rounded-xl">{{ currentPage }}</span>
             <span class="text-[#8094ae] text-sm">/ {{ totalPages }}</span>
           </div>
           <button @click="currentPage++" :disabled="currentPage === totalPages"
@@ -390,7 +390,7 @@ function exportExcel() {
                   </div>
                   <div class="pt-3 border-t border-[#e2e8f0] flex justify-between items-center">
                     <span class="text-sm text-[#8094ae]">Tổng tiền:</span>
-                    <span class="font-bold text-xl text-[#4361ee]">{{ formatCurrency(cSelectedReceipt.details?.reduce((acc: number, d: any) => acc + (d.price * d.quantity), 0) || 0) }}</span>
+                    <span class="font-bold text-xl text-[var(--accent-500)]">{{ formatCurrency(cSelectedReceipt.details?.reduce((acc: number, d: any) => acc + (d.price * d.quantity), 0) || 0) }}</span>
                   </div>
                 </div>
 
@@ -421,14 +421,14 @@ function exportExcel() {
                   <div>Chưa có giao dịch nào</div>
                 </div>
                 <div v-else class="space-y-3">
-                  <div v-for="r in cReceipts" :key="r.id" class="border border-[#e2e8f0] rounded-xl p-4 hover:border-[#4361ee] transition-colors bg-white cursor-pointer" @click="cSelectedReceipt = r">
+                  <div v-for="r in cReceipts" :key="r.id" class="border border-[#e2e8f0] rounded-xl p-4 hover:border-[var(--accent-500)] transition-colors bg-white cursor-pointer" @click="cSelectedReceipt = r">
                     <div class="flex justify-between items-start mb-2">
                       <span class="font-bold text-[#364a63]">{{ r.code }}</span>
                       <StatusBadge :value="r.status" type="status" />
                     </div>
                     <div class="text-sm flex justify-between text-[#8094ae] items-center">
                       <span>{{ new Date(r.createdAt).toLocaleString('vi-VN', {hour: '2-digit', minute:'2-digit', day:'2-digit', month:'2-digit', year:'numeric'}) }}</span>
-                      <span class="font-bold text-[#4361ee] text-base" v-if="r.type === 'EXPORT'">{{ formatCurrency(r.details?.reduce((acc: number, d: any) => acc + (d.price * d.quantity), 0) || 0) }}</span>
+                      <span class="font-bold text-[var(--accent-500)] text-base" v-if="r.type === 'EXPORT'">{{ formatCurrency(r.details?.reduce((acc: number, d: any) => acc + (d.price * d.quantity), 0) || 0) }}</span>
                     </div>
                   </div>
                 </div>
@@ -457,8 +457,8 @@ function exportExcel() {
         </div>
         <div>
           <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số tiền điều chỉnh (VNĐ)</label>
-          <input v-model="cDebtAmount" @input="handleDebtInput" type="number" placeholder="VD: -500000 để giảm, 200000 để tăng" class="w-full h-11 px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all font-mono text-[#364a63]" />
-          <p class="text-xs text-[#8094ae] mt-2 bg-[#eef2ff] text-[#4361ee] p-2 rounded-lg"><i class="fas fa-info-circle mr-1"></i> Nhập số âm để giảm nợ, số dương để tăng nợ.</p>
+          <input v-model="cDebtAmount" @input="handleDebtInput" type="number" placeholder="VD: -500000 để giảm, 200000 để tăng" class="w-full h-11 px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all font-mono text-[#364a63]" />
+          <p class="text-xs text-[#8094ae] mt-2 bg-[#eef2ff] text-[var(--accent-500)] p-2 rounded-lg"><i class="fas fa-info-circle mr-1"></i> Nhập số âm để giảm nợ, số dương để tăng nợ.</p>
         </div>
         <div class="flex gap-3 pt-2">
           <button class="flex-1 h-11 bg-[#f8f9fa] hover:bg-[#e2e8f0] text-[#364a63] rounded-xl text-sm font-bold transition-colors" @click="showCDebtModal = false">Hủy</button>
