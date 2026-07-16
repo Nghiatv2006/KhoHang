@@ -121,7 +121,7 @@ public class ProductFormatUtil {
             String modelWord = words[1];
             List<String> validModels = Arrays.asList("7", "8", "x", "xr", "xs", "se", "11", "12", "13", "14", "15", "16");
             if (!validModels.contains(modelWord)) {
-                throw new IllegalArgumentException("Đời máy '" + modelWord + "' không hợp lệ. Chỉ chấp nhận các đời máy: " + String.join(", ", validModels).toUpperCase() + ".");
+                throw new IllegalArgumentException("Cửa hàng hiện chỉ kinh doanh các dòng máy từ iPhone 7 trở lên. Đời máy '" + modelWord.toUpperCase() + "' không được hỗ trợ (Các đời được phép: " + String.join(", ", validModels).toUpperCase() + ").");
             }
             
             // 4. Kiểm tra chéo với danh mục
@@ -130,21 +130,36 @@ public class ProductFormatUtil {
             boolean hasPlus = lowerName.contains("plus");
             boolean hasMini = lowerName.contains("mini");
             boolean hasSE = Arrays.asList(words).contains("se") || modelWord.equals("se");
+            boolean hasXS = modelWord.equals("xs");
+            
+            List<String> invalidProModels = Arrays.asList("7", "8", "x", "xr", "se");
 
             if (catNameLower.contains("iphone thường")) {
-                if (hasPro || hasMax || hasPlus || hasMini || hasSE) {
-                    throw new IllegalArgumentException("Tên sản phẩm chứa từ khóa (Pro, Max, Plus, Mini, SE) không phù hợp với danh mục 'iPhone thường'. Vui lòng tạo danh mục mới cho dòng máy này hoặc xóa từ khóa.");
+                if (hasPro || hasMax || hasPlus || hasMini || hasSE || hasXS) {
+                    throw new IllegalArgumentException("Danh mục 'iPhone thường' chỉ dành cho dòng máy tiêu chuẩn (VD: iPhone 11 128GB, iPhone XR 64GB). Sản phẩm có chứa từ khóa (Pro, Max, Plus, Mini, SE, XS) vui lòng chọn danh mục khác.");
                 }
             } else if (catNameLower.contains("iphone pro max")) {
-                if (!hasPro || !hasMax) {
-                    throw new IllegalArgumentException("Sản phẩm thuộc danh mục 'iPhone Pro Max' bắt buộc phải có chữ 'Pro Max' đứng sau đời máy (VD: " + example + ").");
+                if (invalidProModels.contains(modelWord)) {
+                    throw new IllegalArgumentException("Apple không sản xuất phiên bản Pro/Pro Max cho dòng máy '" + modelWord.toUpperCase() + "'. Vui lòng kiểm tra lại (Các bản cao cấp này chỉ bắt đầu từ đời XS và 11 trở lên).");
+                }
+                boolean isXSMax = hasXS && hasMax;
+                boolean isNormalProMax = hasPro && hasMax;
+                if (!isXSMax && !isNormalProMax) {
+                    throw new IllegalArgumentException("Sản phẩm thuộc danh mục 'iPhone Pro Max' bắt buộc phải là dòng 'Pro Max' hoặc 'XS Max' (VD: " + example + ", iPhone XS Max 256GB).");
                 }
             } else if (catNameLower.contains("iphone pro")) {
-                if (!hasPro) {
-                    throw new IllegalArgumentException("Sản phẩm thuộc danh mục 'iPhone Pro' bắt buộc phải có chữ 'Pro' đứng sau đời máy (VD: " + example + ").");
+                if (invalidProModels.contains(modelWord)) {
+                    throw new IllegalArgumentException("Apple không sản xuất phiên bản Pro/Pro Max cho dòng máy '" + modelWord.toUpperCase() + "'. Vui lòng kiểm tra lại (Các bản cao cấp này chỉ bắt đầu từ đời XS và 11 trở lên).");
                 }
-                if (hasMax) {
-                    throw new IllegalArgumentException("Sản phẩm có chữ 'Max' vui lòng chọn danh mục 'iPhone Pro Max'.");
+                boolean isXSPro = hasXS && !hasMax;
+                boolean isNormalPro = hasPro && !hasMax;
+                
+                if (!isXSPro && !isNormalPro) {
+                    if (hasMax) {
+                        throw new IllegalArgumentException("Sản phẩm có chữ 'Max' vui lòng chọn danh mục 'iPhone Pro Max'.");
+                    } else {
+                        throw new IllegalArgumentException("Sản phẩm thuộc danh mục 'iPhone Pro' bắt buộc phải là dòng 'Pro' hoặc 'XS' (VD: " + example + ", iPhone XS 64GB).");
+                    }
                 }
             }
             
