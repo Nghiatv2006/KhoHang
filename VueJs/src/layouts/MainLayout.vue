@@ -234,11 +234,10 @@ onMounted(() => {
   initTheme()
   updateTime()
   timer = setInterval(updateTime, 1000)
-  // Check ngay lúc mount; chỉ poll nếu là manager/admin
-  if (isManagerOrAdmin.value) {
-    refreshStocktakeBadge()
-    stocktakeTimer = setInterval(refreshStocktakeBadge, 10_000)
-  }
+  // Check ngay lúc mount cho mọi role
+  refreshStocktakeBadge()
+  stocktakeTimer = setInterval(refreshStocktakeBadge, 10_000)
+
   // Load badge counts
   loadBadgeCounts()
   badgeTimer = setInterval(loadBadgeCounts, 3000) // Refresh mỗi 3 giây

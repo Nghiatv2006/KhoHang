@@ -55,4 +55,16 @@ public class StocktakeController {
         StocktakeResponse res = stocktakeService.cancelStocktake(id, currentUser);
         return ResponseEntity.ok(res);
     }
+
+    @PatchMapping("/{id}/reject")
+    public ResponseEntity<StocktakeResponse> rejectStocktake(@PathVariable Integer id, @AuthenticationPrincipal User currentUser) {
+        StocktakeResponse res = stocktakeService.rejectStocktake(id, currentUser);
+        return ResponseEntity.ok(res);
+    }
+
+    @PatchMapping("/{id}/approve")
+    public ResponseEntity<StocktakeResponse> approveStocktake(@PathVariable Integer id, @RequestBody com.example.Hehe.dto.StocktakeApproveRequest request, @AuthenticationPrincipal User currentUser) {
+        StocktakeResponse res = stocktakeService.approveStocktake(id, request, currentUser);
+        return ResponseEntity.ok(res);
+    }
 }

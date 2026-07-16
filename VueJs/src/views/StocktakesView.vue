@@ -55,14 +55,48 @@ watch([filterFrom, filterTo], () => {
 
 // Selected stocktake details
 const selectedStocktake = ref<any>(null)
-const showDetailDrawer = ref(false)
-const savingDraft = ref(false)
 const isSpaceEasterEgg = ref(false)
 
+const canEditDraft = computed(() => {
+  if (!selectedStocktake.value || selectedStocktake.value.status !== 'DRAFT') return false
+  if (user.value?.role === 'STAFF') return true
+  if (selectedStocktake.value.createdById === user.value?.id) return true
+  return false
+})
+
+const hasDeviation = computed(() => {
+  if (!selectedStocktake.value) return false
+  return selectedStocktake.value.details.some((d: any) => d.actualQuantity !== d.expectedQuantity)
+})
+
+const showDetailDrawer = ref(false)
+
 // Confirm dialogs
+const showCreateConfirm = ref(false)
 const showCompleteConfirm = ref(false)
 const showCancelConfirm = ref(false)
+const showRejectConfirm = ref(false)
 const actionLoading = ref(false)
+
+const showApproveModal = ref(false)
+const approveForm = ref({ reason: '', responsibleType: 'internal', responsibleUserId: '', responsiblePersonName: '', warehouseWorkerName: '' })
+const systemUsers = ref<any[]>([])
+const rejectReason = ref('')
+
+async function loadSystemUsers(specificBranchId?: number) {
+  try {
+    const branchId = specificBranchId || user.value?.branchId || user.value?.branch?.id || ''
+    const res = await api.get(`/api/users?branchId=${branchId}`)
+    if (res.ok) {
+      const data = await res.json()
+      if (specificBranchId) {
+        systemUsers.value = data.filter((u: any) => u.branchId === specificBranchId)
+      } else {
+        systemUsers.value = data
+      }
+    }
+  } catch (err) {}
+}
 
 // Linked receipt modal
 const showReceiptModal = ref(false)
@@ -88,6 +122,8 @@ async function loadStocktakes() {
 
 // Create new stocktake
 async function createStocktake() {
+  showCreateConfirm.value = false
+  actionLoading.value = true
   try {
     const res = await api.post('/api/stocktakes', { notes: 'Phiên kiểm kê mới khởi tạo' })
     if (res.ok) {
@@ -102,6 +138,8 @@ async function createStocktake() {
     }
   } catch (err: any) {
     toast.error('Lỗi kết nối: ' + err.message)
+  } finally {
+    actionLoading.value = false
   }
 }
 
@@ -125,10 +163,12 @@ async function loadingDetail(id: number) {
   }
 }
 
-// Save draft quantities
-async function saveDraft() {
+
+
+// Save Draft or Save Manager Edit (Manual)
+async function saveStocktake() {
   if (!selectedStocktake.value) return
-  savingDraft.value = true
+  actionLoading.value = true
   try {
     const payload = {
       notes: selectedStocktake.value.notes,
@@ -139,22 +179,43 @@ async function saveDraft() {
     }
     const res = await api.put(`/api/stocktakes/${selectedStocktake.value.id}`, payload)
     if (res.ok) {
-      toast.success('Lưu số liệu kiểm kê thành công!')
+      toast.success('Đã lưu số liệu kiểm kê!')
       await loadingDetail(selectedStocktake.value.id)
       await loadStocktakes()
-      await refreshStocktakeBadge() // ↠ Cập nhật số báo đỏ ngay lập tức
     } else {
       const err = await res.text()
-      toast.error(err || 'Không thể lưu bản nháp.')
+      toast.error(err || 'Lưu số liệu thất bại.')
     }
   } catch (err: any) {
     toast.error('Lỗi kết nối: ' + err.message)
   } finally {
-    savingDraft.value = false
+    actionLoading.value = false
   }
 }
 
-// Complete/Approve Stocktake
+// Premium Auto-Save Feature
+let autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+function triggerAutoSave() {
+  if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
+  autoSaveTimeout = setTimeout(async () => {
+    if (!selectedStocktake.value) return;
+    try {
+      const payload = {
+        notes: selectedStocktake.value.notes,
+        details: selectedStocktake.value.details.map((d: any) => ({
+          id: d.id,
+          actualQuantity: Number(d.actualQuantity)
+        }))
+      }
+      // Silent save in background
+      await api.put(`/api/stocktakes/${selectedStocktake.value.id}`, payload)
+    } catch (e) {
+      console.error('Auto save failed', e)
+    }
+  }, 1000);
+}
+
+// Complete Stocktake
 async function completeStocktake() {
   if (!selectedStocktake.value) return
   showCompleteConfirm.value = false
@@ -178,13 +239,146 @@ async function completeStocktake() {
 
     const res = await api.patch(`/api/stocktakes/${selectedStocktake.value.id}/complete`, {})
     if (res.ok) {
-      toast.success('Hoàn tất kiểm kê và cập nhật tồn kho thành công!')
+      toast.success('Nộp kiểm kê thành công!')
       await loadingDetail(selectedStocktake.value.id)
       await loadStocktakes()
       await refreshStocktakeBadge()   // ↠ cập nhật badge ngay
     } else {
       const err = await res.text()
-      toast.error(err || 'Không thể duyệt hoàn tất phiên kiểm kê.')
+      toast.error(err || 'Không thể nộp phiên kiểm kê.')
+    }
+  } catch (err: any) {
+    toast.error('Lỗi kết nối: ' + err.message)
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+async function openApproveModal() {
+  approveForm.value.warehouseWorkerName = ''
+  if (selectedStocktake.value?.branchId) {
+    await loadSystemUsers(selectedStocktake.value.branchId)
+  }
+  showApproveModal.value = true
+}
+
+async function approveStocktakeDeviation() {
+  if (!selectedStocktake.value) return
+  if (!approveForm.value.reason) {
+    toast.error('Vui lòng nhập lý do (VD: Đếm ngu, Mất hàng...)')
+    return
+  }
+  showApproveModal.value = false
+  actionLoading.value = true
+  try {
+    let responsibleName = ''
+    let responsibleUserId: number | null = null
+
+    if (!hasDeviation.value) {
+      if (!approveForm.value.warehouseWorkerName.trim()) {
+        toast.error('Vui lòng nhập tên thủ kho đếm sai.')
+        actionLoading.value = false
+        return
+      }
+      const creatorName = selectedStocktake.value?.createdByName || 'Nhân viên hệ thống'
+      responsibleName = `NV Lập phiếu: ${creatorName} & Thủ kho đếm: ${approveForm.value.warehouseWorkerName.trim()}`
+    } else {
+      if (approveForm.value.responsibleType === 'internal') {
+        if (!approveForm.value.responsibleUserId) {
+          responsibleName = 'Công ty tự chịu trách nhiệm'
+        } else {
+          responsibleUserId = Number(approveForm.value.responsibleUserId)
+          const emp = systemUsers.value.find((u: any) => u.id === responsibleUserId)
+          responsibleName = emp ? emp.fullName : ''
+        }
+      } else {
+        if (!approveForm.value.responsiblePersonName.trim()) {
+          toast.error('Vui lòng nhập tên đối tượng bên ngoài (Khách hàng, Kẻ gian...).')
+          actionLoading.value = false
+          return
+        }
+        responsibleName = approveForm.value.responsiblePersonName.trim()
+      }
+    }
+
+    // Tự động lưu số liệu trước khi duyệt
+    const payload = {
+      notes: selectedStocktake.value.notes,
+      details: selectedStocktake.value.details.map((d: any) => ({
+        id: d.id,
+        actualQuantity: Number(d.actualQuantity)
+      }))
+    }
+    const saveRes = await api.put(`/api/stocktakes/${selectedStocktake.value.id}`, payload)
+    if (!saveRes.ok) {
+      const err = await saveRes.text()
+      toast.error(err || 'Lưu số liệu thất bại trước khi duyệt.')
+      actionLoading.value = false
+      return
+    }
+
+    const res = await api.patch(`/api/stocktakes/${selectedStocktake.value.id}/approve`, {
+      reason: approveForm.value.reason,
+      responsiblePersonName: responsibleName,
+      responsibleUserId: responsibleUserId
+    })
+    if (res.ok) {
+      toast.success('Duyệt kiểm kê thành công!')
+      await loadingDetail(selectedStocktake.value.id)
+      await loadStocktakes()
+    } else {
+      const err = await res.text()
+      toast.error(err || 'Duyệt kiểm kê thất bại.')
+    }
+  } catch (err: any) {
+    toast.error('Lỗi kết nối: ' + err.message)
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+
+// Reject Stocktake (Yêu cầu đếm lại)
+async function rejectStocktake() {
+  if (!selectedStocktake.value) return
+  if (!rejectReason.value.trim()) {
+    toast.error('Vui lòng nhập lý do yêu cầu đếm lại.')
+    return
+  }
+  showRejectConfirm.value = false
+  actionLoading.value = true
+  try {
+    const currentDate = new Date()
+    const pad = (n: number) => n.toString().padStart(2, '0')
+    const timeStr = `${pad(currentDate.getHours())}:${pad(currentDate.getMinutes())} ${pad(currentDate.getDate())}/${pad(currentDate.getMonth()+1)}`
+    
+    const oldNotes = selectedStocktake.value.notes || ''
+    const newNotes = oldNotes ? `${oldNotes}\n[${timeStr} - QUẢN LÝ YÊU CẦU ĐẾM LẠI]: ${rejectReason.value.trim()}` : `[${timeStr} - QUẢN LÝ YÊU CẦU ĐẾM LẠI]: ${rejectReason.value.trim()}`
+    
+    const payload = {
+      notes: newNotes,
+      details: selectedStocktake.value.details.map((d: any) => ({
+        id: d.id,
+        actualQuantity: Number(d.actualQuantity)
+      }))
+    }
+    const saveRes = await api.put(`/api/stocktakes/${selectedStocktake.value.id}`, payload)
+    if (!saveRes.ok) {
+       toast.error('Lỗi khi lưu lý do đếm lại.')
+       actionLoading.value = false
+       return
+    }
+
+    const res = await api.patch(`/api/stocktakes/${selectedStocktake.value.id}/reject`, {})
+    if (res.ok) {
+      toast.success('Đã yêu cầu nhân viên đếm lại!')
+      rejectReason.value = ''
+      await loadingDetail(selectedStocktake.value.id)
+      await loadStocktakes()
+      await refreshStocktakeBadge()
+    } else {
+      const err = await res.text()
+      toast.error(err || 'Không thể yêu cầu đếm lại.')
     }
   } catch (err: any) {
     toast.error('Lỗi kết nối: ' + err.message)
@@ -288,33 +482,10 @@ const paginatedStocktakes = computed(() => {
 
 const totalPagesPeriodic = computed(() => Math.ceil(filteredStocktakes.value.length / itemsPerPage) || 1)
 
-const paginatedReceiptStocktakes = computed(() => {
-  const start = (currentPageReceipt.value - 1) * itemsPerPage
-  return filteredReceiptStocktakes.value.slice(start, start + itemsPerPage)
-})
 
-const totalPagesReceipt = computed(() => Math.ceil(filteredReceiptStocktakes.value.length / itemsPerPage) || 1)
 
-const adjustmentReceipts = computed(() => {
-  if (!selectedStocktake.value || !selectedStocktake.value.details) return []
-  const map = new Map()
-  for (const d of selectedStocktake.value.details) {
-    if (d.adjustmentReceiptId) {
-      map.set(d.adjustmentReceiptId, {
-        id: d.adjustmentReceiptId,
-        code: d.adjustmentReceiptCode,
-        type: d.adjustmentReceiptCode?.startsWith('AI') ? 'ADJUST_IN' : 'ADJUST_OUT'
-      })
-    }
-  }
-  return Array.from(map.values())
-})
 
 // Formatting Helpers
-function formatVND(val: number) {
-  return new Intl.NumberFormat('vi-VN').format(val) + ' đ'
-}
-
 function formatDate(dateStr: string) {
   if (!dateStr || dateStr.startsWith('1970-01-01')) return '-'
   try {
@@ -338,9 +509,75 @@ function formatDateTime(dateTimeStr: string) {
   }
 }
 
+function printBlindCount() {
+  if (!selectedStocktake.value) return;
+  
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    toast.error('Trình duyệt đã chặn popup. Vui lòng cho phép popup để in.');
+    return;
+  }
+  
+  let html = `
+    <html>
+      <head>
+        <title>Phiếu Kiểm Đếm Kho - ${selectedStocktake.value.code}</title>
+        <style>
+          body { font-family: sans-serif; padding: 20px; }
+          h1 { text-align: center; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #000; padding: 8px; text-align: left; }
+          .qty-box { width: 100px; height: 30px; }
+          .header-info { margin-bottom: 20px; }
+        </style>
+      </head>
+      <body>
+        <h1>PHIẾU KIỂM ĐẾM KHO</h1>
+        <div class="header-info">
+          <p><strong>Mã phiên kiểm kê:</strong> ${selectedStocktake.value.code}</p>
+          <p><strong>Chi nhánh:</strong> ${selectedStocktake.value.branchName}</p>
+          <p><strong>Ngày tạo:</strong> ${formatDateTime(selectedStocktake.value.createdAt)}</p>
+          <p><strong>Người thực hiện:</strong> ........................................</p>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>STT</th>
+              <th>Sản phẩm</th>
+              <th>SKU</th>
+              <th>Lô SX</th>
+              <th>HSD</th>
+              <th>Số lượng đếm được</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${selectedStocktake.value.details.map((d: any, i: number) => `
+              <tr>
+                <td>${i + 1}</td>
+                <td>${d.productName}</td>
+                <td>${d.productSku}</td>
+                <td>${d.batchCode}</td>
+                <td>${formatDate(d.expirationDate)}</td>
+                <td><div class="qty-box"></div></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <script>
+          window.onload = function() { window.print(); window.close(); }
+        <\/script>
+      </body>
+    </html>
+  `;
+  
+  printWindow.document.write(html);
+  printWindow.document.close();
+}
+
 function getStatusBadgeClass(status: string) {
   switch (status) {
     case 'DRAFT': return 'bg-slate-100 text-slate-700 border-slate-200'
+    case 'PENDING_APPROVAL': return 'bg-orange-100 text-orange-700 border-orange-200'
     case 'COMPLETED': return 'bg-emerald-100 text-emerald-700 border-emerald-200'
     case 'CANCELLED': return 'bg-red-100 text-red-700 border-red-200'
     default: return 'bg-slate-100 text-slate-600'
@@ -349,7 +586,8 @@ function getStatusBadgeClass(status: string) {
 
 function getStatusLabel(status: string) {
   switch (status) {
-    case 'DRAFT': return 'Lưu nháp'
+    case 'DRAFT': return 'Đang kiểm đếm'
+    case 'PENDING_APPROVAL': return 'Chờ duyệt'
     case 'COMPLETED': return 'Đã hoàn tất'
     case 'CANCELLED': return 'Đã hủy'
     default: return status
@@ -412,6 +650,13 @@ const filteredReceiptStocktakes = computed(() => {
     return db - da
   })
 })
+
+const paginatedReceiptStocktakes = computed(() => {
+  const start = (currentPageReceipt.value - 1) * itemsPerPage
+  return filteredReceiptStocktakes.value.slice(start, start + itemsPerPage)
+})
+
+const totalPagesReceipt = computed(() => Math.ceil(filteredReceiptStocktakes.value.length / itemsPerPage) || 1)
 
 // Xem chi tiết phiếu nhận hàng
 const selectedRsReceipt = ref<any>(null)
@@ -542,9 +787,12 @@ function triggerStocktakesAnimation() {
   loadReceiptStocktakes()
 }
 
-onMounted(async () => {
+onMounted(() => {
   window.addEventListener('trigger-stocktakes-animation', triggerStocktakesAnimation)
-  await Promise.all([loadStocktakes(), loadReceiptStocktakes()])
+  if (isManager.value) {
+    loadSystemUsers()
+  }
+  Promise.all([loadStocktakes(), loadReceiptStocktakes()])
 })
 
 onUnmounted(() => {
@@ -605,7 +853,8 @@ onUnmounted(() => {
           </div>
           <select v-model="selectedStatus" class="h-11 px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm text-[#364a63] font-medium outline-none">
             <option value="">Tất cả trạng thái</option>
-            <option value="DRAFT">Lưu nháp</option>
+            <option value="DRAFT">Đang kiểm đếm</option>
+            <option value="PENDING_APPROVAL">Chờ duyệt</option>
             <option value="COMPLETED">Đã hoàn tất</option>
             <option value="CANCELLED">Đã hủy</option>
           </select>
@@ -614,7 +863,7 @@ onUnmounted(() => {
             <option value="yes">Có chênh lệch</option>
             <option value="no">Khớp số lượng</option>
           </select>
-          <button @click="createStocktake"
+          <button v-if="user?.role === 'STAFF'" @click="showCreateConfirm = true"
             class="h-11 px-5 bg-gradient-to-r from-[var(--accent-500)] to-[var(--accent-300)] hover:from-[var(--accent-700)] hover:to-[var(--accent-500)] text-white rounded-xl font-bold transition-all shadow-md flex items-center gap-2 whitespace-nowrap">
             <i class="fas fa-plus"></i> Khởi tạo kiểm kê
           </button>
@@ -698,7 +947,7 @@ onUnmounted(() => {
               <td class="p-4 text-sm text-[#8094ae] font-mono"><div>{{ formatDateTime(st.createdAt) }}</div></td>
               <td class="p-4 text-sm text-slate-500 max-w-[200px] truncate" :title="st.notes"><div>{{ st.notes || '-' }}</div></td>
               <td class="p-4">
-                <span :class="['inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border', getStatusBadgeClass(st.status)]">
+                <span :class="['inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border whitespace-nowrap', getStatusBadgeClass(st.status)]">
                   {{ getStatusLabel(st.status) }}
                 </span>
               </td>
@@ -826,36 +1075,15 @@ onUnmounted(() => {
             <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider">Ghi chú kiểm kê</label>
             <textarea
               v-model="selectedStocktake.notes"
-              :disabled="selectedStocktake.status !== 'DRAFT'"
+              @input="triggerAutoSave"
+              :disabled="selectedStocktake.status !== 'DRAFT' && !(selectedStocktake.status === 'PENDING_APPROVAL' && isManager)"
               rows="2"
               placeholder="Nhập ghi chú hoặc lý do kiểm kê đợt này..."
               class="w-full p-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63] disabled:opacity-75 disabled:cursor-not-allowed"
             ></textarea>
           </div>
 
-          <!-- Adjustment Receipts links -->
-          <div v-if="adjustmentReceipts.length > 0" class="bg-blue-50 border border-blue-100 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
-                <i class="fas fa-file-invoice-dollar text-lg"></i>
-              </div>
-              <div>
-                <div class="text-xs font-bold text-blue-800 uppercase tracking-wide">Phiếu điều chỉnh kho liên kết</div>
-                <div class="text-xs text-blue-600 mt-0.5">Phiên kiểm kê này có chênh lệch và đã sinh các phiếu cân bằng tồn kho:</div>
-              </div>
-            </div>
-            <div class="flex flex-wrap gap-2">
-              <button
-                v-for="r in adjustmentReceipts"
-                :key="r.id"
-                @click="viewReceipt(r.id)"
-                class="px-4 py-2 bg-white hover:bg-blue-600 hover:text-white text-blue-600 border border-blue-200 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
-              >
-                <i class="fas" :class="r.type === 'ADJUST_IN' ? 'fa-plus-circle text-emerald-500' : 'fa-minus-circle text-amber-500'"></i>
-                {{ r.code }} ({{ r.type === 'ADJUST_IN' ? 'Tăng tồn kho' : 'Giảm tồn kho' }})
-              </button>
-            </div>
-          </div>
+
 
           <!-- Items Table -->
           <div class="space-y-3">
@@ -894,8 +1122,9 @@ onUnmounted(() => {
                     <td class="p-3 text-right font-mono font-bold">{{ d.expectedQuantity }}</td>
                     <td class="p-3 text-center">
                       <input
-                        v-if="selectedStocktake.status === 'DRAFT'"
+                        v-if="canEditDraft || (selectedStocktake.status === 'PENDING_APPROVAL' && isManager)"
                         v-model.number="d.actualQuantity"
+                        @input="triggerAutoSave"
                         type="number"
                         min="0"
                         class="w-20 h-9 border border-[#e2e8f0] bg-white rounded-lg text-center font-mono font-bold text-[#364a63] focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none"
@@ -936,27 +1165,44 @@ onUnmounted(() => {
 
         <!-- Drawer Footer -->
         <div class="px-8 py-5 border-t border-[#f1f5f9] bg-[#f8f9fa] flex flex-col sm:flex-row gap-4 justify-between items-center">
-          <div>
+          <div class="flex gap-3">
             <button
               @click="showDetailDrawer = false"
               class="px-6 h-11 border border-slate-200 bg-white hover:bg-slate-50 text-[#364a63] rounded-xl font-bold transition-all text-sm"
             >
               Đóng panel
             </button>
+            
+            <button
+              v-if="selectedStocktake.status === 'DRAFT' || selectedStocktake.status === 'PENDING_APPROVAL'"
+              @click="saveStocktake"
+              class="hidden"
+            >
+            </button>
+
+            <button
+              v-if="selectedStocktake.status === 'DRAFT'"
+              @click="printBlindCount"
+              class="px-6 h-11 border border-slate-200 bg-white hover:bg-slate-50 text-[#364a63] rounded-xl font-bold transition-all text-sm flex items-center gap-2"
+            >
+              <i class="fas fa-print"></i> In phiếu kiểm đếm
+            </button>
           </div>
           
           <div v-if="selectedStocktake.status === 'DRAFT'" class="flex gap-3">
-            <button
-              @click="saveDraft"
-              :disabled="savingDraft"
-              class="px-6 h-11 bg-slate-100 hover:bg-[var(--accent-500)]/10 text-[var(--accent-500)] rounded-xl font-bold transition-all text-sm flex items-center gap-2"
-            >
-              <i v-if="savingDraft" class="fas fa-spinner fa-spin"></i>
-              <i v-else class="fas fa-save"></i>
-              Lưu bản nháp
-            </button>
 
-            <!-- Manager only complete/cancel -->
+
+            <!-- Complete for Staff/Manager -->
+            <button
+              v-if="canEditDraft"
+              @click="showCompleteConfirm = true"
+              class="px-6 h-11 bg-[#4361ee] hover:bg-[#3a0ca3] text-white rounded-xl font-bold transition-all text-sm flex items-center gap-1.5 shadow-sm hover:shadow-md"
+            >
+              <i class="fas fa-paper-plane"></i>
+              Hoàn tất & Nộp
+            </button>
+            
+            <!-- Cancel for Manager -->
             <template v-if="isManager">
               <button
                 @click="showCancelConfirm = true"
@@ -965,15 +1211,32 @@ onUnmounted(() => {
                 <i class="fas fa-ban"></i>
                 Hủy bỏ
               </button>
-              
-              <button
-                @click="showCompleteConfirm = true"
-                class="px-6 h-11 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold transition-all text-sm flex items-center gap-1.5 shadow-sm hover:shadow-md"
-              >
-                <i class="fas fa-check-circle"></i>
-                Duyệt hoàn tất
-              </button>
             </template>
+          </div>
+
+          <div v-if="selectedStocktake.status === 'PENDING_APPROVAL' && isManager" class="flex gap-3">
+
+            <button
+              @click="showCancelConfirm = true"
+              class="px-6 h-11 bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200 rounded-xl font-bold transition-all text-sm flex items-center gap-1.5"
+            >
+              <i class="fas fa-ban"></i>
+              Hủy bỏ (Vĩnh viễn)
+            </button>
+            <button
+              @click="showRejectConfirm = true"
+              class="px-6 h-11 bg-orange-50 hover:bg-orange-100 text-[#f77f00] border border-orange-200 rounded-xl font-bold transition-all text-sm flex items-center gap-1.5"
+            >
+              <i class="fas fa-undo"></i>
+              Yêu cầu đếm lại
+            </button>
+            <button
+              @click="openApproveModal"
+              class="px-6 h-11 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold transition-all text-sm flex items-center gap-1.5 shadow-sm hover:shadow-md"
+            >
+              <i class="fas fa-check-double"></i>
+              {{ hasDeviation ? 'Duyệt chênh lệch' : 'Duyệt kiểm kê' }}
+            </button>
           </div>
         </div>
       </div>
@@ -1268,9 +1531,7 @@ onUnmounted(() => {
                 <tr class="bg-slate-50 border-b border-slate-100">
                   <th class="p-3 text-xs font-bold text-[#8094ae] pl-5">Sản phẩm</th>
                   <th class="p-3 text-xs font-bold text-[#8094ae]">Lô SX</th>
-                  <th class="p-3 text-xs font-bold text-[#8094ae] text-right">Số lượng</th>
-                  <th class="p-3 text-xs font-bold text-[#8094ae] text-right">Giá nhập</th>
-                  <th class="p-3 text-xs font-bold text-[#8094ae] pr-5 text-right">Thành tiền</th>
+                  <th class="p-3 text-xs font-bold text-[#8094ae] text-right pr-5">Số lượng</th>
                 </tr>
               </thead>
               <tbody>
@@ -1284,11 +1545,7 @@ onUnmounted(() => {
                     <div class="text-[11px] font-mono text-[#8094ae]">SKU: {{ item.productSku }}</div>
                   </td>
                   <td class="p-3 font-mono text-xs">{{ item.batchCode }}</td>
-                  <td class="p-3 text-right font-mono font-bold">{{ item.quantity }}</td>
-                  <td class="p-3 text-right font-mono">{{ formatVND(item.price) }}</td>
-                  <td class="p-3 pr-5 text-right font-mono font-bold text-[#364a63]">
-                    {{ formatVND(item.price * item.quantity) }}
-                  </td>
+                  <td class="p-3 text-right font-mono font-bold pr-5">{{ item.quantity }}</td>
                 </tr>
               </tbody>
             </table>
@@ -1307,12 +1564,23 @@ onUnmounted(() => {
       </div>
     </AppModal>
 
+    <!-- CREATE CONFIRMATION -->
+    <ConfirmDialog
+      :show="showCreateConfirm"
+      title="Khởi tạo kiểm kê"
+      message="Bạn có chắc chắn muốn khởi tạo một đợt kiểm kê mới? Thao tác này sẽ chốt số liệu hệ thống hiện tại để chuẩn bị đối chiếu thực tế."
+      type="info"
+      :loading="actionLoading"
+      @confirm="createStocktake"
+      @cancel="showCreateConfirm = false"
+    />
+
     <!-- DUYỆT HOÀN TẤT CONFIRMATION -->
     <ConfirmDialog
       :show="showCompleteConfirm"
-      title="Xác nhận duyệt kiểm kê"
-      message="Hành động này sẽ chốt số liệu thực tế kiểm đếm, tự động tạo phiếu tăng/giảm để cân bằng và cập nhật lại số lượng tồn kho. Bạn có chắc chắn muốn hoàn tất?"
-      confirmText="Duyệt hoàn tất"
+      title="Xác nhận nộp kiểm kê"
+      message="Hành động này sẽ nộp số liệu thực tế kiểm đếm. Nếu có chênh lệch, phiếu sẽ chuyển sang chờ duyệt. Bạn có chắc chắn muốn nộp?"
+      confirmText="Nộp kiểm kê"
       cancelText="Hủy"
       @confirm="completeStocktake"
       @cancel="showCompleteConfirm = false"
@@ -1329,6 +1597,135 @@ onUnmounted(() => {
       @confirm="cancelStocktake"
       @cancel="showCancelConfirm = false"
     />
+
+    <!-- REJECT MODAL -->
+    <AppModal
+      :show="showRejectConfirm"
+      title="Yêu cầu đếm lại"
+      size="sm"
+      @close="showRejectConfirm = false"
+    >
+      <div class="p-6 space-y-4">
+        <p class="text-sm text-slate-600">Bạn có chắc chắn muốn trả phiếu kiểm kê này về trạng thái Đang kiểm đếm để nhân viên thực hiện đếm lại?</p>
+        <div>
+          <label class="block text-sm font-bold text-[#364a63] mb-1">Lý do đếm lại <span class="text-rose-500">*</span></label>
+          <textarea
+            v-model="rejectReason"
+            rows="3"
+            placeholder="VD: Cột B hàng vẫn còn, hãy đếm kỹ lại..."
+            class="w-full p-3 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none"
+          ></textarea>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-[#f1f5f9] bg-[#f8f9fa] flex justify-end gap-3 rounded-b-2xl">
+        <button
+          @click="showRejectConfirm = false"
+          class="px-5 h-10 border border-[#e2e8f0] bg-white hover:bg-slate-50 text-[#364a63] rounded-xl font-bold text-sm transition-all"
+        >
+          Hủy
+        </button>
+        <button
+          @click="rejectStocktake"
+          :disabled="actionLoading"
+          class="px-5 h-10 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold text-sm transition-all flex items-center gap-2"
+        >
+          <i class="fas fa-undo"></i>
+          Xác nhận trả về
+        </button>
+      </div>
+    </AppModal>
+
+    <!-- APPROVE DEVIATION MODAL -->
+    <AppModal
+      :show="showApproveModal"
+      :title="hasDeviation ? 'Duyệt chênh lệch tồn kho' : 'Chốt sổ (Không lệch tồn)'"
+      size="md"
+      @close="showApproveModal = false"
+    >
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-sm font-bold text-[#364a63] mb-1">
+            {{ hasDeviation ? 'Lý do chênh lệch' : 'Lý do (Ghi chú phạt lỗi)' }} <span class="text-rose-500">*</span>
+          </label>
+          <textarea
+            v-model="approveForm.reason"
+            rows="3"
+            placeholder="VD: Hàng hỏng, mất mát do lỗi nhân viên..."
+            class="w-full p-3 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none"
+          ></textarea>
+        </div>
+        <div v-if="hasDeviation">
+          <label class="block text-sm font-bold text-[#364a63] mb-1">Loại đối tượng chịu trách nhiệm</label>
+          <div class="flex gap-4 mb-3">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" v-model="approveForm.responsibleType" value="internal" class="text-[#4361ee] focus:ring-[#4361ee]" />
+              <span class="text-sm text-slate-700 font-medium">Nhân viên nội bộ</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" v-model="approveForm.responsibleType" value="external" class="text-[#4361ee] focus:ring-[#4361ee]" />
+              <span class="text-sm text-slate-700 font-medium">Đối tượng bên ngoài (Khách hàng, Kẻ gian...)</span>
+            </label>
+          </div>
+          
+          <template v-if="approveForm.responsibleType === 'internal'">
+            <select v-model="approveForm.responsibleUserId" class="w-full p-3 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none text-[#364a63]">
+              <option value="">-- Bỏ qua (Công ty tự chịu rủi ro) --</option>
+              <option v-for="u in systemUsers" :key="u.id" :value="u.id">
+                {{ u.fullName }} ({{ u.role }}) - {{ u.username }}
+              </option>
+            </select>
+          </template>
+          
+          <template v-else>
+            <input
+              v-model="approveForm.responsiblePersonName"
+              type="text"
+              placeholder="VD: Đối tác giao hàng bên ngoài, Nhà cung cấp X..."
+              class="w-full p-3 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none"
+            />
+          </template>
+
+          <div class="text-xs text-slate-500 mt-2 italic flex items-start gap-1">
+            <i class="fas fa-info-circle mt-0.5 text-[#f77f00]/60"></i>
+            <span>Hệ thống sẽ tự động sinh các Phiếu Nhập/Xuất điều chỉnh để làm cân bằng tồn kho. Thông tin trách nhiệm sẽ được ghi nhận vào các phiếu này.</span>
+          </div>
+        </div>
+
+        <div v-else>
+          <label class="block text-sm font-bold text-[#364a63] mb-3">Thông tin đối tượng chịu trách nhiệm (Phạt KPI)</label>
+          
+          <div class="space-y-3 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+            <div>
+              <span class="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Nhân viên hệ thống (Người lập phiếu/Nhập liệu)</span>
+              <div class="px-3 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-600 font-medium">
+                {{ selectedStocktake?.createdByName || 'Không xác định' }}
+              </div>
+            </div>
+            
+            <div>
+              <span class="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Nhân viên kho (Người trực tiếp đếm) <span class="text-rose-500">*</span></span>
+              <input
+                v-model="approveForm.warehouseWorkerName"
+                type="text"
+                placeholder="Nhập tên thủ kho / nhân viên đếm hàng..."
+                class="w-full p-2.5 border border-[#e2e8f0] bg-white rounded-lg text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all"
+              />
+            </div>
+          </div>
+
+          <div class="text-xs text-slate-500 mt-2 italic flex items-start gap-1">
+            <i class="fas fa-info-circle mt-0.5 text-[#4361ee]/60"></i>
+            <span>Hệ thống KHÔNG sinh phiếu điều chỉnh kho vì số lượng thực tế đã khớp hoàn toàn. Biên bản quy trách nhiệm sẽ được lưu vĩnh viễn vào lịch sử phiếu này.</span>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
+          <button @click="showApproveModal = false" class="px-5 py-2.5 rounded-lg border border-slate-200 text-slate-600 font-bold text-sm">Hủy</button>
+          <button @click="approveStocktakeDeviation" :disabled="actionLoading" class="px-5 py-2.5 rounded-lg bg-emerald-500 text-white font-bold text-sm shadow-sm flex items-center gap-2">
+            <i v-if="actionLoading" class="fas fa-spinner fa-spin"></i> {{ hasDeviation ? 'Duyệt chênh lệch' : 'Chốt sổ & Lưu lỗi' }}
+          </button>
+        </div>
+      </div>
+    </AppModal>
 
   </div>
 </template>

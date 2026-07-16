@@ -87,6 +87,8 @@ const isSpaceEasterEgg = ref(false)
 const uSaving = ref(false)
 const showDeleteUser = ref(false)
 const deletingUser = ref<any>(null)
+const verifyingEmail = ref(false)
+const isEmailVerified = ref(false)
 
 // Chống tự động điền bằng readonly tạm thời
 const usernameReadonly = ref(true)
@@ -163,6 +165,8 @@ function openAddUser() {
   passwordReadonly.value = true
   emailReadonly.value = true
   phoneReadonly.value = true
+  isEmailVerified.value = false
+  // Reset previous watcher if any by re-assigning (handled globally or via simple state)
   showUserModal.value = true
 }
 
@@ -184,25 +188,38 @@ function openEditUser(u: any) {
   passwordReadonly.value = false
   emailReadonly.value = false
   phoneReadonly.value = false
+  isEmailVerified.value = u.email ? true : false
   showUserModal.value = true
 }
 function confirmDeleteUser(u: any) { deletingUser.value = u; showDeleteUser.value = true }
 
+watch(() => userForm.email, (newEmail, oldEmail) => {
+  if (oldEmail !== undefined && newEmail !== oldEmail) {
+    if (editingUser.value && newEmail === editingUser.value.email) {
+      isEmailVerified.value = true
+    } else {
+      isEmailVerified.value = false
+    }
+  }
+})
+
 async function saveUser() {
   if (!userForm.fullName?.trim()) { toast.error('Họ tên là bắt buộc.'); return }
+  if (!userForm.email?.trim()) { toast.error('Email là bắt buộc.'); return }
   if (!editingUser.value && !userForm.password) { toast.error('Mật khẩu là bắt buộc khi tạo mới.'); return }
   
-  if (userForm.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userForm.email.trim())) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userForm.email.trim())) {
     toast.error('Định dạng email không hợp lệ.')
     return
   }
-  let cleanPhone = null
-  if (userForm.phone?.trim()) {
-    cleanPhone = userForm.phone.trim().replace(/[-. ]/g, '')
-    if (!/^(0|\+84|84)[0-9]{9,11}$/.test(cleanPhone)) {
-      toast.error('Số điện thoại không hợp lệ (phải bắt đầu bằng 0, 84 hoặc +84 và gồm 10-12 chữ số).')
-      return
-    }
+  if (!userForm.phone?.trim()) {
+    toast.error('Số điện thoại là bắt buộc.')
+    return
+  }
+  let cleanPhone = userForm.phone.trim().replace(/[-. ]/g, '')
+  if (!/^(0|\+84|84)[0-9]{9,11}$/.test(cleanPhone)) {
+    toast.error('Số điện thoại không hợp lệ (phải bắt đầu bằng 0, 84 hoặc +84 và gồm 10-12 chữ số).')
+    return
   }
   
   uSaving.value = true
@@ -252,6 +269,33 @@ async function toggleUser(u: any) {
     if (res.ok) { toast.success('Cập nhật trạng thái thành công!'); await loadUsers() }
     else toast.error(data.message || 'Có lỗi.')
   } catch { toast.error('Có lỗi.') }
+}
+
+async function verifyEmail() {
+  if (!userForm.email?.trim()) {
+    toast.error('Vui lòng nhập email trước khi kiểm tra.')
+    return
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userForm.email.trim())) {
+    toast.error('Định dạng email không hợp lệ.')
+    return
+  }
+  
+  verifyingEmail.value = true
+  try {
+    const res = await api.post('/api/users/verify-email', { email: userForm.email.trim() })
+    const data = await res.json()
+    if (res.ok) {
+      isEmailVerified.value = true
+      toast.success(data.message || 'Xác thực email thành công!')
+    } else {
+      toast.error(data.message || 'Lỗi gửi email xác thực.')
+    }
+  } catch {
+    toast.error('Không thể kết nối đến máy chủ.')
+  } finally {
+    verifyingEmail.value = false
+  }
 }
 
 
@@ -507,13 +551,20 @@ onUnmounted(() => {
                 <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Mật khẩu <span v-if="!editingUser" class="text-[#ea4f52]">*</span></label>
                 <input v-model="userForm.password" type="password" :readonly="passwordReadonly" @focus="passwordReadonly = false" autocomplete="new-password" :placeholder="editingUser ? 'Để trống nếu không đổi' : 'Nhập mật khẩu'" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63]" />
               </div>
-              <div>
-                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số điện thoại</label>
+              <div class="col-span-2">
+                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số điện thoại <span class="text-[#ea4f52]">*</span></label>
                 <input v-model="userForm.phone" type="text" :readonly="phoneReadonly" @focus="phoneReadonly = false" autocomplete="off" placeholder="Số điện thoại" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63]" />
               </div>
-              <div>
-                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Email</label>
-                <input v-model="userForm.email" type="email" :readonly="emailReadonly" @focus="emailReadonly = false" autocomplete="off" placeholder="Email" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63]" />
+              <div class="col-span-2">
+                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Email <span class="text-[#ea4f52]">*</span></label>
+                <div class="flex gap-2">
+                  <input v-model="userForm.email" type="email" :readonly="emailReadonly" @focus="emailReadonly = false" @input="isEmailVerified = false" autocomplete="off" placeholder="Email" class="flex-1 w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] text-[#364a63]" />
+                  <button type="button" @click="verifyEmail" :disabled="!userForm.email || verifyingEmail || isEmailVerified" :class="['h-11 px-4 rounded-xl text-sm font-bold transition-colors shadow-sm flex items-center justify-center gap-2 whitespace-nowrap', isEmailVerified ? 'bg-[var(--accent-500)] text-white border-none' : 'bg-white border border-[#e2e8f0] hover:bg-[#f8f9fa] text-[#364a63] disabled:opacity-50 disabled:cursor-not-allowed']">
+                    <i v-if="verifyingEmail" class="fas fa-spinner fa-spin"></i>
+                    <i v-else-if="isEmailVerified" class="fas fa-check"></i>
+                    {{ isEmailVerified ? 'Đã xác thực' : 'Check email' }}
+                  </button>
+                </div>
               </div>
               <div>
                 <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Chi nhánh</label>
@@ -541,8 +592,9 @@ onUnmounted(() => {
           <!-- Footer -->
           <div class="p-6 border-t border-[#f1f5f9] bg-[#f8fafc] flex gap-3">
             <button class="flex-1 h-11 bg-white border border-[#e2e8f0] hover:bg-[#f8f9fa] text-[#364a63] rounded-xl text-sm font-bold transition-colors shadow-sm" @click="showUserModal = false">Hủy bỏ</button>
-            <button class="flex-1 h-11 bg-[var(--accent-500)] hover:bg-[var(--accent-700)] text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2" :disabled="uSaving" @click="saveUser">
+            <button class="flex-1 h-11 bg-[var(--accent-500)] hover:bg-[var(--accent-700)] text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2" :disabled="uSaving || !isEmailVerified" :class="{'opacity-50 cursor-not-allowed': uSaving || !isEmailVerified}" @click="saveUser">
               <i v-if="uSaving" class="fas fa-spinner fa-spin"></i>
+              <i v-else class="fas fa-save"></i>
               {{ uSaving ? 'Đang lưu...' : 'Lưu thông tin' }}
             </button>
           </div>
