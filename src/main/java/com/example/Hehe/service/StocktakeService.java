@@ -11,5 +11,7 @@ public interface StocktakeService {
     StocktakeResponse createStocktake(StocktakeSaveRequest request, User currentUser);
     StocktakeResponse updateStocktake(Integer id, StocktakeSaveRequest request, User currentUser);
     StocktakeResponse completeStocktake(Integer id, User currentUser);
+    StocktakeResponse approveStocktake(Integer id, com.example.Hehe.dto.StocktakeApproveRequest request, User currentUser);
     StocktakeResponse cancelStocktake(Integer id, User currentUser);
+    StocktakeResponse rejectStocktake(Integer id, User currentUser);
 }

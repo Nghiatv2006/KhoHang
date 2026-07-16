@@ -34,8 +34,13 @@ public class AuditLogResponse {
             this.userFullName = log.getUser().getFullName();
             this.username = log.getUser().getUsername();
         } else {
-            this.userFullName = "[Người dùng đã bị xóa]";
-            this.username = "N/A";
+            if ("DỌN DẸP".equals(log.getAction())) {
+                this.userFullName = "[Hệ thống]";
+                this.username = "SYSTEM";
+            } else {
+                this.userFullName = "[Người dùng đã bị xóa]";
+                this.username = "N/A";
+            }
         }
     }
 

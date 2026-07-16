@@ -117,24 +117,28 @@ public class UserServiceImpl implements UserService {
             throw new RuntimeException("Tên đăng nhập '" + request.getUsername().trim() + "' đã tồn tại.");
         }
 
-        // Kiểm tra định dạng email (nếu gửi lên)
-        if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
-            String email = request.getEmail().trim();
-            if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
-                throw new RuntimeException("Định dạng email không hợp lệ.");
-            }
+        // Kiểm tra email (bắt buộc, không trùng)
+        if (request.getEmail() == null || request.getEmail().trim().isEmpty()) {
+            throw new RuntimeException("Email không được để trống.");
+        }
+        String email = request.getEmail().trim();
+        if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+            throw new RuntimeException("Định dạng email không hợp lệ.");
+        }
+        if (userRepository.existsByEmail(email)) {
+            throw new RuntimeException("Email '" + email + "' đã tồn tại.");
         }
 
-        // Kiểm tra định dạng số điện thoại (nếu gửi lên)
-        String cleanPhone = null;
-        if (request.getPhone() != null && !request.getPhone().trim().isEmpty()) {
-            cleanPhone = request.getPhone().trim().replaceAll("[-. ]", "");
-            if (!cleanPhone.matches("^(0|\\+84|84)[0-9]{9,11}$")) {
-                throw new RuntimeException("Số điện thoại không hợp lệ (phải bắt đầu bằng 0, 84 hoặc +84 và gồm 10-12 chữ số).");
-            }
-            if (userRepository.existsByPhone(cleanPhone)) {
-                throw new RuntimeException("Số điện thoại '" + cleanPhone + "' đã được sử dụng bởi nhân viên khác.");
-            }
+        // Kiểm tra định dạng số điện thoại (bắt buộc, không trùng)
+        if (request.getPhone() == null || request.getPhone().trim().isEmpty()) {
+            throw new RuntimeException("Số điện thoại không được để trống.");
+        }
+        String cleanPhone = request.getPhone().trim().replaceAll("[-. ]", "");
+        if (!cleanPhone.matches("^(0|\\+84|84)[0-9]{9,11}$")) {
+            throw new RuntimeException("Số điện thoại không hợp lệ (phải bắt đầu bằng 0, 84 hoặc +84 và gồm 10-12 chữ số).");
+        }
+        if (userRepository.existsByPhone(cleanPhone)) {
+            throw new RuntimeException("Số điện thoại '" + cleanPhone + "' đã được sử dụng bởi nhân viên khác.");
         }
 
         User user = new User();
@@ -197,9 +201,20 @@ public class UserServiceImpl implements UserService {
         User savedUser = userRepository.save(user);
 
         // Ghi Nhật ký
+        String logDetails;
+        if (savedUser.getRole() == UserRole.MANAGER) {
+            String branchName = savedUser.getBranch() != null ? savedUser.getBranch().getName() : "chi nhánh";
+            logDetails = "Bổ nhiệm Quản lý cho " + branchName + ": " + savedUser.getFullName();
+        } else if (savedUser.getRole() == UserRole.STAFF) {
+            logDetails = "Thêm nhân viên kho mới: " + savedUser.getFullName();
+        } else if (savedUser.getRole() == UserRole.ADMIN) {
+            logDetails = "Khởi tạo tài khoản Quản trị hệ thống: " + savedUser.getFullName();
+        } else {
+            logDetails = "Tạo tài khoản mới: " + savedUser.getFullName();
+        }
+
         auditLogService.logAction(currentUser, "CREATE", "users",
-                String.valueOf(savedUser.getId()),
-                "Tạo tài khoản mới: " + savedUser.getFullName() + " (" + savedUser.getUsername() + ") - Vai trò: " + savedUser.getRole().name());
+                String.valueOf(savedUser.getId()), logDetails);
 
         return convertToResponse(savedUser);
     }
@@ -229,34 +244,35 @@ public class UserServiceImpl implements UserService {
             user.setUsername(request.getUsername().trim());
         }
 
-        // Sửa Email: kiểm tra định dạng
-        if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
-            String email = request.getEmail().trim();
-            if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
-                throw new RuntimeException("Định dạng email không hợp lệ.");
-            }
-            user.setEmail(email);
-        } else {
-            user.setEmail(null);
+        // Sửa Email: kiểm tra định dạng và trùng lặp
+        if (request.getEmail() == null || request.getEmail().trim().isEmpty()) {
+            throw new RuntimeException("Email không được để trống.");
         }
+        String email = request.getEmail().trim();
+        if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+            throw new RuntimeException("Định dạng email không hợp lệ.");
+        }
+        if (userRepository.existsByEmailAndIdNot(email, id)) {
+            throw new RuntimeException("Email '" + email + "' đã tồn tại.");
+        }
+        user.setEmail(email);
 
         if (request.getFullName() != null && !request.getFullName().trim().isEmpty()) {
             user.setFullName(request.getFullName().trim());
         }
 
-        // Sửa Số điện thoại: kiểm tra định dạng
-        if (request.getPhone() != null && !request.getPhone().trim().isEmpty()) {
-            String phone = request.getPhone().trim().replaceAll("[-. ]", "");
-            if (!phone.matches("^(0|\\+84|84)[0-9]{9,11}$")) {
-                throw new RuntimeException("Số điện thoại không hợp lệ (phải bắt đầu bằng 0, 84 hoặc +84 và gồm 10-12 chữ số).");
-            }
-            if (userRepository.existsByPhoneAndIdNot(phone, id)) {
-                throw new RuntimeException("Số điện thoại '" + phone + "' đã được sử dụng bởi nhân viên khác.");
-            }
-            user.setPhone(phone);
-        } else {
-            user.setPhone(null);
+        // Sửa Số điện thoại: bắt buộc, kiểm tra định dạng và trùng lặp
+        if (request.getPhone() == null || request.getPhone().trim().isEmpty()) {
+            throw new RuntimeException("Số điện thoại không được để trống.");
         }
+        String phone = request.getPhone().trim().replaceAll("[-. ]", "");
+        if (!phone.matches("^(0|\\+84|84)[0-9]{9,11}$")) {
+            throw new RuntimeException("Số điện thoại không hợp lệ (phải bắt đầu bằng 0, 84 hoặc +84 và gồm 10-12 chữ số).");
+        }
+        if (userRepository.existsByPhoneAndIdNot(phone, id)) {
+            throw new RuntimeException("Số điện thoại '" + phone + "' đã được sử dụng bởi nhân viên khác.");
+        }
+        user.setPhone(phone);
 
         // Cập nhật Mật khẩu (nếu nhập mới)
         if (request.getPassword() != null && !request.getPassword().trim().isEmpty()) {

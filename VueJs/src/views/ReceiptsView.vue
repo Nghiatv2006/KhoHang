@@ -937,19 +937,8 @@ const availableProducts = computed(() => {
     const inStockIds = new Set(validInventories.map(inv => inv.productId))
     let result = products.value.filter(p => inStockIds.has(p.id))
     
-    // Ràng buộc phiếu tiêu hủy: 
-    if (t === 'DISPOSAL') {
-      if (createForm.value.description === 'Hàng hết hạn') {
-        // Nếu là hàng hết hạn, chỉ chọn hàng Sữa hoặc Hữu cơ (như logic cũ)
-        result = result.filter(p => {
-          const catName = categories.value.find(c => c.id === p.categoryId)?.name?.toLowerCase() || ''
-          return catName.includes('sữa') || catName.includes('hữu cơ')
-        })
-      } else {
-        // Với lý do khác (lỗi kĩ thuật, khác...), không giới hạn ngành hàng
-        // Nhưng ta có thể bỏ qua lọc, cho phép tất cả các sản phẩm có tồn kho
-      }
-    }
+    // Phiếu tiêu hủy: không giới hạn ngành hàng
+    // Lọc theo ngày hết hạn đã được xử lý ở trên (lớp lọc validInventories)
     
     return result
   }

@@ -13,7 +13,7 @@ const emit = defineEmits<{ close: [] }>()
     <Transition name="overlay">
       <div
         v-if="show"
-        class="fixed inset-0 z-[900] flex items-center justify-center p-4"
+        class="fixed inset-0 z-[1100] flex items-center justify-center p-4"
         style="background: rgba(0,0,0,0.35); backdrop-filter: blur(4px);"
         @click.self="emit('close')"
       >
