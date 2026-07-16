@@ -186,8 +186,9 @@ const totalStocktakeBadge = computed(() => {
 
 const adminNavItems = computed(() => {
   const items: { label: string; to: string; icon: string }[] = []
+  const isHeadBranch = user.value?.branchName?.includes('Hà Nội') || user.value?.branch?.isHead === true;
   // @ts-ignore
-  if (!user.value || user.value.role !== 'ADMIN') {
+  if (!isHeadBranch && (!user.value || user.value.role !== 'ADMIN')) {
     items.push({ label: 'Đối tác', to: '/partners', icon: 'fas fa-handshake' })
   }
   if (isManagerOrAdmin.value) {
@@ -233,11 +234,10 @@ onMounted(() => {
   initTheme()
   updateTime()
   timer = setInterval(updateTime, 1000)
-  // Check ngay lúc mount; chỉ poll nếu là manager/admin
-  if (isManagerOrAdmin.value) {
-    refreshStocktakeBadge()
-    stocktakeTimer = setInterval(refreshStocktakeBadge, 10_000)
-  }
+  // Check ngay lúc mount cho mọi role
+  refreshStocktakeBadge()
+  stocktakeTimer = setInterval(refreshStocktakeBadge, 10_000)
+
   // Load badge counts
   loadBadgeCounts()
   badgeTimer = setInterval(loadBadgeCounts, 3000) // Refresh mỗi 3 giây

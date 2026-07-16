@@ -187,7 +187,7 @@ INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code
 
 
 -- ==============================================================================
--- 8. DỮ LIỆU MẪU QUY MÔ LỚN (TỰ ĐỘNG SINH CHO 30 NGÀY)
+-- 8. DỮ LIỆU MẪU QUY MÔ LỚN (TỰ ĐỘNG SINH CHO 90 NGÀY)
 -- ==============================================================================
 
 DO $$
@@ -213,17 +213,17 @@ BEGIN
     DELETE FROM receipts WHERE code LIKE 'IM_AUTO_%' OR code LIKE 'EX_AUTO_%';
 
     -- Sinh dữ liệu quy mô lớn cho TẤT CẢ 3 chi nhánh mỗi ngày
-    FOR day_offset IN 0..29 LOOP
+    FOR day_offset IN 0..89 LOOP
         curr_date := NOW() - (day_offset || ' days')::INTERVAL;
         
-        -- t là trục thời gian đi từ 0 (quá khứ, cách đây 29 ngày) đến 29 (hôm nay)
-        t := 29 - day_offset;
+        -- t là trục thời gian đi từ 0 (quá khứ, cách đây 89 ngày) đến 89 (hôm nay)
+        t := 89 - day_offset;
         
-        -- Đường màu xanh dương (Xuất bán): Sóng cong vòm đỉnh ở giữa tháng
-        exp_trend := 3 + (SIN((t + 3) / 35.0 * 3.14159265) * 15)::INT;
+        -- Đường màu xanh dương (Xuất bán): Sóng cong vòm đỉnh ở giữa chu kỳ
+        exp_trend := 3 + (SIN((t + 10) / 105.0 * 3.14159265) * 15)::INT;
         
-        -- Đường màu xanh lá (Nhập kho): Đường thoai thoải, ngóc đầu lên ở cuối tháng và cắt đường xanh dương
-        imp_trend := 2 + ((t * t) / 70.0)::INT;
+        -- Đường màu xanh lá (Nhập kho): Đường thoai thoải, ngóc đầu lên ở cuối chu kỳ và cắt đường xanh dương
+        imp_trend := 2 + ((t * t) / 630.0)::INT;
 
         FOR target_branch IN 1..3 LOOP
             IF target_branch = 1 THEN creator_id := 3;     -- staff_hn_1
@@ -233,7 +233,7 @@ BEGIN
 
             -- Tạo 1 Phiếu NHẬP hằng ngày cho chi nhánh này
             INSERT INTO receipts (code, type, status, payment_status, source_branch_id, dest_branch_id, created_by, description, created_at)
-            VALUES ('IM_AUTO_' || day_offset || '_' || target_branch || '_' || EXTRACT(EPOCH FROM curr_date)::BIGINT, 'IMPORT', 'COMPLETED', 'PAID', NULL, target_branch, creator_id, 'Nhập hàng định kỳ', curr_date)
+            VALUES ('IM_AUTO_' || day_offset || '_' || target_branch || '_' || EXTRACT(EPOCH FROM curr_date)::BIGINT, 'IMPORT', 'COMPLETED', 'PAID', CASE WHEN target_branch = 1 THEN NULL ELSE 1 END, target_branch, creator_id, CASE WHEN target_branch = 1 THEN 'Nhập hàng định kỳ' ELSE 'Nhập từ kho tổng' END, curr_date)
             RETURNING id INTO r_imp_id;
 
             -- Chỉ Tạo Phiếu XUẤT hằng ngày cho chi nhánh nhánh (target_branch > 1), vì Hà Nội (1) là kho tổng không bán lẻ

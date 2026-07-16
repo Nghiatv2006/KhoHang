@@ -12,19 +12,26 @@ export async function refreshStocktakeBadge() {
       
       const uStr = localStorage.getItem('wh_user')
       let isStaff = false
+      let isManagerOrAdmin = false
       if (uStr) {
         try {
           const user = JSON.parse(uStr)
           isStaff = user.role === 'STAFF'
+          isManagerOrAdmin = ['MANAGER', 'ADMIN'].includes(user.role)
         } catch {}
       }
 
       const newCount = list.filter(s => {
-        if (s.status !== 'DRAFT') return false
-        if (isStaff) {
-          return s.notes === 'Phiên kiểm kê mới khởi tạo'
+        if (isManagerOrAdmin && s.status === 'PENDING_APPROVAL') {
+          return true
         }
-        return true
+        if (s.status === 'DRAFT') {
+          if (isStaff) {
+            return true // Nhân viên thấy mọi phiếu nháp để vào điền số
+          }
+          return true // Quản lý cũng thấy phiếu nháp chưa làm
+        }
+        return false
       }).length
 
       // Chỉ cập nhật nếu thực sự thay đổi → tránh Vue re-render sidebar mỗi 10 giây

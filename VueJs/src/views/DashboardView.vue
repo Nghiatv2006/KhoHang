@@ -1,5 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch, nextTick, reactive } from 'vue'
+
+function toLocalISODate(d: Date): string {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 import { api } from '../api'
 import * as echarts from 'echarts'
 
@@ -16,6 +23,68 @@ const inventoryAgeData = ref<any>({})
 const stocktakeDiscrepancyData = ref<any[]>([])
 const branchSalesDataRaw = ref<any>({})
 const user = ref<any>(JSON.parse(localStorage.getItem('wh_user') || '{}'))
+
+const filterType = ref('30')
+const customStartDate = ref('')
+const customEndDate = ref('')
+
+const displayStartDate = computed({
+  get: () => {
+    if (filterType.value === 'custom') return customStartDate.value
+    return toLocalISODate(dateRange.value.start)
+  },
+  set: (val) => {
+    if (filterType.value !== 'custom') {
+      customStartDate.value = toLocalISODate(dateRange.value.start)
+      customEndDate.value = toLocalISODate(dateRange.value.end)
+      filterType.value = 'custom'
+    }
+    customStartDate.value = val
+  }
+})
+
+const displayEndDate = computed({
+  get: () => {
+    if (filterType.value === 'custom') return customEndDate.value
+    return toLocalISODate(dateRange.value.end)
+  },
+  set: (val) => {
+    if (filterType.value !== 'custom') {
+      customStartDate.value = toLocalISODate(dateRange.value.start)
+      customEndDate.value = toLocalISODate(dateRange.value.end)
+      filterType.value = 'custom'
+    }
+    customEndDate.value = val
+  }
+})
+
+const dateRange = computed(() => {
+  let end = new Date()
+  let start = new Date()
+  
+  if (filterType.value === 'custom') {
+    start = customStartDate.value ? new Date(customStartDate.value) : new Date()
+    end = customEndDate.value ? new Date(customEndDate.value) : new Date()
+  } else if (filterType.value === 'lastMonth') {
+    start.setMonth(start.getMonth() - 1)
+    start.setDate(1)
+    end = new Date(start.getFullYear(), start.getMonth() + 1, 0)
+  } else if (filterType.value === 'thisWeek') {
+    const day = start.getDay()
+    const diff = start.getDate() - day + (day === 0 ? -6 : 1) // 1 is Monday
+    start.setDate(diff)
+  } else if (filterType.value === 'thisMonth') {
+    start.setDate(1)
+  } else {
+    const days = parseInt(filterType.value)
+    start.setDate(end.getDate() - days + 1)
+  }
+  
+  start.setHours(0, 0, 0, 0)
+  end.setHours(23, 59, 59, 999)
+  
+  return { start, end }
+})
 
 const trendChartRef = ref<HTMLElement | null>(null)
 const catRevenueChartRef = ref<HTMLElement | null>(null)
@@ -35,25 +104,7 @@ const isHeadBranchUser = computed(() => {
   return !bId || Number(bId) === 1 || user.value?.role === 'ADMIN'
 })
 
-const totalHeadBranchImport30Days = computed(() => {
-  const now = new Date()
-  let sum = 0
-  const thirtyDaysAgo = new Date(now)
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().substring(0, 10)
-  
-  receipts.value.forEach(r => {
-    if (r.status !== 'COMPLETED' || !r.createdAt) return
-    const receiptDateStr = r.createdAt.substring(0, 10)
-    if (receiptDateStr >= thirtyDaysAgoStr) {
-      if (r.type === 'IMPORT' && r.destBranchId === 1) {
-        const val = (r.details || []).reduce((s: number, det: any) => s + (det.quantity * det.price), 0)
-        sum += val
-      }
-    }
-  })
-  return sum
-})
+
 
 const receipts = ref<any[]>([])
 const inventories = ref<any[]>([])
@@ -125,22 +176,20 @@ onMounted(async () => {
 
 // Lọc phiếu xuất bán thành công trong 30 ngày gần nhất
 const completedExports30Days = computed(() => {
-  const thirtyDaysAgo = new Date()
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-  const limitStr = thirtyDaysAgo.toISOString().substring(0, 10)
+  const startStr = toLocalISODate(dateRange.value.start)
+  const endStr = toLocalISODate(dateRange.value.end)
   
   return myReceipts.value.filter(r => {
     if (r.type !== 'EXPORT' || r.status !== 'COMPLETED' || !r.createdAt) return false
     const rDateStr = r.createdAt.substring(0, 10)
-    return rDateStr >= limitStr
+    return rDateStr >= startStr && rDateStr <= endStr
   })
 })
 
 // Tính lợi nhuận (Xuất - Nhập) trong 30 ngày gần nhất
-const totalProfit30Days = computed(() => {
-  const thirtyDaysAgo = new Date()
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-  const limitStr = thirtyDaysAgo.toISOString().substring(0, 10)
+const trendTotals = computed(() => {
+  const startStr = toLocalISODate(dateRange.value.start)
+  const endStr = toLocalISODate(dateRange.value.end)
   
   let revenue = 0
   let cost = 0
@@ -148,16 +197,16 @@ const totalProfit30Days = computed(() => {
   myReceipts.value.forEach(r => {
     if (r.status !== 'COMPLETED' || !r.createdAt) return
     const rDateStr = r.createdAt.substring(0, 10)
-    if (rDateStr >= limitStr) {
+    if (rDateStr >= startStr && rDateStr <= endStr) {
       const val = (r.details || []).reduce((s: number, d: any) => s + (Number(d.quantity) || 0) * (Number(d.price) || 0), 0)
       if (r.type === 'EXPORT') {
         revenue += val
-      } else if (r.type === 'IMPORT') {
+      } else if (r.type === 'IMPORT' && !r.sourceBranchId) {
         cost += val
       }
     }
   })
-  return revenue - cost
+  return { revenue, cost, profit: revenue - cost }
 })
 
 // Ánh xạ tên danh mục từ ID sản phẩm
@@ -294,11 +343,16 @@ function updateCharts() {
     const importValues: number[] = []
     const exportValues: number[] = []
     
-    const now = new Date()
-    for (let i = 29; i >= 0; i--) {
+    const start = dateRange.value.start
+    const end = dateRange.value.end
+    let diffDays = Math.ceil(Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    if (diffDays === 0) diffDays = 1;
+    if (diffDays > 365) diffDays = 365;
+    const now = end
+    for (let i = diffDays - 1; i >= 0; i--) {
       const d = new Date(now)
       d.setDate(d.getDate() - i)
-      const dateStr = d.toISOString().substring(0, 10)
+      const dateStr = toLocalISODate(d)
       
       const day = d.getDate().toString().padStart(2, '0')
       const month = (d.getMonth() + 1).toString().padStart(2, '0')
@@ -310,7 +364,7 @@ function updateCharts() {
         if (r.status !== 'COMPLETED' || !r.createdAt) return
         if (r.createdAt.substring(0, 10) === dateStr) {
           const val = (r.details || []).reduce((s: number, det: any) => s + (det.quantity * det.price), 0)
-          if (r.type === 'IMPORT') impSum += val
+          if (r.type === 'IMPORT' && !r.sourceBranchId) impSum += val
           else if (r.type === 'EXPORT') expSum += val
         }
       })
@@ -395,7 +449,7 @@ function updateCharts() {
           }
         }
       ]
-    })
+    }, true)
   }
 
 
@@ -476,7 +530,7 @@ function updateCharts() {
     }, true)
   }
 
-  // Chart 6: Tỷ trọng doanh thu theo Danh mục (30 ngày)
+  // Chart 6: Tỷ trọng doanh thu theo Danh mục
   if (catRevenueChartInst && revealedCharts.has('cat')) {
     const data = categorySalesRevenue30Days.value.map((c: any) => ({ value: c.val, name: c.name, details: c.details }))
     const totalRev = data.reduce((s, item) => s + item.value, 0)
@@ -671,11 +725,16 @@ function updateCharts() {
     const dates: string[] = []
     const importValues: number[] = []
     
-    const now = new Date()
-    for (let i = 29; i >= 0; i--) {
+    const start = dateRange.value.start
+    const end = dateRange.value.end
+    let diffDays = Math.ceil(Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    if (diffDays === 0) diffDays = 1;
+    if (diffDays > 365) diffDays = 365;
+    const now = end
+    for (let i = diffDays - 1; i >= 0; i--) {
       const d = new Date(now)
       d.setDate(d.getDate() - i)
-      const dateStr = d.toISOString().substring(0, 10)
+      const dateStr = toLocalISODate(d)
       
       const day = d.getDate().toString().padStart(2, '0')
       const month = (d.getMonth() + 1).toString().padStart(2, '0')
@@ -760,6 +819,10 @@ function updateCharts() {
   }
 }
 
+watch([filterType, customStartDate, customEndDate], () => {
+  if (!loading.value) updateCharts()
+}, { deep: true })
+
 watch([products, customers, categories, receipts, inventories, branches, branchSalesDataRaw], () => {
   if (!loading.value) {
     updateCharts()
@@ -784,8 +847,24 @@ function formatVND(val: number) {
   
   <div v-else class="max-w-[1400px]">
 
-    <div class="mb-6">
-      <h2 class="text-2xl font-bold text-slate-800">Tổng quan Dashboard</h2>
+    <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <h2 class="text-2xl font-bold text-slate-800">Tổng quan</h2>
+      <div class="flex flex-wrap items-center gap-3">
+        <select v-model="filterType" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-[#4361ee] focus:border-[#4361ee] text-slate-700 outline-none shadow-sm font-medium">
+          <option value="lastMonth">Tháng trước</option>
+          <option value="thisWeek">Tuần này</option>
+          <option value="thisMonth">Tháng này</option>
+          <option value="7">7 ngày qua</option>
+          <option value="30">30 ngày qua</option>
+          <option value="90">90 ngày qua</option>
+          <option value="custom">Tùy chỉnh ngày</option>
+        </select>
+        <div class="flex items-center gap-2">
+          <input type="date" v-model="displayStartDate" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-[#4361ee] focus:border-[#4361ee] text-slate-700 outline-none shadow-sm transition-all cursor-pointer">
+          <span class="text-slate-500 font-medium">-</span>
+          <input type="date" v-model="displayEndDate" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-[#4361ee] focus:border-[#4361ee] text-slate-700 outline-none shadow-sm transition-all cursor-pointer">
+        </div>
+      </div>
     </div>
 
     <div v-if="errorMsg" class="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl flex items-start shadow-sm">
@@ -803,13 +882,27 @@ function formatVND(val: number) {
         <div class="p-6 border-b border-[#f1f5f9] flex justify-between items-center bg-[#f8f9fa]/50">
           <div>
             <h6 class="font-bold text-[#364a63] m-0">
-              <i class="fas fa-chart-line text-[#4361ee] mr-2"></i>Xu hướng Nhập - Xuất kho (30 ngày gần nhất)
+              <i class="fas fa-chart-line text-[#4361ee] mr-2"></i>Xu hướng Nhập - Xuất kho
             </h6>
-            <div class="mt-2 text-sm">
-              <span class="text-[#8094ae] mr-2">Ước tính lợi nhuận gộp:</span>
-              <span :class="['font-extrabold text-lg', totalProfit30Days >= 0 ? 'text-emerald-500' : 'text-rose-500']">
-                {{ totalProfit30Days > 0 ? '+' : '' }}{{ formatVND(totalProfit30Days) }}
-              </span>
+            <div class="mt-2 text-sm flex gap-6">
+              <div>
+                <span class="text-[#8094ae] mr-2">Tổng Xuất:</span>
+                <span class="font-extrabold text-lg text-indigo-500">
+                  {{ formatVND(trendTotals.revenue) }}
+                </span>
+              </div>
+              <div>
+                <span class="text-[#8094ae] mr-2">Tổng Nhập:</span>
+                <span class="font-extrabold text-lg text-emerald-500">
+                  {{ formatVND(trendTotals.cost) }}
+                </span>
+              </div>
+              <div>
+                <span class="text-[#8094ae] mr-2">Ước tính lợi nhuận gộp:</span>
+                <span :class="['font-extrabold text-lg', trendTotals.profit >= 0 ? 'text-emerald-500' : 'text-rose-500']">
+                  {{ trendTotals.profit > 0 ? '+' : '' }}{{ formatVND(trendTotals.profit) }}
+                </span>
+              </div>
             </div>
           </div>
           <div class="flex items-center gap-4 text-xs font-semibold text-[#8094ae]">
@@ -827,7 +920,7 @@ function formatVND(val: number) {
         <!-- Branch Sales -->
         <div data-reveal-id="branch" class="scroll-reveal-card bg-violet-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#8b5cf6] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col" style="transition-delay: 100ms">
           <div class="p-6 border-b border-[#f1f5f9]">
-            <h6 class="font-bold text-[#364a63] m-0"><i class="fas fa-store text-[#8b5cf6] mr-2"></i>Doanh thu xuất bán theo Chi nhánh (30 ngày)</h6>
+            <h6 class="font-bold text-[#364a63] m-0"><i class="fas fa-store text-[#8b5cf6] mr-2"></i>Doanh thu xuất bán theo Chi nhánh</h6>
           </div>
           <div class="p-4 relative" style="height: 350px;">
             <div ref="branchChartRef" class="w-full h-full"></div>
@@ -837,7 +930,7 @@ function formatVND(val: number) {
         <!-- Category Sales Share -->
         <div data-reveal-id="cat" class="scroll-reveal-card bg-emerald-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#10b981] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col" style="transition-delay: 200ms">
           <div class="p-6 border-b border-[#f1f5f9]">
-            <h6 class="font-bold text-[#364a63] m-0"><i class="fas fa-chart-pie text-[#10b981] mr-2"></i>Tỷ trọng doanh thu theo Danh mục (30 ngày)</h6>
+            <h6 class="font-bold text-[#364a63] m-0"><i class="fas fa-chart-pie text-[#10b981] mr-2"></i>Tỷ trọng doanh thu theo Danh mục</h6>
           </div>
           <div class="p-4 relative" style="height: 350px;">
             <div ref="catRevenueChartRef" class="w-full h-full"></div>
@@ -854,7 +947,7 @@ function formatVND(val: number) {
             <span class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center mr-3 shadow-sm border border-indigo-200/50">
               <i class="fas fa-gem text-indigo-600 text-sm"></i>
             </span>
-            Top 5 Sản phẩm Bán chạy (30 ngày)
+            Top 5 Sản phẩm Bán chạy
           </h6>
         </div>
         <div class="p-4 relative bg-white/40 backdrop-blur-sm z-10" style="height: 350px;">
@@ -863,27 +956,7 @@ function formatVND(val: number) {
       </div>
 
       <!-- Xu hướng Nhập kho Chi nhánh Tổng (Chỉ hiển thị cho chi nhánh tổng) -->
-      <div v-if="isHeadBranchUser" data-reveal-id="head-import" class="scroll-reveal-card bg-white rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#10b981] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col relative" style="transition-delay: 400ms">
-        <div class="p-6 border-b border-[#f1f5f9] flex justify-between items-center bg-[#f8f9fa]/50">
-          <div>
-            <h6 class="font-bold text-[#364a63] m-0">
-              <i class="fas fa-arrow-down text-[#10b981] mr-2"></i>Xu hướng Nhập kho Chi nhánh Tổng (30 ngày gần nhất)
-            </h6>
-            <div class="mt-2 text-sm">
-              <span class="text-[#8094ae] mr-2">Tổng giá trị nhập kho:</span>
-              <span class="font-extrabold text-lg text-emerald-500">
-                {{ formatVND(totalHeadBranchImport30Days) }}
-              </span>
-            </div>
-          </div>
-          <div class="flex items-center gap-4 text-xs font-semibold text-[#8094ae]">
-            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-[#05b171]"></span>Nhập kho</span>
-          </div>
-        </div>
-        <div class="p-4 relative" style="height: 350px;">
-          <div ref="headBranchImportChartRef" class="w-full h-full"></div>
-        </div>
-      </div>
+
     </div>
   </div>
 </template>
