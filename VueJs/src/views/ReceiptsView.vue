@@ -211,7 +211,10 @@ watch(filterTimeRange, (val) => {
     return `${y}-${m}-${day}`
   }
   
-  if (val === 'today') {
+  if (val === 'all') {
+    filterStartDate.value = ''
+    filterEndDate.value = ''
+  } else if (val === 'today') {
     filterStartDate.value = fmt(today)
     filterEndDate.value = fmt(today)
   } else if (val === 'week') {
@@ -349,6 +352,13 @@ const filteredReceipts = computed(() => {
   return result.sort((a, b) => {
     const da = a.createdAt ? new Date(a.createdAt).getTime() : 0
     const db = b.createdAt ? new Date(b.createdAt).getTime() : 0
+    
+    // Khi xem các tab chờ xử lý (Chờ duyệt, Chờ Admin, Chưa thanh toán...), hiển thị phiếu lâu nhất lên trước
+    if (['DRAFT', 'PENDING_ADMIN', 'PENDING_STOCKTAKE', 'UNPAID', 'COMPENSATION'].includes(filterStatus.value)) {
+      return da - db
+    }
+    
+    // Mặc định: mới nhất lên trước
     return db - da
   })
 })
@@ -2153,7 +2163,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
 
     <!-- STAT CARDS -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div @click="filterStatus = filterStatus === 'DRAFT' ? '' : 'DRAFT'"
+      <div @click="filterStatus = filterStatus === 'DRAFT' ? '' : 'DRAFT'; filterTimeRange = filterStatus ? 'all' : 'today';"
         :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'DRAFT' ? 'border-yellow-400 ring-2 ring-yellow-200' : 'border-[#f1f5f9] hover:border-yellow-300']">
         <div class="w-12 h-12 rounded-xl bg-yellow-50 flex items-center justify-center text-yellow-500 text-xl">
           <i class="fas fa-pencil-alt"></i>
@@ -2163,7 +2173,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
           <div class="text-2xl font-extrabold text-yellow-500">{{ statDraft }}</div>
         </div>
       </div>
-      <div @click="filterStatus = filterStatus === 'COMPLETED' ? '' : 'COMPLETED'"
+      <div @click="filterStatus = filterStatus === 'COMPLETED' ? '' : 'COMPLETED'; filterTimeRange = filterStatus ? 'all' : 'today';"
         :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'COMPLETED' ? 'border-green-400 ring-2 ring-green-200' : 'border-[#f1f5f9] hover:border-green-300']">
         <div class="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center text-green-500 text-xl">
           <i class="fas fa-check-circle"></i>
@@ -2174,7 +2184,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
         </div>
       </div>
 
-      <div @click="filterStatus = filterStatus === 'CANCELLED' ? '' : 'CANCELLED'"
+      <div @click="filterStatus = filterStatus === 'CANCELLED' ? '' : 'CANCELLED'; filterTimeRange = filterStatus ? 'all' : 'today';"
         :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'CANCELLED' ? 'border-red-400 ring-2 ring-red-200' : 'border-[#f1f5f9] hover:border-red-300']">
         <div class="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center text-red-400 text-xl">
           <i class="fas fa-times-circle"></i>
@@ -2186,7 +2196,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
       </div>
 
       <!-- Hóa đơn: card Chưa thanh toán -->
-      <div v-if="receiptType === 'EXPORT'" @click="filterStatus = filterStatus === 'UNPAID' ? '' : 'UNPAID'"
+      <div v-if="receiptType === 'EXPORT'" @click="filterStatus = filterStatus === 'UNPAID' ? '' : 'UNPAID'; filterTimeRange = filterStatus ? 'all' : 'today';"
         :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'UNPAID' ? 'border-orange-400 ring-2 ring-orange-200' : 'border-[#f1f5f9] hover:border-orange-300']">
         <div class="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center text-orange-400 text-xl">
           <i class="fas fa-file-invoice-dollar"></i>
@@ -2198,7 +2208,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
       </div>
 
       <!-- Nhập kho / Điều chuyển: card Chờ Admin -->
-      <div v-if="receiptType === 'IMPORT' || receiptType === 'TRANSFER'" @click="filterStatus = filterStatus === (receiptType === 'TRANSFER' ? 'COMPENSATION' : 'PENDING_ADMIN') ? '' : (receiptType === 'TRANSFER' ? 'COMPENSATION' : 'PENDING_ADMIN')"
+      <div v-if="receiptType === 'IMPORT' || receiptType === 'TRANSFER'" @click="filterStatus = filterStatus === (receiptType === 'TRANSFER' ? 'COMPENSATION' : 'PENDING_ADMIN') ? '' : (receiptType === 'TRANSFER' ? 'COMPENSATION' : 'PENDING_ADMIN'); filterTimeRange = filterStatus ? 'all' : 'today';"
         :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === (receiptType === 'TRANSFER' ? 'COMPENSATION' : 'PENDING_ADMIN') ? 'border-blue-400 ring-2 ring-blue-200' : 'border-[#f1f5f9] hover:border-blue-300']">
         <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500 text-xl">
           <i :class="receiptType === 'TRANSFER' ? 'fas fa-truck-loading' : 'fas fa-shield-alt'"></i>
@@ -2263,6 +2273,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                 <option value="last_month">Tháng trước</option>
                 <option value="this_week">Tuần này</option>
                 <option value="last_week">Tuần trước</option>
+                <option value="all">Tất cả thời gian</option>
                 <option value="custom">Tùy chọn</option>
               </select>
             </div>
