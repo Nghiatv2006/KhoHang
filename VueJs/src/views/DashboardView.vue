@@ -275,7 +275,6 @@ const branchSales30Days = computed(() => {
       const bId = Number(bIdStr)
       const bName = branches.value.find(b => b.id === bId)?.name || `Chi nhánh ${bId}`
       const total = (dataArr as number[]).reduce((sum, v) => sum + v, 0)
-      // Loáº¡i bá» hoÃ n toÃ n Chi nhÃ¡nh 1 (Kho tá»•ng HÃ  Ná»™i) vÃ¬ khÃ´ng phÃ¡t sinh doanh thu xuáº¥t bÃ¡n láº»
       if (bId !== 1 && total > 0) {
         result.push({ name: bName, val: total })
       }
@@ -284,7 +283,39 @@ const branchSales30Days = computed(() => {
   return result.sort((a, b) => b.val - a.val)
 })
 
-// Removed inventoryValueData computed
+// Top 5 khách hàng tiêu biểu (cho chi nhánh con)
+const topCustomers30Days = computed(() => {
+  const customerMap = new Map<number, number>()
+  let unknownSales = 0
+
+  const startStr = toLocalISODate(dateRange.value.start)
+  const endStr = toLocalISODate(dateRange.value.end)
+
+  myReceipts.value.forEach(r => {
+    if (r.type === 'EXPORT' && r.status === 'COMPLETED' && r.createdAt) {
+      const rDateStr = r.createdAt.substring(0, 10)
+      if (rDateStr >= startStr && rDateStr <= endStr) {
+        const val = (r.details || []).reduce((sum: number, d: any) => sum + ((Number(d.quantity) || 0) * (Number(d.price) || 0)), 0)
+        if (r.customerId) {
+          customerMap.set(r.customerId, (customerMap.get(r.customerId) || 0) + val)
+        } else {
+          unknownSales += val
+        }
+      }
+    }
+  })
+
+  const arr = Array.from(customerMap.entries()).map(([cId, val]) => {
+    const cus = customers.value.find(c => c.id === cId)
+    return { name: cus ? cus.name : `Khách hàng ${cId}`, val }
+  })
+  
+  if (unknownSales > 0) {
+    arr.push({ name: 'Khách lẻ / Chưa điền', val: unknownSales })
+  }
+
+  return arr.sort((a, b) => b.val - a.val).slice(0, 3)
+})
 
 const revealedCharts = reactive(new Set<string>())
 
@@ -372,53 +403,9 @@ function updateCharts() {
       exportValues.push(expSum)
     }
 
-    trendChartInst.setOption({
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'line', lineStyle: { color: document.documentElement.classList.contains('dark-mode') ? '#334155' : '#e2e8f0', width: 1, type: 'dashed' } },
-        backgroundColor: document.documentElement.classList.contains('dark-mode') ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.98)',
-        borderColor: document.documentElement.classList.contains('dark-mode') ? '#475569' : '#e2e8f0',
-        borderWidth: 1,
-        textStyle: { color: document.documentElement.classList.contains('dark-mode') ? '#f8fafc' : '#334155', fontSize: 12 },
-        formatter: function (params: any) {
-          let res = `<div class="font-bold mb-1.5 text-slate-700">${params[0].name}</div>`
-          params.forEach((p: any) => {
-            const formattedVal = new Intl.NumberFormat('vi-VN').format(p.value) + 'đ'
-            res += `<div class="flex items-center gap-4 mt-1 text-xs">
-              <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${p.color}; box-shadow: 0 0 8px ${p.color}"></span>
-              <span class="text-slate-500">${p.seriesName}:</span>
-              <span class="font-bold text-slate-700 ml-auto">${formattedVal}</span>
-            </div>`
-          })
-          return res
-        }
-      },
-      grid: { left: '3%', right: '4%', bottom: '3%', top: '5%', containLabel: true },
-      xAxis: {
-        type: 'category',
-        boundaryGap: false,
-        data: dates,
-        axisLine: { lineStyle: { color: '#cbd5e1' } },
-        axisLabel: { color: '#8094ae', fontSize: 11 }
-      },
-      yAxis: {
-        type: 'value',
-        axisLine: { show: false },
-        axisTick: { show: false },
-        splitLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.15)' } },
-        axisLabel: {
-          color: '#8094ae',
-          fontSize: 11,
-          formatter: function (value: number) {
-            if (value >= 1e9) return (value / 1e9).toFixed(1) + ' tỷ'
-            if (value >= 1e6) return (value / 1e6).toFixed(0) + ' tr'
-            if (value >= 1e3) return (value / 1e3).toFixed(0) + ' k'
-            return value
-          }
-        }
-      },
-      series: [
-        {
+      const seriesData: any[] = [];
+      if (isHeadBranchUser.value) {
+        seriesData.push({
           name: 'Nhập kho',
           type: 'line',
           smooth: true,
@@ -432,8 +419,10 @@ function updateCharts() {
               { offset: 1, color: 'rgba(5, 177, 113, 0)' }
             ])
           }
-        },
-        {
+        });
+      }
+
+      seriesData.push({
           name: 'Xuất bán',
           type: 'line',
           smooth: true,
@@ -447,19 +436,67 @@ function updateCharts() {
               { offset: 1, color: 'rgba(99, 102, 241, 0)' }
             ])
           }
-        }
-      ]
-    }, true)
+        });
+
+      trendChartInst.setOption({
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'line', lineStyle: { color: document.documentElement.classList.contains('dark-mode') ? '#334155' : '#e2e8f0', width: 1, type: 'dashed' } },
+          backgroundColor: document.documentElement.classList.contains('dark-mode') ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.98)',
+          borderColor: document.documentElement.classList.contains('dark-mode') ? '#475569' : '#e2e8f0',
+          borderWidth: 1,
+          textStyle: { color: document.documentElement.classList.contains('dark-mode') ? '#f8fafc' : '#334155', fontSize: 12 },
+          formatter: function (params: any) {
+            let res = `<div class="font-bold mb-1.5 text-slate-700">${params[0].name}</div>`
+            params.forEach((p: any) => {
+              const formattedVal = new Intl.NumberFormat('vi-VN').format(p.value) + 'đ'
+              res += `<div class="flex items-center gap-4 mt-1 text-xs">
+                <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${p.color}; box-shadow: 0 0 8px ${p.color}"></span>
+                <span class="text-slate-500">${p.seriesName}:</span>
+                <span class="font-bold text-slate-700 ml-auto">${formattedVal}</span>
+              </div>`
+            })
+            return res
+          }
+        },
+        grid: { left: '3%', right: '4%', bottom: '3%', top: '5%', containLabel: true },
+        xAxis: {
+          type: 'category',
+          boundaryGap: false,
+          data: dates,
+          axisLine: { lineStyle: { color: '#cbd5e1' } },
+          axisLabel: { color: '#8094ae', fontSize: 11 }
+        },
+        yAxis: {
+          type: 'value',
+          axisLine: { show: false },
+          axisTick: { show: false },
+          splitLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.15)' } },
+          axisLabel: {
+            color: '#8094ae',
+            fontSize: 11,
+            formatter: function (value: number) {
+              if (value >= 1e9) return (value / 1e9).toFixed(1) + ' tỷ'
+              if (value >= 1e6) return (value / 1e6).toFixed(0) + ' tr'
+              if (value >= 1e3) return (value / 1e3).toFixed(0) + ' k'
+              return value
+            }
+          }
+        },
+        series: seriesData
+      }, true)
   }
 
 
 
-  // Chart 5: Doanh thu theo Chi nhÃ¡nh (Combo Cá»™t + ÄÆ°á»ng)
+  // Chart 5: Doanh thu theo Chi nhánh HOẶC Top Khách hàng
   if (branchChartInst && revealedCharts.has('branch')) {
-    const data = branchSales30Days.value
+    const data = isHeadBranchUser.value ? branchSales30Days.value : topCustomers30Days.value
     const names = data.length > 0 ? data.map(b => b.name) : ['Trống']
     const values = data.length > 0 ? data.map(b => b.val) : [0]
-    const colors = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ec4899']
+    const colors = isHeadBranchUser.value 
+      ? ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ec4899'] 
+      : ['#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#8b5cf6']
 
     branchChartInst.setOption({
       tooltip: {
@@ -488,7 +525,7 @@ function updateCharts() {
         textStyle: { color: '#64748b', fontSize: 12 }
       },
       grid: { left: '3%', right: '4%', bottom: '10%', top: '10%', containLabel: true },
-      xAxis: { type: 'category', data: names, axisLabel: { color: '#8094ae', width: 90, overflow: 'truncate' } },
+      xAxis: { type: 'category', data: names, axisLabel: { color: '#8094ae', width: 90, overflow: 'truncate', interval: 0 } },
       yAxis: {
         type: 'value',
         splitLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.15)' } },
@@ -881,8 +918,11 @@ function formatVND(val: number) {
       <div data-reveal-id="trend" class="scroll-reveal-card bg-white rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col relative">
         <div class="p-6 border-b border-[#f1f5f9] flex justify-between items-center bg-[#f8f9fa]/50">
           <div>
-            <h6 class="font-bold text-[#364a63] m-0">
-              <i class="fas fa-chart-line text-[#4361ee] mr-2"></i>Xu hướng Nhập - Xuất kho
+            <h6 class="font-bold text-[#364a63] m-0 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2 text-[#4361ee]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+              </svg>
+              {{ isHeadBranchUser ? 'Xu hướng Nhập - Xuất kho' : 'Xu hướng Xuất bán' }}
             </h6>
             <div class="mt-2 text-sm flex gap-6">
               <div>
@@ -891,13 +931,13 @@ function formatVND(val: number) {
                   {{ formatVND(trendTotals.revenue) }}
                 </span>
               </div>
-              <div>
+              <div v-if="isHeadBranchUser">
                 <span class="text-[#8094ae] mr-2">Tổng Nhập:</span>
                 <span class="font-extrabold text-lg text-emerald-500">
                   {{ formatVND(trendTotals.cost) }}
                 </span>
               </div>
-              <div>
+              <div v-if="isHeadBranchUser">
                 <span class="text-[#8094ae] mr-2">Ước tính lợi nhuận gộp:</span>
                 <span :class="['font-extrabold text-lg', trendTotals.profit >= 0 ? 'text-emerald-500' : 'text-rose-500']">
                   {{ trendTotals.profit > 0 ? '+' : '' }}{{ formatVND(trendTotals.profit) }}
@@ -906,7 +946,7 @@ function formatVND(val: number) {
             </div>
           </div>
           <div class="flex items-center gap-4 text-xs font-semibold text-[#8094ae]">
-            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-[#10b981]"></span>Nhập kho</span>
+            <span v-if="isHeadBranchUser" class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-[#10b981]"></span>Nhập kho</span>
             <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-[#6366f1]"></span>Xuất bán</span>
           </div>
         </div>
@@ -917,10 +957,27 @@ function formatVND(val: number) {
 
       <!-- Branch Sales & Category Sales Revenue Share -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Branch Sales -->
-        <div data-reveal-id="branch" class="scroll-reveal-card bg-violet-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#8b5cf6] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col" style="transition-delay: 100ms">
+        <!-- Branch Sales OR Top Customers -->
+        <div data-reveal-id="branch" :class="['scroll-reveal-card rounded-[16px] border border-[#f1f5f9] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col', isHeadBranchUser ? 'bg-violet-50 border-t-4 border-t-[#8b5cf6]' : 'bg-amber-50 border-t-4 border-t-[#f59e0b]']" style="transition-delay: 100ms">
           <div class="p-6 border-b border-[#f1f5f9]">
-            <h6 class="font-bold text-[#364a63] m-0"><i class="fas fa-store text-[#8b5cf6] mr-2"></i>Doanh thu xuất bán theo Chi nhánh</h6>
+            <h6 class="font-bold text-[#364a63] m-0 flex items-center">
+              <template v-if="isHeadBranchUser">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2 text-[#8b5cf6]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                  <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                </svg>
+                Doanh thu xuất bán theo Chi nhánh
+              </template>
+              <template v-else>
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2 text-[#f59e0b]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="9" cy="7" r="4"></circle>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                Top Khách hàng tiêu biểu
+              </template>
+            </h6>
           </div>
           <div class="p-4 relative" style="height: 350px;">
             <div ref="branchChartRef" class="w-full h-full"></div>
@@ -930,7 +987,13 @@ function formatVND(val: number) {
         <!-- Category Sales Share -->
         <div data-reveal-id="cat" class="scroll-reveal-card bg-emerald-50 rounded-[16px] border border-[#f1f5f9] border-t-4 border-t-[#10b981] shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col" style="transition-delay: 200ms">
           <div class="p-6 border-b border-[#f1f5f9]">
-            <h6 class="font-bold text-[#364a63] m-0"><i class="fas fa-chart-pie text-[#10b981] mr-2"></i>Tỷ trọng doanh thu theo Danh mục</h6>
+            <h6 class="font-bold text-[#364a63] m-0 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2 text-[#10b981]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path>
+                <path d="M22 12A10 10 0 0 0 12 2v10z"></path>
+              </svg>
+              Tỷ trọng doanh thu theo Danh mục
+            </h6>
           </div>
           <div class="p-4 relative" style="height: 350px;">
             <div ref="catRevenueChartRef" class="w-full h-full"></div>
@@ -944,9 +1007,9 @@ function formatVND(val: number) {
         <div class="absolute -bottom-24 -left-24 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
         <div class="p-6 border-b border-indigo-50/50 flex justify-between items-center bg-white/60 backdrop-blur-sm relative z-10">
           <h6 class="font-bold text-slate-800 m-0 tracking-tight flex items-center">
-            <span class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center mr-3 shadow-sm border border-indigo-200/50">
-              <i class="fas fa-gem text-indigo-600 text-sm"></i>
-            </span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+            </svg>
             Top 5 Sản phẩm Bán chạy
           </h6>
         </div>

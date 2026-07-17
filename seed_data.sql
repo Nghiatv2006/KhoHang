@@ -25,6 +25,13 @@ INSERT INTO categories (name) VALUES
 ('Bàn phím & Chuột'),
 ('Thiết bị âm thanh');
 
+INSERT INTO categories (name)
+VALUES 
+    ('iPhone thường'),
+    ('iPhone Pro'),
+    ('iPhone Pro Max')
+ON CONFLICT (name) DO NOTHING;
+
 -- Thêm Khách hàng (Customers)
 INSERT INTO customers (name, contact_info, address, debt, email, tax_code, branch_id) VALUES
 ('Nguyễn Văn A', '0912223334', 'Ba Đình, Hà Nội', 5000000.00, 'nguyenvana@example.com', '0101234567', 1),
@@ -32,7 +39,10 @@ INSERT INTO customers (name, contact_info, address, debt, email, tax_code, branc
 ('Công ty CP Công Nghệ Việt', '0243123456', 'Cầu Giấy, Hà Nội', 50000000.00, 'contact@congngheviet.vn', '0105678901', 1),
 ('Đại lý Tuấn Cường', '0988776655', 'Hải Châu, Đà Nẵng', 0.00, 'tuancuong@gmail.com', '0309876543', 3),
 ('Lê Hoàng Nam', '0911223344', 'Quận 1, TP.HCM', 2500000.00, 'namle@example.com', '0201122334', 2),
-('Phạm Thu Hương', '0966554433', 'Hoàn Kiếm, Hà Nội', 0.00, 'huongpham@example.com', '0109988776', 1);
+('Phạm Thu Hương', '0966554433', 'Hoàn Kiếm, Hà Nội', 0.00, 'huongpham@example.com', '0109988776', 1),
+('Đại lý Minh Trí', '0901112223', 'Quận 10, TP.HCM', 15000000.00, 'contact@minhtri.vn', '0209998887', 2),
+('Trương Văn C', '0977889900', 'Sơn Trà, Đà Nẵng', 0.00, 'truongvanc@example.com', '0301112223', 3),
+('Công ty TNHH MTV Biển Đông', '0236123456', 'Thanh Khê, Đà Nẵng', 10000000.00, 'biendong@example.com', '0304445556', 3);
 
 
 -- ==============================================================================
@@ -149,12 +159,12 @@ INSERT INTO audit_logs (user_id, action, entity_name, entity_id, details) VALUES
 INSERT INTO receipts (code, type, status, payment_status, source_branch_id, dest_branch_id, created_by, customer_id, description, created_at) VALUES
 ('EX20260601', 'EXPORT', 'COMPLETED', 'PAID', 1, NULL, 2, 1, 'Bán sỉ iPhone cho đại lý HN', CURRENT_TIMESTAMP - INTERVAL '28 days'),
 ('EX20260603', 'EXPORT', 'COMPLETED', 'PAID', 2, NULL, 5, 2, 'Bán lẻ MacBook tại HCM', CURRENT_TIMESTAMP - INTERVAL '25 days'),
-('EX20260605', 'EXPORT', 'COMPLETED', 'UNPAID', 3, NULL, 3, 1, 'Bán hàng cho khách nợ Đà Nẵng', CURRENT_TIMESTAMP - INTERVAL '22 days'),
+('EX20260605', 'EXPORT', 'COMPLETED', 'UNPAID', 3, NULL, 3, 8, 'Bán hàng cho khách nợ Đà Nẵng', CURRENT_TIMESTAMP - INTERVAL '22 days'),
 ('EX20260608', 'EXPORT', 'COMPLETED', 'PAID', 1, NULL, 2, 2, 'Khách mua AirPods và Phụ kiện HN', CURRENT_TIMESTAMP - INTERVAL '19 days'),
-('EX20260610', 'EXPORT', 'COMPLETED', 'UNPAID', 2, NULL, 5, 2, 'Bán sữa số lượng lớn HCM', CURRENT_TIMESTAMP - INTERVAL '16 days'),
-('EX20260612', 'EXPORT', 'COMPLETED', 'PAID', 3, NULL, 3, 1, 'Khách mua lẻ iPhone ĐN', CURRENT_TIMESTAMP - INTERVAL '14 days'),
+('EX20260610', 'EXPORT', 'COMPLETED', 'UNPAID', 2, NULL, 5, 5, 'Bán sữa số lượng lớn HCM', CURRENT_TIMESTAMP - INTERVAL '16 days'),
+('EX20260612', 'EXPORT', 'COMPLETED', 'PAID', 3, NULL, 3, 9, 'Khách mua lẻ iPhone ĐN', CURRENT_TIMESTAMP - INTERVAL '14 days'),
 ('EX20260615', 'EXPORT', 'COMPLETED', 'PAID', 1, NULL, 2, 1, 'Xuất bán MacBook HN', CURRENT_TIMESTAMP - INTERVAL '11 days'),
-('EX20260618', 'EXPORT', 'COMPLETED', 'UNPAID', 2, NULL, 5, 1, 'Hợp đồng bán sỉ iPhone HCM', CURRENT_TIMESTAMP - INTERVAL '8 days'),
+('EX20260618', 'EXPORT', 'COMPLETED', 'UNPAID', 2, NULL, 5, 7, 'Hợp đồng bán sỉ iPhone HCM', CURRENT_TIMESTAMP - INTERVAL '8 days'),
 ('EX20260620', 'EXPORT', 'COMPLETED', 'PAID', 3, NULL, 3, 2, 'Bán MacBook và AirPods ĐN', CURRENT_TIMESTAMP - INTERVAL '5 days'),
 ('EX20260621', 'EXPORT', 'COMPLETED', 'PAID', 1, NULL, 2, 2, 'Bán sữa hộp HN', CURRENT_TIMESTAMP - INTERVAL '3 days');
 
@@ -176,8 +186,8 @@ INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code
 -- Phiếu nhập kho (IMPORT)
 INSERT INTO receipts (code, type, status, payment_status, source_branch_id, dest_branch_id, created_by, customer_id, description, created_at) VALUES
 ('IM20260602', 'IMPORT', 'COMPLETED', 'PAID', NULL, 1, 2, NULL, 'Nhập thêm iPhone và MacBook HN', CURRENT_TIMESTAMP - INTERVAL '27 days'),
-('IM20260607', 'IMPORT', 'COMPLETED', 'PAID', NULL, 2, 5, NULL, 'Nhập thêm sữa HCM', CURRENT_TIMESTAMP - INTERVAL '20 days'),
-('IM20260614', 'IMPORT', 'COMPLETED', 'PAID', NULL, 3, 3, NULL, 'Nhập AirPods Đà Nẵng', CURRENT_TIMESTAMP - INTERVAL '12 days');
+('IM20260607', 'IMPORT', 'COMPLETED', 'PAID', 1, 2, 5, NULL, 'Nhập thêm sữa HCM', CURRENT_TIMESTAMP - INTERVAL '20 days'),
+('IM20260614', 'IMPORT', 'COMPLETED', 'PAID', 1, 3, 3, NULL, 'Nhập AirPods Đà Nẵng', CURRENT_TIMESTAMP - INTERVAL '12 days');
 
 INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code, mfg_date, exp_date) VALUES
 ((SELECT id FROM receipts WHERE code='IM20260602'), 1, 10, 29000000, 'IP15-HN-001', '1970-01-01', '1970-01-01'),
@@ -239,7 +249,7 @@ BEGIN
             -- Chỉ Tạo Phiếu XUẤT hằng ngày cho chi nhánh nhánh (target_branch > 1), vì Hà Nội (1) là kho tổng không bán lẻ
             IF target_branch > 1 THEN
                 INSERT INTO receipts (code, type, status, payment_status, source_branch_id, dest_branch_id, created_by, customer_id, description, created_at)
-                VALUES ('EX_AUTO_' || day_offset || '_' || target_branch || '_' || EXTRACT(EPOCH FROM curr_date)::BIGINT, 'EXPORT', 'COMPLETED', 'PAID', target_branch, NULL, creator_id, 1, 'Xuất bán sỉ hằng ngày', curr_date)
+                VALUES ('EX_AUTO_' || day_offset || '_' || target_branch || '_' || EXTRACT(EPOCH FROM curr_date)::BIGINT, 'EXPORT', 'COMPLETED', 'PAID', target_branch, NULL, creator_id, CASE WHEN target_branch = 2 THEN (CASE WHEN day_offset % 3 = 0 THEN 2 WHEN day_offset % 3 = 1 THEN 5 ELSE 7 END) ELSE (CASE WHEN day_offset % 3 = 0 THEN 4 WHEN day_offset % 3 = 1 THEN 8 ELSE 9 END) END, 'Xuất bán sỉ hằng ngày', curr_date)
                 RETURNING id INTO r_exp_id;
             END IF;
 
