@@ -25,6 +25,13 @@ INSERT INTO categories (name) VALUES
 ('Bàn phím & Chuột'),
 ('Thiết bị âm thanh');
 
+INSERT INTO categories (name)
+VALUES 
+    ('iPhone thường'),
+    ('iPhone Pro'),
+    ('iPhone Pro Max')
+ON CONFLICT (name) DO NOTHING;
+
 -- Thêm Khách hàng (Customers)
 INSERT INTO customers (name, contact_info, address, debt, email, tax_code, branch_id) VALUES
 ('Nguyễn Văn A', '0912223334', 'Ba Đình, Hà Nội', 5000000.00, 'nguyenvana@example.com', '0101234567', 1),
