@@ -372,10 +372,18 @@ public class ReceiptServiceImpl implements ReceiptService {
         receiptRepository.save(r);
 
         // Ghi Nhật ký
-        String typeLabel = r.getType() != null ? translateType(r.getType()) : "PHᯪU";
-        auditLogService.logAction(currentUser, "CREATE", "receipts",
-                String.valueOf(r.getId()),
-                "Tạo phiếu " + typeLabel + ": " + r.getCode());
+        String typeLabel = r.getType() != null ? translateType(r.getType()) : "PHIẾU";
+        if (r.getType() == ReceiptType.DISPOSAL) {
+            String detailMsg = "Tạo phiếu Tiêu hủy: " + r.getCode();
+            if (r.getDisposalReason() != null) {
+                detailMsg += "\nLý do: " + r.getDisposalReason();
+            }
+            auditLogService.logAction(currentUser, "CREATE_DISPOSAL_RECEIPT", "receipts", String.valueOf(r.getId()), detailMsg);
+        } else {
+            auditLogService.logAction(currentUser, "CREATE_RECEIPT", "receipts",
+                    String.valueOf(r.getId()),
+                    "Tạo phiếu " + typeLabel + ": " + r.getCode());
+        }
 
         return new ReceiptResponse(r);
     }
@@ -840,7 +848,17 @@ public class ReceiptServiceImpl implements ReceiptService {
         }
         
         receiptRepository.save(r);
-        auditLogService.logAction(currentUser, "APPROVE", "receipts", String.valueOf(r.getId()), "Hoàn tất phiếu " + translateType(r.getType()) + " " + r.getCode() + " -> Hoàn tất");
+        if (r.getType() == ReceiptType.DISPOSAL) {
+            java.util.List<String> disposalDetails = new java.util.ArrayList<>();
+            for (ReceiptDetail d : r.getDetails()) {
+                String batchCode = d.getBatchCode() != null ? d.getBatchCode() : "N/A";
+                disposalDetails.add("• " + d.getProduct().getName() + " (Lô: " + batchCode + "): " + d.getQuantity());
+            }
+            String detailMsg = "Duyệt phiếu Tiêu hủy " + r.getCode() + "\n" + String.join("\n", disposalDetails);
+            auditLogService.logAction(currentUser, "APPROVE", "receipts", String.valueOf(r.getId()), detailMsg);
+        } else {
+            auditLogService.logAction(currentUser, "APPROVE", "receipts", String.valueOf(r.getId()), "Duyệt phiếu " + translateType(r.getType()) + " " + r.getCode());
+        }
         return new ReceiptResponse(r);
     }
 

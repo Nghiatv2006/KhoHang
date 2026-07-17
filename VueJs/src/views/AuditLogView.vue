@@ -36,6 +36,8 @@ const ACTION_LABELS: Record<string, string> = {
   'LOGIN':         'Đăng nhập',
   'LOGOUT':        'Đăng xuất',
   'CREATE':        'Thêm mới',
+  'CREATE_RECEIPT':'Tạo phiếu',
+  'CREATE_DISPOSAL_RECEIPT':'Tạo phiếu tiêu hủy',
   'UPDATE':        'Cập nhật',
   'DELETE':        'Xóa',
   'RESTORE':       'Khôi phục',
@@ -211,6 +213,8 @@ function actionColor(action: string, isWarning: boolean) {
     'LOGIN':  'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800/50',
     'LOGOUT': 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
     'CREATE': 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800/50',
+    'CREATE_RECEIPT': 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/50',
+    'CREATE_DISPOSAL_RECEIPT': 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200 dark:bg-fuchsia-900/30 dark:text-fuchsia-400 dark:border-fuchsia-800/50',
     'UPDATE': 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800/50',
     'DELETE': 'bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800/50',
     'RESTORE': 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-900/30 dark:text-sky-400 dark:border-sky-800/50',
@@ -443,6 +447,9 @@ watch(currentPage, () => {
                           </span>
                           <span v-else-if="log.action === 'IMPORT_EXCEL'">
                             Xem chi tiết (+{{ log.details.split('\n').length - 1 }} sản phẩm)
+                          </span>
+                          <span v-else-if="log.action === 'APPROVE' && log.details.includes('Tiêu hủy')">
+                            Xem chi tiết (+{{ log.details.split('\n').length - 1 }} sản phẩm tiêu hủy)
                           </span>
                           <span v-else>
                             Xem chi tiết (+{{ log.details.split('\n').length - 1 }} thay đổi)

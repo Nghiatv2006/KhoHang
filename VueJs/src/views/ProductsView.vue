@@ -124,7 +124,8 @@ async function saveProduct() {
     try { data = await res.json() } catch {}
 
     if (res.ok) {
-      toast.success(editingProduct.value ? 'Cập nhật sản phẩm thành công!' : 'Thêm sản phẩm thành công!')
+      const productName = (data as any).name || payload.name;
+      toast.success(editingProduct.value ? `Cập nhật sản phẩm ${productName} thành công!` : `Thêm sản phẩm ${productName} thành công!`)
       showProductModal.value = false
       await loadProducts(editingProduct.value ? currentPage.value : 0)
     } else {
@@ -165,6 +166,14 @@ async function handleExcelImport(event: Event) {
   if (!target.files || target.files.length === 0) return
   
   const file = target.files[0]
+  
+  const extension = file.name.split('.').pop()?.toLowerCase() || ''
+  if (!['xlsx', 'xls'].includes(extension)) {
+    toast.error('Tải lên thất bại: Hệ thống chỉ chấp nhận file Excel. Vui lòng kiểm tra lại định dạng file của bạn!')
+    target.value = ''
+    return
+  }
+
   pendingImportFile.value = file
   
   const formData = new FormData()
