@@ -292,6 +292,7 @@ watch([filterKeyword, filterUserId, filterAction, filterFrom, filterTo, filterTi
 
 watch(currentPage, () => {
   triggerSearch()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 })
 </script>
 
@@ -502,16 +503,23 @@ watch(currentPage, () => {
                 </button>
                 
                 <div v-else-if="typeof item === 'string' && item.startsWith('...')" class="relative flex items-center justify-center w-8 h-8">
-                  <div v-if="showJumpInput === item.replace('...', '')" class="absolute z-10 flex items-center bottom-10">
-                    <input v-model="jumpPageNumber" @keyup.enter="handleJump" @blur="handleJump" v-focus
-                           type="number" min="1" :max="totalPages"
-                           class="w-16 h-9 px-2 text-center text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 border-2 border-indigo-500 rounded-lg outline-none shadow-xl"
-                           placeholder="Trang" />
-                  </div>
-                  <button v-else @click="openJumpInput(item.replace('...', '') as 'left' | 'right')"
+                  <button @click="openJumpInput(item.replace('...', '') as 'left' | 'right')"
                           class="w-8 h-8 flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer" title="Nhảy đến trang">
                     <i class="fas fa-ellipsis-h text-[10px]"></i>
                   </button>
+                  <div v-if="showJumpInput === item.replace('...', '')" class="absolute z-50 bottom-full mb-2 bg-white dark:bg-slate-900 shadow-[0_4px_15px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-600 transform -translate-x-1/2 left-1/2 w-[140px] flex flex-col">
+                    <div class="bg-slate-700 dark:bg-slate-800 text-white font-bold text-[13px] px-2.5 py-1.5 text-left">
+                      Chuyển trang...
+                    </div>
+                    <div class="p-2 flex items-center gap-2">
+                      <input v-model="jumpPageNumber" @keyup.enter="handleJump" @blur="handleJump" v-focus
+                             type="number" min="1" :max="totalPages"
+                             class="flex-1 w-0 h-[28px] px-1 text-center text-[13px] font-semibold text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-[3px] outline-none focus:border-indigo-500" />
+                      <button @mousedown.prevent="handleJump" class="w-[36px] h-[28px] bg-slate-700 dark:bg-slate-800 hover:bg-slate-800 text-white font-bold text-[13px] rounded-[3px] transition-colors cursor-pointer">
+                        Đi
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </template>
 
