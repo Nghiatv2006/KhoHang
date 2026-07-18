@@ -1,4 +1,4 @@
--- ==============================================================================
+﻿-- ==============================================================================
 -- DỮ LIỆU MẪU (SEED DATA) - NGÀNH HÀNG: IPHONE
 -- Lưu ý: Hãy chạy toàn bộ schema.sql trước khi chạy file này.
 -- ==============================================================================
@@ -58,18 +58,18 @@ INSERT INTO users (username, password, full_name, role, branch_id, status, phone
 
 INSERT INTO products (code, name, unit, import_price, price, category_id, has_expiry, image_url, mfg_date, exp_date) VALUES
 -- iPhone thường (category_id = 1)
-('IP16_128',     'iPhone 16 128GB',         'Chiếc', 18500000, 22990000, 1, FALSE, '/uploads/images/iphone16.png',      '1970-01-01', '1970-01-01'),
-('IP16_256',     'iPhone 16 256GB',         'Chiếc', 20500000, 25490000, 1, FALSE, '/uploads/images/iphone16.png',      '1970-01-01', '1970-01-01'),
-('IP15_128',     'iPhone 15 128GB',         'Chiếc', 15000000, 18990000, 1, FALSE, '/uploads/images/iphone15.png',      '1970-01-01', '1970-01-01'),
-('IP15_256',     'iPhone 15 256GB',         'Chiếc', 17000000, 21490000, 1, FALSE, '/uploads/images/iphone15.png',      '1970-01-01', '1970-01-01'),
+('IP16_128_TITAN', 'iPhone 16 128GB Màu Titan', 'Chiếc', 18500000, 22990000, 1, FALSE, '/uploads/images/iphone16_titan.png', '1970-01-01', '1970-01-01'),
+('IP16_256_DEN',   'iPhone 16 256GB Màu Đen',   'Chiếc', 20500000, 25490000, 1, FALSE, '/uploads/images/iphone16_den.png', '1970-01-01', '1970-01-01'),
+('IP15_128_TRANG', 'iPhone 15 128GB Màu Trắng', 'Chiếc', 15000000, 18990000, 1, FALSE, '/uploads/images/iphone15_trang.png', '1970-01-01', '1970-01-01'),
+('IP15_256_HONG',  'iPhone 15 256GB Màu Hồng',  'Chiếc', 17000000, 21490000, 1, FALSE, '/uploads/images/iphone15_hong.png', '1970-01-01', '1970-01-01'),
 -- iPhone Pro (category_id = 2)
-('IP16P_128',    'iPhone 16 Pro 128GB',     'Chiếc', 24000000, 28990000, 2, FALSE, '/uploads/images/iphone16pro.png',   '1970-01-01', '1970-01-01'),
-('IP16P_256',    'iPhone 16 Pro 256GB',     'Chiếc', 26500000, 31990000, 2, FALSE, '/uploads/images/iphone16pro.png',   '1970-01-01', '1970-01-01'),
-('IP15P_128',    'iPhone 15 Pro 128GB',     'Chiếc', 21000000, 25990000, 2, FALSE, '/uploads/images/iphone15pro.png',   '1970-01-01', '1970-01-01'),
-('IP15P_256',    'iPhone 15 Pro 256GB',     'Chiếc', 23000000, 27990000, 2, FALSE, '/uploads/images/iphone15pro.png',   '1970-01-01', '1970-01-01'),
+('IP16P_128_TITAN', 'iPhone 16 Pro 128GB Màu Titan', 'Chiếc', 24000000, 28990000, 2, FALSE, '/uploads/images/iphone16_titan.png', '1970-01-01', '1970-01-01'),
+('IP16P_256_DEN',   'iPhone 16 Pro 256GB Màu Đen',   'Chiếc', 26500000, 31990000, 2, FALSE, '/uploads/images/iphone16_den.png', '1970-01-01', '1970-01-01'),
+('IP15P_128_TRANG', 'iPhone 15 Pro 128GB Màu Trắng', 'Chiếc', 21000000, 25990000, 2, FALSE, '/uploads/images/iphone15_trang.png', '1970-01-01', '1970-01-01'),
+('IP15P_256_HONG',  'iPhone 15 Pro 256GB Màu Hồng',  'Chiếc', 23000000, 27990000, 2, FALSE, '/uploads/images/iphone15_hong.png', '1970-01-01', '1970-01-01'),
 -- iPhone Pro Max (category_id = 3)
-('IP16PM_256',   'iPhone 16 Pro Max 256GB', 'Chiếc', 29000000, 34990000, 3, FALSE, '/uploads/images/iphone16promax.png','1970-01-01', '1970-01-01'),
-('IP16PM_512',   'iPhone 16 Pro Max 512GB', 'Chiếc', 33000000, 39990000, 3, FALSE, '/uploads/images/iphone16promax.png','1970-01-01', '1970-01-01');
+('IP16PM_256_TITAN', 'iPhone 16 Pro Max 256GB Màu Titan', 'Chiếc', 29000000, 34990000, 3, FALSE, '/uploads/images/iphone16_titan.png', '1970-01-01', '1970-01-01'),
+('IP16PM_512_DEN',   'iPhone 16 Pro Max 512GB Màu Đen',   'Chiếc', 33000000, 39990000, 3, FALSE, '/uploads/images/iphone16_den.png', '1970-01-01', '1970-01-01');
 
 -- ==============================================================================
 -- 6. TỒN KHO BAN ĐẦU (INVENTORIES)
@@ -77,29 +77,29 @@ INSERT INTO products (code, name, unit, import_price, price, category_id, has_ex
 
 INSERT INTO inventories (branch_id, product_id, mfg_date, exp_date, batch_code, quantity, has_expiry) VALUES
 -- Chi nhánh Hà Nội (kho tổng)
-(1,  1, '1970-01-01', '1970-01-01', 'IP16-128-HN-001',    80, FALSE),
-(1,  2, '1970-01-01', '1970-01-01', 'IP16-256-HN-001',    60, FALSE),
-(1,  3, '1970-01-01', '1970-01-01', 'IP15-128-HN-001',    50, FALSE),
-(1,  4, '1970-01-01', '1970-01-01', 'IP15-256-HN-001',    40, FALSE),
-(1,  5, '1970-01-01', '1970-01-01', 'IP16P-128-HN-001',   60, FALSE),
-(1,  6, '1970-01-01', '1970-01-01', 'IP16P-256-HN-001',   50, FALSE),
-(1,  7, '1970-01-01', '1970-01-01', 'IP15P-128-HN-001',   40, FALSE),
-(1,  8, '1970-01-01', '1970-01-01', 'IP15P-256-HN-001',   30, FALSE),
-(1,  9, '1970-01-01', '1970-01-01', 'IP16PM-256-HN-001',  40, FALSE),
-(1, 10, '1970-01-01', '1970-01-01', 'IP16PM-512-HN-001',  25, FALSE),
+(1,  1, '1970-01-01', '1970-01-01', 'IP16-128-TITAN-HN-001', 80, FALSE),
+(1,  2, '1970-01-01', '1970-01-01', 'IP16-256-DEN-HN-001',   60, FALSE),
+(1,  3, '1970-01-01', '1970-01-01', 'IP15-128-TRANG-HN-001', 50, FALSE),
+(1,  4, '1970-01-01', '1970-01-01', 'IP15-256-HONG-HN-001',  40, FALSE),
+(1,  5, '1970-01-01', '1970-01-01', 'IP16P-128-TITAN-HN-001',   60, FALSE),
+(1,  6, '1970-01-01', '1970-01-01', 'IP16P-256-DEN-HN-001',   50, FALSE),
+(1,  7, '1970-01-01', '1970-01-01', 'IP15P-128-TRANG-HN-001',   40, FALSE),
+(1,  8, '1970-01-01', '1970-01-01', 'IP15P-256-HONG-HN-001',   30, FALSE),
+(1,  9, '1970-01-01', '1970-01-01', 'IP16PM-256-TITAN-HN-001',  40, FALSE),
+(1, 10, '1970-01-01', '1970-01-01', 'IP16PM-512-DEN-HN-001',  25, FALSE),
 -- Chi nhánh TP.HCM
-(2,  1, '1970-01-01', '1970-01-01', 'IP16-128-HCM-001',   30, FALSE),
-(2,  2, '1970-01-01', '1970-01-01', 'IP16-256-HCM-001',   25, FALSE),
-(2,  5, '1970-01-01', '1970-01-01', 'IP16P-128-HCM-001',  20, FALSE),
-(2,  6, '1970-01-01', '1970-01-01', 'IP16P-256-HCM-001',  15, FALSE),
-(2,  9, '1970-01-01', '1970-01-01', 'IP16PM-256-HCM-001', 12, FALSE),
-(2, 10, '1970-01-01', '1970-01-01', 'IP16PM-512-HCM-001',  8, FALSE),
+(2,  1, '1970-01-01', '1970-01-01', 'IP16-128-TITAN-HCM-001', 30, FALSE),
+(2,  2, '1970-01-01', '1970-01-01', 'IP16-256-DEN-HCM-001',   25, FALSE),
+(2,  5, '1970-01-01', '1970-01-01', 'IP16P-128-TITAN-HCM-001',  20, FALSE),
+(2,  6, '1970-01-01', '1970-01-01', 'IP16P-256-DEN-HCM-001',  15, FALSE),
+(2,  9, '1970-01-01', '1970-01-01', 'IP16PM-256-TITAN-HCM-001', 12, FALSE),
+(2, 10, '1970-01-01', '1970-01-01', 'IP16PM-512-DEN-HCM-001',  8, FALSE),
 -- Chi nhánh Đà Nẵng
-(3,  3, '1970-01-01', '1970-01-01', 'IP15-128-DN-001',    20, FALSE),
-(3,  4, '1970-01-01', '1970-01-01', 'IP15-256-DN-001',    15, FALSE),
-(3,  7, '1970-01-01', '1970-01-01', 'IP15P-128-DN-001',   18, FALSE),
-(3,  8, '1970-01-01', '1970-01-01', 'IP15P-256-DN-001',   12, FALSE),
-(3,  9, '1970-01-01', '1970-01-01', 'IP16PM-256-DN-001',  10, FALSE);
+(3,  3, '1970-01-01', '1970-01-01', 'IP15-128-TRANG-DN-001', 20, FALSE),
+(3,  4, '1970-01-01', '1970-01-01', 'IP15-256-HONG-DN-001',  15, FALSE),
+(3,  7, '1970-01-01', '1970-01-01', 'IP15P-128-TRANG-DN-001',   18, FALSE),
+(3,  8, '1970-01-01', '1970-01-01', 'IP15P-256-HONG-DN-001',   12, FALSE),
+(3,  9, '1970-01-01', '1970-01-01', 'IP16PM-256-TITAN-DN-001',  10, FALSE);
 
 -- ==============================================================================
 -- 7. PHIẾU KHO MẪU (RECEIPTS)
@@ -121,32 +121,32 @@ INSERT INTO receipts (code, type, status, payment_status, source_branch_id, dest
 
 INSERT INTO receipt_details (receipt_id, product_id, quantity, price, batch_code, mfg_date, exp_date) VALUES
 -- IM20260601: Nhập HN
-((SELECT id FROM receipts WHERE code='IM20260601'),  1, 20, 18500000, 'IP16-128-HN-001',   '1970-01-01', '1970-01-01'),
-((SELECT id FROM receipts WHERE code='IM20260601'),  5, 15, 24000000, 'IP16P-128-HN-001',  '1970-01-01', '1970-01-01'),
-((SELECT id FROM receipts WHERE code='IM20260601'),  9, 10, 29000000, 'IP16PM-256-HN-001', '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='IM20260601'),  1, 20, 18500000, 'IP16-128-TITAN-HN-001', '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='IM20260601'),  5, 15, 24000000, 'IP16P-128-TITAN-HN-001',  '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='IM20260601'),  9, 10, 29000000, 'IP16PM-256-TITAN-HN-001', '1970-01-01', '1970-01-01'),
 -- IM20260605: Nhập HCM
-((SELECT id FROM receipts WHERE code='IM20260605'),  2, 15, 20500000, 'IP16-256-HCM-001',  '1970-01-01', '1970-01-01'),
-((SELECT id FROM receipts WHERE code='IM20260605'),  6, 10, 26500000, 'IP16P-256-HCM-001', '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='IM20260605'),  2, 15, 20500000, 'IP16-256-DEN-HCM-001', '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='IM20260605'),  6, 10, 26500000, 'IP16P-256-DEN-HCM-001', '1970-01-01', '1970-01-01'),
 -- IM20260610: Nhập Đà Nẵng
-((SELECT id FROM receipts WHERE code='IM20260610'),  3, 12, 15000000, 'IP15-128-DN-001',   '1970-01-01', '1970-01-01'),
-((SELECT id FROM receipts WHERE code='IM20260610'),  7, 10, 21000000, 'IP15P-128-DN-001',  '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='IM20260610'),  3, 12, 15000000, 'IP15-128-TRANG-DN-001', '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='IM20260610'),  7, 10, 21000000, 'IP15P-128-TRANG-DN-001',  '1970-01-01', '1970-01-01'),
 -- EX20260602: Xuất HN
-((SELECT id FROM receipts WHERE code='EX20260602'),  1,  3, 22990000, 'IP16-128-HN-001',   '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='EX20260602'),  1,  3, 22990000, 'IP16-128-TITAN-HN-001', '1970-01-01', '1970-01-01'),
 -- EX20260606: Xuất HCM
-((SELECT id FROM receipts WHERE code='EX20260606'),  6,  2, 31990000, 'IP16P-256-HCM-001', '1970-01-01', '1970-01-01'),
-((SELECT id FROM receipts WHERE code='EX20260606'),  2,  3, 25490000, 'IP16-256-HCM-001',  '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='EX20260606'),  6,  2, 31990000, 'IP16P-256-DEN-HCM-001', '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='EX20260606'),  2,  3, 25490000, 'IP16-256-DEN-HCM-001', '1970-01-01', '1970-01-01'),
 -- EX20260608: Xuất HCM (nợ)
-((SELECT id FROM receipts WHERE code='EX20260608'),  9,  2, 34990000, 'IP16PM-256-HCM-001','1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='EX20260608'),  9,  2, 34990000, 'IP16PM-256-TITAN-HCM-001','1970-01-01', '1970-01-01'),
 -- EX20260612: Xuất ĐN
-((SELECT id FROM receipts WHERE code='EX20260612'),  3,  5, 18990000, 'IP15-128-DN-001',   '1970-01-01', '1970-01-01'),
-((SELECT id FROM receipts WHERE code='EX20260612'),  7,  3, 25990000, 'IP15P-128-DN-001',  '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='EX20260612'),  3,  5, 18990000, 'IP15-128-TRANG-DN-001', '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='EX20260612'),  7,  3, 25990000, 'IP15P-128-TRANG-DN-001',  '1970-01-01', '1970-01-01'),
 -- EX20260615: Xuất HN
-((SELECT id FROM receipts WHERE code='EX20260615'),  9,  1, 34990000, 'IP16PM-256-HN-001', '1970-01-01', '1970-01-01'),
-((SELECT id FROM receipts WHERE code='EX20260615'), 10,  1, 39990000, 'IP16PM-512-HN-001', '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='EX20260615'),  9,  1, 34990000, 'IP16PM-256-TITAN-HN-001', '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='EX20260615'), 10,  1, 39990000, 'IP16PM-512-DEN-HN-001', '1970-01-01', '1970-01-01'),
 -- EX20260618: Xuất HCM (nợ)
-((SELECT id FROM receipts WHERE code='EX20260618'),  1,  2, 22990000, 'IP16-128-HCM-001',  '1970-01-01', '1970-01-01'),
+((SELECT id FROM receipts WHERE code='EX20260618'),  1,  2, 22990000, 'IP16-128-TITAN-HCM-001', '1970-01-01', '1970-01-01'),
 -- EX20260620: Xuất ĐN
-((SELECT id FROM receipts WHERE code='EX20260620'),  8,  2, 27990000, 'IP15P-256-DN-001',  '1970-01-01', '1970-01-01');
+((SELECT id FROM receipts WHERE code='EX20260620'),  8,  2, 27990000, 'IP15P-256-HONG-DN-001',  '1970-01-01', '1970-01-01');
 
 -- ==============================================================================
 -- 8. KIỂM KÊ MẪU (STOCKTAKES)
@@ -157,8 +157,8 @@ INSERT INTO stocktakes (code, branch_id, created_by, status, notes) VALUES
 ('STK_HCM_001', 2, 5, 'DRAFT',     'Đang thực hiện kiểm kê kho HCM');
 
 INSERT INTO stocktake_details (stocktake_id, product_id, mfg_date, exp_date, batch_code, expected_quantity, actual_quantity, adjustment_receipt_id) VALUES
-(1, 1, '1970-01-01', '1970-01-01', 'IP16-128-HN-001',   77, 77, NULL),
-(1, 5, '1970-01-01', '1970-01-01', 'IP16P-128-HN-001',  60, 60, NULL);
+(1, 1, '1970-01-01', '1970-01-01', 'IP16-128-TITAN-HN-001',   77, 77, NULL),
+(1, 5, '1970-01-01', '1970-01-01', 'IP16P-128-TITAN-HN-001',  60, 60, NULL);
 
 -- ==============================================================================
 -- 9. NHẬT KÝ MẪU (AUDIT LOGS)
