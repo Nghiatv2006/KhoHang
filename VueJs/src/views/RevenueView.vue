@@ -274,7 +274,7 @@ const sortedProductStats = computed(() => {
   
   if (filterSearch.value) {
     const term = filterSearch.value.toLowerCase()
-    list = list.filter(p => p.productName.toLowerCase().includes(term) || (p.productId.toString() === term))
+    list = list.filter(p => p.productName.toLowerCase().includes(term))
   }
   
   return [...list].sort((a, b) => b.profit - a.profit)
@@ -450,7 +450,6 @@ async function exportExcel() {
           @click="showLegend = true"
           class="h-[42px] px-4 border border-[#e2e8f0] bg-white hover:bg-[#f8f9fa] text-[#4361ee] rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-2"
         >
-          <i class="fas fa-info-circle"></i>
           <span>Chú giải</span>
         </button>
 
@@ -643,14 +642,13 @@ async function exportExcel() {
           </div>
           
           <!-- Lọc Sản Phẩm (Chỉ hiện ở Tab Theo Sản Phẩm) -->
-          <div v-if="activeTab === 1" class="mt-4 flex flex-col sm:flex-row gap-3">
-            <div class="flex-1 relative">
-              <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <div v-if="activeTab === 1" class="mt-4 flex flex-col sm:flex-row justify-end gap-3">
+            <div class="w-full sm:w-[350px] relative">
               <input 
                 type="text" 
                 v-model="filterSearch" 
-                placeholder="Tìm tên hoặc mã sản phẩm..." 
-                class="w-full pl-10 pr-4 h-[38px] border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all"
+                placeholder="Tìm tên sản phẩm..." 
+                class="w-full px-4 h-[38px] border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all"
               />
             </div>
             <select 
@@ -695,14 +693,14 @@ async function exportExcel() {
             <div class="w-full overflow-x-auto">
               <table class="w-full text-sm">
                 <thead>
-              <tr class="bg-[#f8f9fa] text-[#8094ae] text-xs uppercase tracking-wider">
-                <th class="px-5 py-3 text-left font-bold w-[14%]">Mã HĐ & Ngày</th>
-                <th v-if="isAdmin && !selectedBranchId" class="px-5 py-3 text-left font-bold w-[14%]">Chi nhánh</th>
-                <th class="px-5 py-3 text-left font-bold w-[18%]">NV & Khách hàng</th>
-                <th class="px-5 py-3 text-left font-bold w-[15%] whitespace-nowrap">Tổng tiền</th>
-                <th class="px-5 py-3 text-left font-bold w-[15%] whitespace-nowrap">Thực thu/Nợ</th>
-                <th class="px-5 py-3 text-left font-bold w-[14%] whitespace-nowrap">Lợi nhuận</th>
-                <th class="px-5 py-3 text-center font-bold w-[10%]">Trạng thái</th>
+              <tr class="border-b border-slate-100">
+                <th class="px-5 py-3 text-left tracking-wider text-[11px] font-semibold text-slate-400 uppercase w-[14%]">Mã HĐ & Ngày</th>
+                <th v-if="isAdmin && !selectedBranchId" class="px-5 py-3 text-left tracking-wider text-[11px] font-semibold text-slate-400 uppercase w-[14%]">Chi nhánh</th>
+                <th class="px-5 py-3 text-left tracking-wider text-[11px] font-semibold text-slate-400 uppercase w-[18%]">NV & Khách hàng</th>
+                <th class="px-5 py-3 text-left tracking-wider text-[11px] font-semibold text-slate-400 uppercase w-[15%] whitespace-nowrap">Tổng tiền</th>
+                <th class="px-5 py-3 text-left tracking-wider text-[11px] font-semibold text-slate-400 uppercase w-[15%] whitespace-nowrap">Thực thu/Nợ</th>
+                <th class="px-5 py-3 text-left tracking-wider text-[11px] font-semibold text-slate-400 uppercase w-[14%] whitespace-nowrap">Lợi nhuận</th>
+                <th class="px-5 py-3 text-center tracking-wider text-[11px] font-semibold text-slate-400 uppercase w-[10%]">Trạng thái</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-[#f1f5f9]">
@@ -755,12 +753,12 @@ async function exportExcel() {
                 Hiển thị {{ paginatedReceipts.length ? (currentPageReceipts - 1) * itemsPerPage + 1 : 0 }} - {{ Math.min(currentPageReceipts * itemsPerPage, filteredReceipts.length) }} trên tổng số {{ filteredReceipts.length }}
               </span>
               <div class="flex items-center gap-1">
-                <button @click="currentPageReceipts--" :disabled="currentPageReceipts === 1" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 transition-colors" title="Trang trước"><i class="fas fa-chevron-left text-[10px]"></i></button>
+                <button @click="currentPageReceipts--" :disabled="currentPageReceipts === 1" class="px-3 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 transition-colors text-xs font-semibold" title="Trang trước">Trang trước</button>
                 <template v-for="(p, idx) in getPaginationArray(currentPageReceipts, totalPagesReceipts)" :key="idx">
                   <button v-if="p !== '...'" @click="currentPageReceipts = Number(p)" :class="['min-w-[32px] h-8 px-2 flex items-center justify-center rounded-lg text-xs font-bold transition-colors', currentPageReceipts === p ? 'bg-[#4361ee] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900']">{{ p }}</button>
                   <button v-else @click="handleJumpPage('receipts')" class="min-w-[32px] h-8 px-1 flex items-center justify-center text-slate-400 hover:text-[#4361ee] hover:bg-blue-50 rounded-lg transition-colors font-bold" title="Nhấn để chuyển trang">...</button>
                 </template>
-                <button @click="currentPageReceipts++" :disabled="currentPageReceipts === totalPagesReceipts" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 transition-colors" title="Trang sau"><i class="fas fa-chevron-right text-[10px]"></i></button>
+                <button @click="currentPageReceipts++" :disabled="currentPageReceipts === totalPagesReceipts" class="px-3 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 transition-colors text-xs font-semibold" title="Trang sau">Trang sau</button>
               </div>
             </div>
           </div>
@@ -770,13 +768,13 @@ async function exportExcel() {
             <div class="w-full overflow-x-auto">
               <table class="w-full text-sm">
                 <thead>
-              <tr class="bg-[#f8f9fa] text-[#8094ae] text-xs uppercase tracking-wider">
-                <th class="px-5 py-3 text-left font-bold">Tên sản phẩm</th>
-                <th class="px-5 py-3 text-left font-bold w-[14%]">Danh mục</th>
-                <th class="px-5 py-3 text-center font-bold w-[10%]">SL bán</th>
-                <th class="px-5 py-3 text-left font-bold w-[18%]">Doanh thu</th>
-                <th class="px-5 py-3 text-left font-bold w-[18%]">Lợi nhuận</th>
-                <th class="px-5 py-3 text-center font-bold w-[12%]">% Đóng góp LN</th>
+              <tr class="border-b border-slate-100">
+                <th class="px-5 py-3 text-left tracking-wider text-[11px] font-semibold text-slate-400 uppercase">Tên sản phẩm</th>
+                <th class="px-5 py-3 text-left tracking-wider text-[11px] font-semibold text-slate-400 uppercase w-[14%]">Danh mục</th>
+                <th class="px-5 py-3 text-center tracking-wider text-[11px] font-semibold text-slate-400 uppercase w-[10%]">SL bán</th>
+                <th class="px-5 py-3 text-left tracking-wider text-[11px] font-semibold text-slate-400 uppercase w-[18%]">Doanh thu</th>
+                <th class="px-5 py-3 text-left tracking-wider text-[11px] font-semibold text-slate-400 uppercase w-[18%]">Lợi nhuận</th>
+                <th class="px-5 py-3 text-center tracking-wider text-[11px] font-semibold text-slate-400 uppercase w-[12%]">% Đóng góp LN</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-[#f1f5f9]">
@@ -808,12 +806,12 @@ async function exportExcel() {
                 Hiển thị {{ paginatedProducts.length ? (currentPageProducts - 1) * itemsPerPage + 1 : 0 }} - {{ Math.min(currentPageProducts * itemsPerPage, sortedProductStats.length) }} trên tổng số {{ sortedProductStats.length }}
               </span>
               <div class="flex items-center gap-1">
-                <button @click="currentPageProducts--" :disabled="currentPageProducts === 1" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 transition-colors" title="Trang trước"><i class="fas fa-chevron-left text-[10px]"></i></button>
+                <button @click="currentPageProducts--" :disabled="currentPageProducts === 1" class="px-3 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 transition-colors text-xs font-semibold" title="Trang trước">Trang trước</button>
                 <template v-for="(p, idx) in getPaginationArray(currentPageProducts, totalPagesProducts)" :key="idx">
                   <button v-if="p !== '...'" @click="currentPageProducts = Number(p)" :class="['min-w-[32px] h-8 px-2 flex items-center justify-center rounded-lg text-xs font-bold transition-colors', currentPageProducts === p ? 'bg-[#4361ee] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900']">{{ p }}</button>
                   <button v-else @click="handleJumpPage('products')" class="min-w-[32px] h-8 px-1 flex items-center justify-center text-slate-400 hover:text-[#4361ee] hover:bg-blue-50 rounded-lg transition-colors font-bold" title="Nhấn để chuyển trang">...</button>
                 </template>
-                <button @click="currentPageProducts++" :disabled="currentPageProducts === totalPagesProducts" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 transition-colors" title="Trang sau"><i class="fas fa-chevron-right text-[10px]"></i></button>
+                <button @click="currentPageProducts++" :disabled="currentPageProducts === totalPagesProducts" class="px-3 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 transition-colors text-xs font-semibold" title="Trang sau">Trang sau</button>
               </div>
             </div>
           </div>
@@ -835,10 +833,10 @@ async function exportExcel() {
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[85vh] overflow-hidden" @click.stop>
           <div class="flex items-center justify-between p-5 border-b border-[#f1f5f9] shrink-0">
             <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <i class="fas fa-book text-[#4361ee]"></i> Chú giải Thuật ngữ
+              Chú giải Thuật ngữ
             </h3>
-            <button @click="showLegend = false" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors">
-              <i class="fas fa-times"></i>
+            <button @click="showLegend = false" class="px-3 py-1 flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors text-sm font-semibold">
+              Đóng
             </button>
           </div>
           <div class="p-6 space-y-5 text-sm text-slate-600 overflow-y-auto custom-scrollbar">
@@ -872,13 +870,13 @@ async function exportExcel() {
             <div class="bg-blue-50/50 p-4 rounded-xl border border-blue-100 mt-2 space-y-3">
               <div>
                 <div class="font-bold text-blue-800 mb-1 flex items-center gap-2">
-                  <i class="fas fa-info-circle"></i> Quy tắc chốt số liệu
+                  Quy tắc chốt số liệu
                 </div>
                 <p class="text-blue-700/80 leading-relaxed text-[13px]">Báo cáo lấy dữ liệu theo <strong class="text-blue-800">Ngày tạo hóa đơn</strong> và chỉ tính hóa đơn <strong class="text-blue-800">Hoàn thành</strong> (Tự động bỏ hóa đơn Hủy).</p>
               </div>
               <div>
                 <div class="font-bold text-blue-800 mb-1 flex items-center gap-2">
-                  <i class="fas fa-file-excel"></i> Lưu ý Xuất Excel (Raw Data)
+                  Lưu ý Xuất Excel (Raw Data)
                 </div>
                 <p class="text-blue-700/80 leading-relaxed text-[13px]">File xuất ra luôn lấy <strong>Toàn bộ dữ liệu</strong> theo Khoảng thời gian & Chi nhánh. Các bộ lọc phụ (Trạng thái thanh toán, Tên/Danh mục SP) <strong>không</strong> ảnh hưởng tới file tải về để đảm bảo tính toàn vẹn của Báo cáo tổng.</p>
               </div>
