@@ -72,7 +72,7 @@ const badgeReceiptStocktake = ref(0)
 
 async function loadBadgeCounts() {
   try {
-    const res = await api.get('/api/receipts')
+    const res = await api.get(`/api/receipts?_t=${Date.now()}`)
     if (!res.ok) return
     const receipts: any[] = await res.json()
     const myBranchId = user.value?.branchId || user.value?.branch?.id
@@ -85,10 +85,10 @@ async function loadBadgeCounts() {
     const importReceipts = receipts.filter(r => {
       if (r.type !== 'IMPORT') return false;
       const isDest = myBranchId && Number(r.destBranchId) === Number(myBranchId);
-      if (r.status === 'DRAFT') return (isManager && isDest) || isAdmin;
+      if (r.status === 'DRAFT') return (isManager || isAdmin) && isDest;
       if (r.status === 'PENDING_ADMIN') return isAdmin;
       if (r.status === 'PENDING_STOCKTAKE') return isStaff && isDest;
-      if (r.status === 'PENDING_SHORTFALL_MANAGER') return isManager && isDest;
+      if (r.status === 'PENDING_SHORTFALL_MANAGER') return isManager && !isAdmin && isDest;
       if (r.status === 'PENDING_SHORTFALL_ADMIN') return isAdmin;
       
       const isSource = myBranchId && Number(r.sourceBranchId) === Number(myBranchId);
@@ -101,8 +101,14 @@ async function loadBadgeCounts() {
     const invoiceReceipts = receipts.filter(r => {
       if (r.type !== 'EXPORT') return false;
       const isSource = myBranchId && Number(r.sourceBranchId) === Number(myBranchId);
-      if (r.status === 'DRAFT') return (isManager && isSource) || isAdmin;
-      if (r.status === 'PENDING_ADMIN') return isAdmin;
+      
+      if (r.status === 'DRAFT') {
+         if (isAdmin && Number(r.sourceBranchId) === 1) return true;
+         if (isManager && isSource && r.createdById === (user.value as any)?.id) return true;
+         if (isStaff && isSource) return true;
+         return false;
+      }
+      
       if (r.status === 'COMPLETED' && (r.paymentStatus === 'UNPAID' || r.paymentStatus === 'Chưa thanh toán')) {
         return isSource;
       }
@@ -110,17 +116,22 @@ async function loadBadgeCounts() {
     })
     badgeInvoice.value = invoiceReceipts.length
 
-    // Điều chuyển (luồng mới: đích lập phiếu xin hàng)
+    // Điều chuyển
     const transferReceipts = receipts.filter(r => {
       if (r.type !== 'TRANSFER') return false;
       const isSource = myBranchId && Number(r.sourceBranchId) === Number(myBranchId);
       const isDest = myBranchId && Number(r.destBranchId) === Number(myBranchId);
-      // Manager đích duyệt phiếu nháp của Staff đích
-      if (r.status === 'DRAFT') return isManager && isDest;
-      // Manager nguồn duyệt xuất kho
-      if (r.status === 'PENDING_ADMIN') return isManager && isSource;
-      // Staff đích kiểm kê nhận hàng
+      
+      // Source creates Draft, Source Manager/Admin approves it
+      if (r.status === 'DRAFT') return (isManager || isAdmin) && isSource;
+      
+      // Dest receives it, Dest Manager/Admin approves it
+      if (r.status === 'PENDING_ADMIN') return (isManager || isAdmin) && isDest;
+      
       if (r.status === 'PENDING_STOCKTAKE') return isStaff && isDest;
+      if (r.status === 'PENDING_SHORTFALL_MANAGER') return isManager && !isAdmin && isDest;
+      if (r.status === 'PENDING_SHORTFALL_ADMIN') return (isManager && isSource) || isAdmin;
+      if (r.status === 'PENDING_COMPENSATION') return isManager && isSource;
       return false;
     })
     badgeTransfer.value = transferReceipts.length
@@ -129,8 +140,8 @@ async function loadBadgeCounts() {
     const disposalReceipts = receipts.filter(r => {
       if (r.type !== 'DISPOSAL') return false;
       const isSource = myBranchId && Number(r.sourceBranchId) === Number(myBranchId);
-      if (r.status === 'DRAFT') return (isManager && isSource) || isAdmin;
-      if (r.status === 'PENDING_ADMIN') return (isManager && isSource) || isAdmin;
+      if (r.status === 'DRAFT') return (isManager || isAdmin) && isSource;
+      if (r.status === 'PENDING_ADMIN') return (isManager || isAdmin) && isSource;
       if (r.status === 'PENDING_STOCKTAKE') return isAdmin;
       return false;
     })
