@@ -129,14 +129,8 @@ public class StocktakeServiceImpl implements StocktakeService {
         Stocktake s = stocktakeRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy phiên kiểm kê với ID: " + id));
 
-        if (s.getStatus() != StocktakeStatus.DRAFT && s.getStatus() != StocktakeStatus.PENDING_APPROVAL) {
-            throw new RuntimeException("Chỉ có thể chỉnh sửa số liệu phiên kiểm kê ở trạng thái DRAFT hoặc PENDING_APPROVAL.");
-        }
-
-        if (s.getStatus() == StocktakeStatus.PENDING_APPROVAL) {
-            if (currentUser.getRole() != UserRole.MANAGER && currentUser.getRole() != UserRole.ADMIN) {
-                throw new RuntimeException("Chỉ Quản lý hoặc Admin mới có quyền chỉnh sửa số liệu khi chờ duyệt.");
-            }
+        if (s.getStatus() != StocktakeStatus.DRAFT) {
+            throw new RuntimeException("Chỉ có thể chỉnh sửa số liệu phiên kiểm kê ở trạng thái Nháp (đang kiểm đếm). Nếu số liệu sai, vui lòng sử dụng chức năng 'Yêu cầu đếm lại'.");
         }
 
         Integer branchId = getUserBranchId(currentUser);

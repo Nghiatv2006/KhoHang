@@ -1076,7 +1076,7 @@ onUnmounted(() => {
             <textarea
               v-model="selectedStocktake.notes"
               @input="triggerAutoSave"
-              :disabled="selectedStocktake.status !== 'DRAFT' && !(selectedStocktake.status === 'PENDING_APPROVAL' && isManager)"
+              :disabled="selectedStocktake.status !== 'DRAFT'"
               rows="2"
               placeholder="Nhập ghi chú hoặc lý do kiểm kê đợt này..."
               class="w-full p-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] disabled:opacity-75 disabled:cursor-not-allowed"
@@ -1122,7 +1122,7 @@ onUnmounted(() => {
                     <td class="p-3 text-right font-mono font-bold">{{ d.expectedQuantity }}</td>
                     <td class="p-3 text-center">
                       <input
-                        v-if="canEditDraft || (selectedStocktake.status === 'PENDING_APPROVAL' && isManager)"
+                        v-if="canEditDraft"
                         v-model.number="d.actualQuantity"
                         @input="triggerAutoSave"
                         type="number"
