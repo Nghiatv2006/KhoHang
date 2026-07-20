@@ -1,7 +1,0 @@
-﻿Hoàn thiện luồng Phiếu Kho:
-1. Đảo ngược luồng Điều chuyển (Transfer) về cơ chế Xin hàng (Inbound Request).
-2. Fix lỗi Manager không thể hủy Phiếu nháp (Draft) do nhân viên nghỉ việc tạo.
-3. UI: Tách Lý do hủy thành Banner đỏ nổi bật trên đầu Chi tiết phiếu.
-4. UI: Sửa lỗi z-index bảng Chi tiết phiếu đè lên Modal Hủy.
-5. UI: Tăng kích thước (padding, border) và thêm chuẩn Dark Mode cho Modal Chỉnh sửa phiếu.
-6. Backend: Lưu trữ đầy đủ lịch sử chỉnh sửa phiếu (ReceiptEditLog).
