@@ -685,7 +685,7 @@ function updateCharts() {
     topSoldChartInst.setOption({
       tooltip: {
         trigger: 'item',
-        formatter: '<div class="font-bold mb-1">{b}</div><div class="flex justify-between gap-4"><span class="text-slate-500">Đã bán:</span> <span class="text-indigo-600 font-bold">{c} sp</span></div><div class="flex justify-between gap-4"><span class="text-slate-500">Tỷ trọng:</span> <span class="text-emerald-500 font-bold">{d}%</span></div>',
+        formatter: '<div class="font-bold mb-1">{b}</div><div class="flex justify-between gap-4"><span class="text-slate-500">Đã bán:</span> <span class="text-indigo-600 font-bold">{c} sản phẩm</span></div><div class="flex justify-between gap-4"><span class="text-slate-500">Tỷ trọng:</span> <span class="text-emerald-500 font-bold">{d}%</span></div>',
         backgroundColor: document.documentElement.classList.contains('dark-mode') ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)',
         borderColor: document.documentElement.classList.contains('dark-mode') ? '#475569' : '#e2e8f0',
         textStyle: { color: document.documentElement.classList.contains('dark-mode') ? '#f8fafc' : '#1e293b' },
@@ -720,7 +720,7 @@ function updateCharts() {
           },
           label: {
             show: true,
-            formatter: '{b|{b}}\n{c|{c} sp}',
+            formatter: '{b|{b}}\n{c|{c} sản phẩm}',
             rich: {
               b: { color: document.documentElement.classList.contains('dark-mode') ? '#cbd5e1' : '#1e293b', fontSize: 13, fontWeight: '800', padding: [0, 0, 4, 0] },
               c: { color: document.documentElement.classList.contains('dark-mode') ? '#a5b4fc' : '#4f46e5', fontSize: 15, fontWeight: '900', textShadowBlur: 4, textShadowColor: 'rgba(79, 70, 229, 0.2)' }

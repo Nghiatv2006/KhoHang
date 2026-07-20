@@ -1,0 +1,1411 @@
+<template>
+  <div class="space-y-6 max-w-[1400px] mx-auto font-sans">
+
+    <!-- HEADER -->
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div>
+        <h2 class="text-2xl font-bold text-[#364a63] m-0 flex items-center gap-3">
+          <i :class="pageConfig.icon" class="text-[#4361ee]"></i>
+          {{ pageConfig.title }}
+        </h2>
+        <p class="text-[#8094ae] text-sm mt-1">{{ pageConfig.desc }}</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <button
+          v-if="receiptType === 'EXPORT' && (isAdmin || isManager)"
+          @click="exportExcel"
+          :disabled="exportingExcel"
+          class="h-[42px] bg-emerald-600 hover:bg-emerald-700 text-white px-5 rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
+        >
+          <i class="fas fa-file-excel"></i>
+          <span>{{ exportingExcel ? 'Đang xuất...' : 'Xuất Excel' }}</span>
+        </button>
+
+        <button
+          v-if="user?.role === 'STAFF' && !(receiptType === 'TRANSFER' && isHeadBranch)"
+          @click="openCreateModal"
+          class="h-[42px] bg-[#4361ee] hover:bg-[#3a0ca3] text-white px-5 rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-2"
+        >
+          <i class="fas fa-plus"></i> {{ pageConfig.btnLabel }}
+        </button>
+      </div>
+    </div>
+
+    <!-- STAT CARDS -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div @click="filterStatus = filterStatus === 'DRAFT' ? '' : 'DRAFT'"
+        :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'DRAFT' ? 'border-yellow-400 ring-2 ring-yellow-200' : 'border-[#f1f5f9] hover:border-yellow-300']">
+        <div class="w-12 h-12 rounded-xl bg-yellow-50 flex items-center justify-center text-yellow-500 text-xl">
+          <i class="fas fa-pencil-alt"></i>
+        </div>
+        <div>
+          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide">Chờ duyệt</div>
+          <div class="text-2xl font-extrabold text-yellow-500">{{ statDraft }}</div>
+        </div>
+      </div>
+      <div @click="filterStatus = filterStatus === 'COMPLETED' ? '' : 'COMPLETED'"
+        :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'COMPLETED' ? 'border-green-400 ring-2 ring-green-200' : 'border-[#f1f5f9] hover:border-green-300']">
+        <div class="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center text-green-500 text-xl">
+          <i class="fas fa-check-circle"></i>
+        </div>
+        <div>
+          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide">Đã duyệt</div>
+          <div class="text-2xl font-extrabold text-green-500">{{ statCompleted }}</div>
+        </div>
+      </div>
+
+      <div @click="filterStatus = filterStatus === 'CANCELLED' ? '' : 'CANCELLED'"
+        :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'CANCELLED' ? 'border-red-400 ring-2 ring-red-200' : 'border-[#f1f5f9] hover:border-red-300']">
+        <div class="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center text-red-400 text-xl">
+          <i class="fas fa-times-circle"></i>
+        </div>
+        <div>
+          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide">Đã hủy</div>
+          <div class="text-2xl font-extrabold text-red-400">{{ statCancelled }}</div>
+        </div>
+      </div>
+
+      <!-- Hóa đơn: card Chưa thanh toán -->
+      <div v-if="receiptType === 'EXPORT'" @click="filterStatus = filterStatus === 'UNPAID' ? '' : 'UNPAID'"
+        :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'UNPAID' ? 'border-orange-400 ring-2 ring-orange-200' : 'border-[#f1f5f9] hover:border-orange-300']">
+        <div class="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center text-orange-400 text-xl">
+          <i class="fas fa-file-invoice-dollar"></i>
+        </div>
+        <div>
+          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide">Chưa thanh toán</div>
+          <div class="text-2xl font-extrabold text-orange-400">{{ statUnpaid }}</div>
+        </div>
+      </div>
+
+      <!-- Nhập kho / Điều chuyển: card Chờ Admin -->
+      <div v-if="receiptType === 'IMPORT' || receiptType === 'TRANSFER'" @click="filterStatus = filterStatus === (receiptType === 'TRANSFER' ? 'COMPENSATION' : 'PENDING_ADMIN') ? '' : (receiptType === 'TRANSFER' ? 'COMPENSATION' : 'PENDING_ADMIN')"
+        :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === (receiptType === 'TRANSFER' ? 'COMPENSATION' : 'PENDING_ADMIN') ? 'border-blue-400 ring-2 ring-blue-200' : 'border-[#f1f5f9] hover:border-blue-300']">
+        <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500 text-xl">
+          <i :class="receiptType === 'TRANSFER' ? 'fas fa-truck-loading' : 'fas fa-shield-alt'"></i>
+        </div>
+        <div>
+          <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide">{{ receiptType === 'TRANSFER' ? 'Điều chuyển bù' : 'Chờ Admin' }}</div>
+          <div class="text-2xl font-extrabold text-blue-500">{{ statPendingAdmin }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABLE CARD -->
+    <div class="bg-white rounded-2xl border border-[#f1f5f9] border-t-4 border-t-[#4361ee] shadow-sm overflow-hidden">
+      <!-- Toolbar -->
+      <div class="p-5 border-b border-[#f1f5f9]">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" :class="receiptType ? 'lg:grid-cols-4' : 'lg:grid-cols-5'">
+          <!-- Tìm kiếm đa năng -->
+          <div class="lg:col-span-2 relative">
+            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8094ae] text-sm"></i>
+            <input v-model="searchKeyword" type="text" placeholder="Tìm kiếm theo mã phiếu..."
+              class="w-full h-11 pl-10 pr-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all" />
+          </div>
+          <!-- Lọc loại phiếu (chỉ hiện khi không có receiptType prop) -->
+          <div v-if="!receiptType">
+            <select v-model="filterType"
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]">
+              <option value="">-- Tất cả loại phiếu --</option>
+              <option value="IMPORT">Nhập kho</option>
+              <option value="EXPORT">Xuất bán</option>
+              <option value="TRANSFER">Điều chuyển</option>
+            </select>
+          </div>
+          <!-- Lọc trạng thái -->
+          <div>
+            <select v-model="filterStatus"
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]">
+              <option value="">-- Tất cả trạng thái --</option>
+              <option value="DRAFT">Chờ duyệt</option>
+              <option value="COMPLETED">Đã duyệt</option>
+              <option value="CANCELLED">Đã hủy</option>
+              <option value="RECEIVED">Đã nhận hàng</option>
+            </select>
+          </div>
+          <!-- Lọc hao hụt / chênh lệch -->
+          <div>
+            <select v-model="filterDeviation"
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]">
+              <option value="">-- Tất cả chênh lệch --</option>
+              <option value="yes">Có chênh lệch / Hao hụt</option>
+              <option value="no">Khớp số lượng</option>
+            </select>
+          </div>
+          <!-- Thời gian và Ngày -->
+          <div class="lg:col-span-4 grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-1.5">Thời gian</label>
+              <select v-model="filterTimeRange" class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]">
+                <option value="today">Hôm nay</option>
+                <option value="week">7 ngày qua</option>
+                <option value="last_week">Tuần trước (14 ngày qua)</option>
+                <option value="this_month">Tháng này</option>
+                <option value="month">30 ngày qua</option>
+                <option value="custom">Tùy chọn...</option>
+              </select>
+            </div>
+            <!-- Từ ngày -->
+            <div>
+              <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-1.5">Từ ngày</label>
+              <input v-model="filterStartDate" type="date" :disabled="filterTimeRange !== 'custom'"
+                class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] disabled:opacity-50 disabled:bg-gray-100 disabled:cursor-not-allowed" />
+            </div>
+            <!-- Đến ngày -->
+            <div>
+              <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-1.5">Đến ngày</label>
+              <input v-model="filterEndDate" type="date" :disabled="filterTimeRange !== 'custom'"
+                class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63] disabled:opacity-50 disabled:bg-gray-100 disabled:cursor-not-allowed" />
+            </div>
+            <!-- Nút Xóa lọc -->
+            <div class="flex items-end">
+              <button v-if="filterType || filterStatus || searchKeyword || filterDeviation || filterTimeRange !== 'this_month'"
+                @click="filterType = ''; filterStatus = ''; searchKeyword = ''; filterTimeRange = 'this_month'; filterDeviation = ''"
+                class="w-full h-11 flex items-center justify-center gap-2 px-6 bg-white border border-[#e2e8f0] rounded-xl text-sm font-semibold text-[#8094ae] hover:text-[#364a63] hover:bg-[#f8f9fa] transition-all shadow-sm">
+                <i class="fas fa-times"></i> Xóa lọc
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Loading -->
+      <div v-if="loading" class="flex items-center justify-center h-48 gap-3 text-[#8094ae]">
+        <i class="fas fa-spinner fa-spin text-2xl"></i>
+        <span class="font-semibold">Đang tải dữ liệu...</span>
+      </div>
+
+      <!-- Empty -->
+      <div v-else-if="filteredReceipts.length === 0" class="text-center py-16 text-[#8094ae]">
+        <i class="fas fa-inbox text-5xl mb-4 opacity-30"></i>
+        <p class="font-semibold">Không có phiếu kho nào phù hợp</p>
+      </div>
+
+      <!-- Table -->
+      <div v-else class="w-full">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-[#f8f9fa] text-[#8094ae] text-xs uppercase tracking-wider">
+              <th class="px-5 py-3 text-left font-bold">Mã phiếu</th>
+              <th v-if="!receiptType" class="px-5 py-3 text-left font-bold">Loại</th>
+              <th class="px-5 py-3 text-center font-bold">Trạng thái</th>
+              <th class="px-5 py-3 text-left font-bold">Chênh lệch</th>
+              <th class="px-5 py-3 text-left font-bold">Chi nhánh nguồn</th>
+              <th class="px-5 py-3 text-left font-bold">{{ $route.path === '/invoices' ? 'Khách hàng' : 'Chi nhánh đích' }}</th>
+              <th class="px-5 py-3 text-left font-bold">Người lập</th>
+              <th class="px-5 py-3 text-left font-bold">Ngày tạo</th>
+              <th class="px-5 py-3 text-center font-bold">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-[#f1f5f9]">
+            <tr v-for="r in paginatedReceipts" :key="r.id"
+              @dblclick="openDetail(r)"
+              :class="[
+                'receipt-row hover:bg-slate-50/60 cursor-pointer transition-colors group even:bg-slate-50/20',
+                r.hasDeviation && (r.status === 'PENDING_SHORTFALL_MANAGER' || r.status === 'PENDING_SHORTFALL_ADMIN') ? 'bg-rose-50/40 hover:bg-rose-100/40' : ''
+              ]">
+              <td class="px-5 py-4">
+                <span class="font-mono font-bold text-[#4361ee] text-xs">{{ r.code }}</span>
+              </td>
+              <td v-if="!receiptType" class="px-5 py-4">
+                <span :class="['inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold', typeClass(r.type)]">
+                  {{ typeLabel(r.type) }}
+                </span>
+              </td>
+              <td class="px-5 py-4">
+                <div class="flex flex-col items-center gap-1">
+                  <div :class="['sky-status-badge relative overflow-hidden inline-flex items-center justify-center min-w-[130px] px-3 py-1.5 rounded-xl border text-[11px] uppercase tracking-wider font-bold shadow-sm group', statusClass(r)]">
+                    <i class="fas fa-sun sun-icon absolute -right-1 -top-1 text-yellow-300 text-xl drop-shadow-[0_0_8px_rgba(253,224,71,0.8)]"></i>
+                    <i class="fas fa-moon moon-icon absolute -right-1 -bottom-1 text-yellow-300 text-xl drop-shadow-[0_0_8px_rgba(253,224,71,0.8)]"></i>
+                    <span class="relative z-10">{{ statusLabel(r) }}</span>
+                  </div>
+                  <span v-if="r.paymentStatus === 'RECEIVED'" :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold mt-1', paymentStatusClass(r.paymentStatus)]">
+                    📦 Đã nhận hàng
+                  </span>
+                </div>
+              </td>
+              <td class="px-5 py-4">
+                <div v-if="r.hasDeviation" class="flex flex-col max-w-[200px]" :title="r.deviationSummary">
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-rose-50 text-rose-600 border border-rose-100 w-fit">
+                    ⚠️ Lệch số lượng
+                  </span>
+                  <span class="text-xs text-rose-500 mt-1 font-medium truncate" :title="r.deviationSummary">
+                    {{ r.deviationSummary }}
+                  </span>
+                </div>
+                <div v-else-if="r.status === 'COMPLETED' || r.status === 'PENDING_COMPENSATION' || r.paymentStatus === 'RECEIVED'" class="text-xs text-emerald-600 font-medium">
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 w-fit">
+                    Khớp
+                  </span>
+                </div>
+                <div v-else class="text-xs text-slate-400">—</div>
+              </td>
+              <td class="px-5 py-4">
+                <span class="text-[#364a63] font-medium">{{ r.sourceBranchName || 'Bên ngoài hệ thống' }}</span>
+              </td>
+              <td class="px-5 py-4">
+                <span class="text-[#364a63] font-medium" v-if="r.type === 'EXPORT'">{{ getCustomerName(r) }}</span>
+                <span class="text-[#364a63] font-medium" v-else>{{ r.destBranchName || '—' }}</span>
+              </td>
+              <td class="px-5 py-4">
+                <div class="text-[#8094ae]">{{ r.createdByName }}</div>
+                <div v-if="r.stocktakeByName" class="text-xs text-purple-600 mt-1 font-semibold" title="Người kiểm kê"><i class="fas fa-clipboard-check"></i> {{ r.stocktakeByName }}</div>
+                <div v-else-if="r.status === 'COMPLETED' && (r.type === 'IMPORT' || r.type === 'TRANSFER') && r.createdByRole === 'STAFF'" class="text-xs text-purple-600 mt-1 font-semibold opacity-60" title="Người kiểm kê (Dữ liệu cũ)"><i class="fas fa-clipboard-check"></i> {{ r.createdByName }}</div>
+              </td>
+              <td class="px-5 py-4">
+                <span class="text-[#8094ae] text-xs">{{ formatDateTime(r.createdAt) }}</span>
+              </td>
+              <td class="px-5 py-4">
+                <div class="flex items-center justify-center gap-2">
+                  <button @click.stop="openDetail(r)"
+                    class="w-8 h-8 flex items-center justify-center rounded-lg bg-[#f1f5f9] hover:bg-[#4361ee] hover:text-white text-[#8094ae] transition-all"
+                    title="Xem chi tiết">
+                    <i class="fas fa-eye text-xs"></i>
+                  </button>
+
+                  <button v-if="canApproveReceipt(r)"
+                    @click.stop="approveReceipt(r)"
+                    :disabled="approvingId === r.id"
+                    class="w-8 h-8 flex items-center justify-center rounded-lg bg-green-50 hover:bg-green-500 hover:text-white text-green-600 transition-all disabled:opacity-50"
+                    title="Phê duyệt">
+                    <i class="fas fa-check text-xs"></i>
+                  </button>
+                  <button v-if="canConfirmStocktake(r)"
+                    @click.stop="openStocktakeModal(r)"
+                    class="w-8 h-8 flex items-center justify-center rounded-lg bg-purple-50 hover:bg-purple-500 hover:text-white text-purple-600 transition-all"
+                    title="Thực hiện kiểm kê">
+                    <i class="fas fa-boxes text-xs"></i>
+                  </button>
+                  <button v-if="canCancelReceipt(r)"
+                    @click.stop="confirmCancelReceipt(r)"
+                    class="w-8 h-8 flex items-center justify-center rounded-lg bg-red-50 hover:bg-red-500 hover:text-white text-red-500 transition-all"
+                    title="Hủy phiếu">
+                    <i class="fas fa-times text-xs"></i>
+                  </button>
+                  <button v-if="canConfirmTransfer(r)"
+                    @click.stop="openConfirmTransferModal(r)"
+                    class="h-8 px-3 flex items-center justify-center rounded-lg bg-sky-50 hover:bg-sky-500 hover:text-white text-sky-600 transition-all text-xs font-bold"
+                    title="Xác nhận nhận hàng">
+                    <i class="fas fa-truck-loading mr-1"></i>Xác nhận
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div v-if="totalPages > 1" class="px-6 py-4 border-t border-[#e2e8f0] flex flex-col sm:flex-row items-center justify-between bg-white rounded-b-2xl gap-4">
+        <div class="text-sm text-[#8094ae]">
+          Hiển thị <span class="font-bold text-[#364a63]">{{ (currentPage - 1) * itemsPerPage + 1 }}</span> - <span class="font-bold text-[#364a63]">{{ Math.min(currentPage * itemsPerPage, filteredReceipts.length) }}</span> trong số <span class="font-bold text-[#364a63]">{{ filteredReceipts.length }}</span> phiếu
+        </div>
+        <div class="flex items-center gap-2">
+          <button @click="currentPage--" :disabled="currentPage === 1"
+            class="px-3 py-1.5 flex items-center justify-center rounded-lg border border-[#e2e8f0] bg-white text-[#364a63] font-medium text-sm hover:bg-[#f8f9fa] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            <i class="fas fa-chevron-left mr-1.5 text-[10px]"></i> Trước
+          </button>
+          <div class="px-4 py-1.5 flex items-center justify-center rounded-lg bg-[#f8f9fa] text-[#364a63] font-bold text-sm border border-[#e2e8f0]">
+            {{ currentPage }} / {{ totalPages }}
+          </div>
+          <button @click="currentPage++" :disabled="currentPage === totalPages"
+            class="px-3 py-1.5 flex items-center justify-center rounded-lg border border-[#e2e8f0] bg-white text-[#364a63] font-medium text-sm hover:bg-[#f8f9fa] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            Sau <i class="fas fa-chevron-right ml-1.5 text-[10px]"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- DETAIL PANEL MODAL -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <Teleport to="body">
+      <!-- Backdrop -->
+      <Transition name="fade">
+        <div v-if="showDetail && selectedReceipt" @click="showDetail = false" class="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[100]"></div>
+      </Transition>
+
+      <!-- Panel -->
+      <Transition name="slide-panel">
+        <div v-if="showDetail && selectedReceipt" class="fixed inset-y-0 right-0 z-[101] w-full max-w-[700px] bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] flex flex-col border-l border-[#e2e8f0]">
+          <!-- Header -->
+          <div class="theme-modal-header relative overflow-hidden flex items-center justify-between px-8 py-6 transition-colors duration-500" :class="{ 'easter-egg-space': isSpaceEasterEgg }">
+            <template v-if="isSpaceEasterEgg">
+              <!-- Space Easter Egg Decor -->
+              <div class="absolute inset-0 pointer-events-none">
+                <i class="fas fa-rocket absolute top-4 right-32 text-white/80 text-4xl animate-[bounce_3s_infinite] -rotate-45"></i>
+                <i class="fas fa-meteor absolute -top-4 right-16 text-orange-400/60 text-6xl rotate-[120deg] drop-shadow-[0_0_15px_rgba(251,146,60,0.8)]"></i>
+                <i class="fas fa-user-astronaut absolute bottom-2 right-64 text-white/60 text-3xl animate-[bounce_4s_infinite]"></i>
+                <i class="fas fa-star absolute top-2 right-48 text-white/90 text-[8px] animate-pulse"></i>
+                <i class="fas fa-star absolute bottom-4 right-20 text-white/70 text-[6px] animate-pulse" style="animation-delay: 1s"></i>
+                <i class="fas fa-satellite absolute top-8 right-80 text-white/50 text-2xl animate-[spin_20s_linear_infinite]"></i>
+              </div>
+            </template>
+            <template v-else>
+              <!-- Light Mode Decor: Sun & Clouds -->
+              <div :key="'light-detail-' + selectedReceipt?.id" class="theme-light-decor absolute inset-0 pointer-events-none transition-all duration-500">
+                <i class="fas fa-sun absolute -top-12 right-8 text-yellow-300 text-[140px] opacity-10 animate-[spin_40s_linear_infinite]"></i>
+                <i class="fas fa-sun absolute top-3 right-24 text-yellow-300 text-5xl drop-shadow-[0_0_20px_rgba(253,224,71,0.8)] animate-[spin_20s_linear_infinite]"></i>
+                <i class="fas fa-cloud absolute top-8 right-44 text-white/50 text-5xl drop-shadow-sm"></i>
+                <i class="fas fa-cloud absolute top-2 right-64 text-white/40 text-3xl"></i>
+                <i class="fas fa-cloud absolute -bottom-2 right-28 text-white/30 text-7xl"></i>
+              </div>
+
+              <!-- Dark Mode Decor: Moon & Stars -->
+              <div :key="'dark-detail-' + selectedReceipt?.id" class="theme-dark-decor absolute inset-0 pointer-events-none transition-all duration-500">
+                <i class="fas fa-moon absolute -top-8 right-12 text-blue-100 text-[120px] opacity-[0.03] -rotate-12"></i>
+                <i class="fas fa-moon absolute top-3 right-24 text-yellow-200 text-4xl drop-shadow-[0_0_15px_rgba(254,240,138,0.5)] -rotate-12"></i>
+                <i class="fas fa-star absolute top-4 right-48 text-white/80 text-[8px] animate-pulse"></i>
+                <i class="fas fa-star absolute top-8 right-60 text-white/60 text-[10px] animate-pulse" style="animation-delay: 1s"></i>
+                <i class="fas fa-star absolute top-3 right-72 text-white/90 text-[6px] animate-pulse" style="animation-delay: 0.5s"></i>
+                <i class="fas fa-star absolute bottom-4 right-36 text-white/50 text-[12px] animate-pulse" style="animation-delay: 1.5s"></i>
+                <i class="fas fa-star absolute bottom-2 right-56 text-white/70 text-[8px] animate-pulse"></i>
+              </div>
+            </template>
+
+            <div class="relative z-10 text-white drop-shadow-md">
+              <div class="text-xs font-bold opacity-90 uppercase tracking-wider mb-1">
+                {{ selectedReceipt?.type === 'EXPORT' ? 'Chi tiết hóa đơn' : selectedReceipt?.type === 'TRANSFER' ? 'Chi tiết phiếu điều chuyển' : selectedReceipt?.type === 'ADJUST_OUT' ? 'Chi tiết phiếu tiêu hủy' : 'Chi tiết phiếu kho' }}
+              </div>
+              <div class="font-mono font-bold text-xl">{{ selectedReceipt?.code }}</div>
+            </div>
+            <button @click="showDetail = false" class="relative z-10 w-9 h-9 flex items-center justify-center rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-sm transition-all shadow-sm border border-white/10">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+
+          <div class="overflow-y-auto flex-1 p-6 space-y-5 custom-scrollbar">
+            <!-- ── BANNER LÝ DO HỦY ─────────────────────────────── -->
+            <div v-if="selectedReceipt.description && selectedReceipt.description.includes('[Lý do hủy]')" class="bg-red-50 border border-red-200 rounded-2xl p-4 flex gap-4 shadow-sm relative overflow-hidden group">
+              <div class="absolute inset-0 bg-gradient-to-r from-red-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div class="w-10 h-10 rounded-full bg-red-100 border border-red-200 flex items-center justify-center shrink-0">
+                <i class="fas fa-ban text-red-600 text-lg"></i>
+              </div>
+              <div class="flex-1">
+                <div class="text-sm font-bold text-red-700 uppercase tracking-wide mb-1 flex items-center gap-2">
+                  Lý do hủy phiếu
+                </div>
+                <div class="text-sm text-red-600 font-medium whitespace-pre-line">
+                  {{ selectedReceipt.description.split('\n').find((l: string) => l.startsWith('[Lý do hủy]'))?.replace('[Lý do hủy]', '').trim() }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Meta info -->
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Loại phiếu</div>
+                <span :class="['inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold', typeClass(selectedReceipt.type)]">
+                  {{ typeLabel(selectedReceipt.type) }}
+                </span>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Trạng thái</div>
+                <div class="flex flex-col items-start gap-1">
+                  <div :class="['sky-status-badge relative overflow-hidden inline-flex items-center justify-center min-w-[130px] px-3 py-1.5 rounded-xl border text-[11px] uppercase tracking-wider font-bold shadow-sm group', statusClass(selectedReceipt)]">
+                    <i class="fas fa-sun sun-icon absolute -right-1 -top-1 text-yellow-300 text-xl drop-shadow-[0_0_8px_rgba(253,224,71,0.8)]"></i>
+                    <i class="fas fa-moon moon-icon absolute -right-1 -bottom-1 text-yellow-300 text-xl drop-shadow-[0_0_8px_rgba(253,224,71,0.8)]"></i>
+                    <span class="relative z-10">{{ statusLabel(selectedReceipt) }}</span>
+                  </div>
+                  <span v-if="selectedReceipt.paymentStatus === 'RECEIVED'" :class="['inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold', paymentStatusClass(selectedReceipt.paymentStatus)]">
+                    📦 Đã nhận hàng
+                  </span>
+                </div>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Chi nhánh nguồn</div>
+                <div class="font-semibold text-[#364a63]">{{ selectedReceipt.sourceBranchName || 'Bên ngoài hệ thống' }}</div>
+              </div>
+              <div v-if="selectedReceipt.type === 'EXPORT'">
+                <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Khách hàng</div>
+                <div class="font-semibold text-[#364a63]">{{ getCustomerName(selectedReceipt) }}</div>
+              </div>
+              <div v-else>
+                <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Chi nhánh đích</div>
+                <div class="font-semibold text-[#364a63]">{{ selectedReceipt.destBranchName || '—' }}</div>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Người lập</div>
+                <div class="font-semibold text-[#364a63]">{{ selectedReceipt.createdByName }}</div>
+                <div v-if="selectedReceipt.stocktakeByName" class="text-xs text-purple-600 font-bold mt-1 flex items-center gap-1.5" title="Người kiểm kê"><i class="fas fa-clipboard-check"></i> Kiểm kê: {{ selectedReceipt.stocktakeByName }}</div>
+                <div v-else-if="selectedReceipt.status === 'COMPLETED' && (selectedReceipt.type === 'IMPORT' || selectedReceipt.type === 'TRANSFER') && selectedReceipt.createdByRole === 'STAFF'" class="text-xs text-purple-600 font-bold mt-1 flex items-center gap-1.5 opacity-60" title="Người kiểm kê (Dữ liệu cũ)"><i class="fas fa-clipboard-check"></i> Kiểm kê: {{ selectedReceipt.createdByName }}</div>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Người duyệt</div>
+                <div class="font-semibold text-[#364a63]">{{ selectedReceipt.approvedByName || '—' }}</div>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Ngày tạo</div>
+                <div class="font-semibold text-[#364a63]">{{ formatDateTime(selectedReceipt.createdAt) }}</div>
+              </div>
+              <div v-if="selectedReceipt.type === 'EXPORT'">
+                <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Thanh toán</div>
+                <span :class="['inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold', paymentStatusClass(selectedReceipt.paymentStatus)]">
+                  {{ paymentStatusLabel(selectedReceipt.paymentStatus) }}
+                </span>
+              </div>
+              <div v-if="selectedReceipt.description && selectedReceipt.description.split('\n').filter((l: string) => !l.startsWith('[Lý do hủy]')).join('\n').trim()">
+                <div class="text-xs font-bold text-[#8094ae] uppercase mb-1">Ghi chú</div>
+                <div class="text-[#364a63] text-xs whitespace-pre-line">{{ selectedReceipt.description.split('\n').filter((l: string) => !l.startsWith('[Lý do hủy]')).join('\n').trim() }}</div>
+              </div>
+            </div>
+
+            <!-- Detail lines -->
+            <div>
+              <div class="text-xs font-bold text-[#8094ae] uppercase mb-3">Danh sách hàng hóa</div>
+              <div class="rounded-xl border border-[#f1f5f9] overflow-hidden">
+                <table class="w-full text-xs">
+                  <thead>
+                    <tr class="bg-[#f8f9fa] text-[#8094ae] uppercase">
+                      <th class="px-4 py-2.5 text-left font-bold">Sản phẩm</th>
+                      <th class="px-4 py-2.5 text-center font-bold">NSX</th>
+                      <th class="px-4 py-2.5 text-center font-bold">HSD</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)">SL Gửi</th>
+                      <th class="px-4 py-2.5 text-right font-bold text-teal-600" v-if="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null)">SL Nhận</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-else>SL</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Đơn giá</th>
+                      <th class="px-4 py-2.5 text-right font-bold" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">Thành tiền</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-[#f1f5f9]">
+                    <tr v-for="d in selectedReceipt.details" :key="d.id" class="hover:bg-[#f8f9fa]/50">
+                      <td class="px-4 py-3">
+                        <div class="text-[10px] text-[#8094ae] uppercase tracking-wider mb-0.5 font-bold" v-if="d.productCategory">{{ d.productCategory }}</div>
+                        <div class="font-semibold text-[#364a63]">{{ d.productName }}</div>
+                        <div class="text-[11px] text-[#8094ae] mt-1" v-if="d.batchCode">
+                          <i class="fas fa-box-open mr-1 opacity-70"></i> Lô: <span class="font-bold text-[#4361ee]">{{ d.batchCode }}</span>
+                        </div>
+                      </td>
+                      <td class="px-4 py-3 text-center text-[#8094ae]">{{ formatDate(d.manufacturingDate) }}</td>
+                      <td class="px-4 py-3 text-center text-[#8094ae]">{{ formatDate(d.expirationDate) }}</td>
+                      <td class="px-4 py-3 text-right font-bold" v-if="d.receivedQuantity !== null">{{ d.quantity }}</td>
+                      <td class="px-4 py-3 text-right font-bold text-teal-600" v-if="d.receivedQuantity !== null">
+                        {{ d.receivedQuantity !== null ? d.receivedQuantity : d.quantity }}
+                        <span v-if="d.receivedQuantity !== null && d.receivedQuantity < d.quantity" class="text-xs text-amber-500 block">
+                          (-{{ d.quantity - d.receivedQuantity }})
+                        </span>
+                      </td>
+                      <td class="px-4 py-3 text-right font-bold" v-else>{{ d.quantity }}</td>
+                      <td class="px-4 py-3 text-right" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">{{ formatVND(d.price) }}</td>
+<td class="px-4 py-3 text-right font-bold text-[#4361ee]" v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">{{ formatVND(d.quantity * d.price) }}</td>
+                    </tr>
+                  </tbody>
+                  <tfoot v-if="selectedReceipt.type !== 'IMPORT' && selectedReceipt.type !== 'TRANSFER'">
+                    <tr class="bg-[#f8f9fa]">
+                      <td :colspan="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null) ? 6 : 5" class="px-4 py-2.5 text-right font-bold text-[#8094ae] text-xs uppercase">Tổng cộng</td>
+                      <td class="px-4 py-2.5 text-right font-extrabold text-[#4361ee]">
+                        {{ formatVND((selectedReceipt.details || []).reduce((s: number, d: any) => s + d.quantity * d.price, 0)) }}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              
+              <!-- Shortfall reasons section -->
+              <div v-if="selectedReceipt.details?.some((x: any) => x.receivedQuantity !== null && x.receivedQuantity < x.quantity)" class="mt-4 p-4 bg-red-50 rounded-xl border border-red-100">
+                <div class="text-xs font-bold text-red-600 uppercase mb-2 flex items-center gap-1.5"><i class="fas fa-exclamation-circle"></i> Lý do hao hụt</div>
+                <div class="space-y-1.5">
+                  <div v-for="d in selectedReceipt.details.filter((x: any) => x.receivedQuantity !== null && x.receivedQuantity < x.quantity)" :key="'reason-'+d.id" class="text-sm">
+                    <span class="font-bold text-red-700">- {{ d.productName }} (Thiếu {{ d.quantity - d.receivedQuantity }}):</span>
+                    <span class="text-red-600 ml-1 whitespace-pre-wrap break-words">{{ d.shortfallReason }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ── Banner cảnh báo: Chờ Staff xác nhận ────────────────── -->
+            <div v-if="selectedReceipt.status === 'PENDING_STAFF_CONFIRM' && canStaffAcknowledge(selectedReceipt)"
+              class="mt-6 p-4 bg-amber-50 border border-amber-300 rounded-2xl flex items-start gap-3">
+              <i class="fas fa-exclamation-triangle text-amber-500 mt-0.5 text-lg flex-shrink-0"></i>
+              <div class="flex-1">
+                <div class="font-bold text-amber-800 text-sm">Manager đã điều chỉnh phiếu này</div>
+                <div class="text-amber-700 text-xs mt-0.5">Vui lòng xem lịch sử chỉnh sửa bên dưới và xác nhận để gửi lại lên Manager.</div>
+              </div>
+            </div>
+
+            <!-- ── Khu vực chỉnh sửa phiếu ────────────────────────────── -->
+            <div class="mt-6 pt-5 border-t flex flex-wrap items-center gap-3">
+              <!-- Nút Sửa phiếu (Staff) -->
+              <button v-if="canStaffEdit(selectedReceipt)"
+                @click="openEditModal('staff')"
+                class="h-9 px-4 bg-[#eef2ff] hover:bg-[#4361ee] hover:text-white text-[#4361ee] border border-[#4361ee]/30 rounded-xl text-xs font-bold transition-all flex items-center gap-2">
+                <i class="fas fa-pen"></i> Sửa phiếu
+              </button>
+              <!-- Nút Sửa + Gửi xuống (Manager khi DRAFT) -->
+              <button v-if="canManagerEdit(selectedReceipt) && selectedReceipt.status === 'DRAFT'"
+                @click="openEditModal('manager')"
+                class="h-9 px-4 bg-orange-50 hover:bg-orange-500 hover:text-white text-orange-600 border border-orange-300 rounded-xl text-xs font-bold transition-all flex items-center gap-2">
+                <i class="fas fa-pen-to-square"></i> Sửa & Gửi Staff
+              </button>
+              <!-- Nút Sửa (Manager khi PENDING_ADMIN — ghi lý do cho Admin) -->
+              <button v-if="canManagerEdit(selectedReceipt) && selectedReceipt.status === 'PENDING_ADMIN'"
+                @click="openEditModal('manager')"
+                class="h-9 px-4 bg-blue-50 hover:bg-blue-500 hover:text-white text-blue-600 border border-blue-300 rounded-xl text-xs font-bold transition-all flex items-center gap-2">
+                <i class="fas fa-pen-to-square"></i> {{ selectedReceipt?.type === 'TRANSFER' ? 'Sửa (Ghi chú cho Chi nhánh nguồn)' : 'Sửa (Ghi chú cho Admin)' }}
+              </button>
+              <!-- Nút Xác nhận thay đổi (Staff) -->
+              <button v-if="canStaffAcknowledge(selectedReceipt)"
+                @click="staffAcknowledgeEdit()" :disabled="submittingAcknowledge"
+                class="h-9 px-4 bg-amber-400 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm">
+                <i class="fas fa-check" v-if="!submittingAcknowledge"></i>
+                <i class="fas fa-spinner fa-spin" v-else></i>
+                Xác nhận thay đổi
+              </button>
+              <!-- Nút Lịch sử chỉnh sửa -->
+              <button v-if="editHistoryList.length > 0" @click.prevent="toggleEditHistory" type="button"
+                class="h-9 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ml-auto border border-slate-200 relative">
+                <i class="fas fa-history text-xs"></i>
+                Lịch sử sửa ({{ editHistoryList.length }})
+                <i class="fas fa-chevron-down text-[10px] transition-transform" :class="showEditHistory ? 'rotate-180' : ''"></i>
+                <span v-if="!showEditHistory && !hasSeenEditHistory" class="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500 border-2 border-white"></span>
+                </span>
+              </button>
+            </div>
+
+            <!-- ── Panel lịch sử chỉnh sửa ─────────────────────────────── -->
+            <Transition name="slide-down">
+              <div v-if="showEditHistory" class="mt-2 rounded-2xl border border-slate-200 overflow-hidden">
+                <div class="bg-slate-50 px-4 py-2.5 flex items-center gap-2 border-b border-slate-200">
+                  <i class="fas fa-history text-slate-400 text-xs"></i>
+                  <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Lịch sử chỉnh sửa</span>
+                </div>
+                <div v-if="editHistoryList.length === 0" class="px-4 py-5 text-center text-xs text-slate-400">
+                  Chưa có lịch sử chỉnh sửa nào.
+                </div>
+                <div v-else class="divide-y divide-slate-100">
+                  <div v-for="log in editHistoryList" :key="log.id" class="px-4 py-3">
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap mb-1">
+                          <span class="text-xs font-bold text-slate-700">{{ log.editorName }}</span>
+                          <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                            :class="log.editorRole === 'STAFF' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'">
+                            {{ log.editorRole === 'STAFF' ? 'Nhân viên' : 'Quản lý' }}
+                          </span>
+                          <span class="text-[10px] text-slate-400">{{ directionLabel(log.direction) }}</span>
+                        </div>
+                        <div class="text-xs text-slate-600 mb-1">
+                          <span class="font-semibold text-slate-500">Lý do:</span> {{ log.editReason }}
+                        </div>
+                        <div v-if="log.changes" class="text-xs text-slate-500">
+                          <span class="font-semibold">Thay đổi:</span> {{ log.changes }}
+                        </div>
+                        <div v-if="log.acknowledgedAt" class="mt-1 text-[10px] text-green-600 flex items-center gap-1">
+                          <i class="fas fa-check-circle"></i>
+                          {{ log.acknowledgedByName }} đã xác nhận lúc {{ formatDateTime(log.acknowledgedAt) }}
+                        </div>
+                        <div v-else-if="log.direction === 'MANAGER_TO_STAFF'" class="mt-1 text-[10px] text-amber-500 flex items-center gap-1">
+                          <i class="fas fa-clock"></i> Chờ Staff xác nhận
+                        </div>
+                      </div>
+                      <div class="text-[10px] text-slate-400 whitespace-nowrap flex-shrink-0">
+                        {{ formatDateTime(log.createdAt) }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Transition>
+
+            <!-- Approve & Cancel actions -->
+            <div v-if="canApproveReceipt(selectedReceipt)" class="mt-8 pt-5 border-t flex flex-wrap gap-4">
+              <button @click="approveReceipt(selectedReceipt)" :disabled="approvingId === selectedReceipt.id"
+                class="px-5 py-2.5 bg-[#10b981] hover:bg-[#059669] text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-check-circle" v-if="approvingId !== selectedReceipt.id"></i>
+                <i class="fas fa-spinner fa-spin" v-else></i> 
+                {{ approveReceiptText(selectedReceipt) }}
+              </button>
+              <button @click="confirmCancelReceipt(selectedReceipt)" v-if="canCancelReceipt(selectedReceipt)"
+                class="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-ban"></i> Hủy phiếu
+              </button>
+            </div>
+            <div v-else-if="canCancelReceipt(selectedReceipt)" class="mt-8 pt-5 border-t flex gap-4">
+              <button @click="confirmCancelReceipt(selectedReceipt)"
+                class="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-ban"></i> Hủy phiếu
+              </button>
+            </div>
+
+            <!-- Mark as Paid -->
+            <div v-if="selectedReceipt.status === 'COMPLETED' && selectedReceipt.type === 'EXPORT' && (selectedReceipt.paymentStatus === 'UNPAID' || selectedReceipt.paymentStatus === 'Chưa thanh toán')" class="mt-8 pt-5 border-t">
+              <button @click="markAsPaid(selectedReceipt)" :disabled="markingPaidId === selectedReceipt.id"
+                class="px-5 py-2.5 bg-[#f59e0b] hover:bg-[#d97706] text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-hand-holding-usd" v-if="markingPaidId !== selectedReceipt.id"></i>
+                <i class="fas fa-spinner fa-spin" v-else></i>
+                Xác nhận Đã Thanh Toán
+              </button>
+              <p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle"></i> Công nợ khách hàng sẽ được cấn trừ tương ứng khi xác nhận.</p>
+            </div>
+
+            <!-- Confirm Receive (Transfer) -->
+            <div v-if="canConfirmTransfer(selectedReceipt)" class="mt-8 pt-5 border-t">
+              <button @click="openConfirmTransferModal(selectedReceipt)"
+                class="px-5 py-2.5 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-box-open"></i> Xác nhận Nhận Hàng & Cộng Kho
+              </button>
+            </div>
+
+            <!-- Confirm Stocktake (Import) -->
+            <div v-if="canConfirmStocktake(selectedReceipt)" class="mt-8 pt-5 border-t">
+              <button @click="openStocktakeModal(selectedReceipt)"
+                class="px-5 py-2.5 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-boxes"></i> Thực hiện Kiểm kê & Chấp nhận
+              </button>
+              <p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle"></i> Vui lòng đếm lại thực tế hàng hóa tại kho trước khi xác nhận cộng kho.</p>
+            </div>
+
+            <!-- Approve Shortfall (Hao hụt) -->
+            <div v-if="canApproveShortfall(selectedReceipt)" class="mt-8 pt-5 border-t flex flex-wrap gap-4">
+              <button @click="approveShortfall(selectedReceipt, true)" :disabled="approvingShortfallId === selectedReceipt.id"
+                class="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-check-circle" v-if="approvingShortfallId !== selectedReceipt.id"></i>
+                <i class="fas fa-spinner fa-spin" v-else></i> 
+                Duyệt Hao Hụt
+              </button>
+              <button v-if="selectedReceipt.status === 'PENDING_SHORTFALL_MANAGER'" @click="approveShortfall(selectedReceipt, false)" :disabled="approvingShortfallId === selectedReceipt.id"
+                class="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-ban"></i> Từ chối Hao Hụt
+              </button>
+            </div>
+
+            <!-- Compensate Shortfall (Điều chuyển bù) -->
+            <div v-if="canCompensate(selectedReceipt)" class="mt-8 pt-5 border-t">
+              <button @click="compensateShortfall(selectedReceipt)" :disabled="compensatingId === selectedReceipt.id"
+                class="px-5 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                <i class="fas fa-truck-loading" v-if="compensatingId !== selectedReceipt.id"></i>
+                <i class="fas fa-spinner fa-spin" v-else></i>
+                Tạo Phiếu Điều Chuyển Bù
+              </button>
+              <p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle"></i> Sẽ tạo một phiếu Điều chuyển mới có số lượng bằng đúng số lượng hao hụt. Phiếu cũ sẽ được đóng.</p>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- CREATE DRAFT MODAL -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <Teleport to="body">
+      <!-- Backdrop -->
+      <Transition name="fade">
+        <div v-if="showCreateModal" @click="showCreateModal = false" class="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[100]"></div>
+      </Transition>
+
+      <!-- Panel -->
+      <Transition name="slide-panel">
+        <div v-if="showCreateModal" class="fixed inset-y-0 right-0 z-[101] w-full max-w-[800px] bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] flex flex-col border-l border-[#e2e8f0]">
+          <!-- Header -->
+          <div class="theme-modal-header relative overflow-hidden flex items-center justify-between px-8 py-6 transition-colors duration-500" :class="{ 'easter-egg-space': isSpaceEasterEgg }">
+            <template v-if="isSpaceEasterEgg">
+              <!-- Space Easter Egg Decor -->
+              <div class="absolute inset-0 pointer-events-none">
+                <i class="fas fa-rocket absolute top-4 right-32 text-white/80 text-4xl animate-[bounce_3s_infinite] -rotate-45"></i>
+                <i class="fas fa-meteor absolute -top-4 right-16 text-orange-400/60 text-6xl rotate-[120deg] drop-shadow-[0_0_15px_rgba(251,146,60,0.8)]"></i>
+                <i class="fas fa-user-astronaut absolute bottom-2 right-64 text-white/60 text-3xl animate-[bounce_4s_infinite]"></i>
+                <i class="fas fa-star absolute top-2 right-48 text-white/90 text-[8px] animate-pulse"></i>
+                <i class="fas fa-star absolute bottom-4 right-20 text-white/70 text-[6px] animate-pulse" style="animation-delay: 1s"></i>
+                <i class="fas fa-satellite absolute top-8 right-80 text-white/50 text-2xl animate-[spin_20s_linear_infinite]"></i>
+              </div>
+            </template>
+            <template v-else>
+              <!-- Light Mode Decor: Sun & Clouds -->
+              <div :key="'light-' + createForm.type" class="theme-light-decor absolute inset-0 pointer-events-none transition-all duration-500">
+                <i class="fas fa-sun absolute -top-12 right-8 text-yellow-300 text-[140px] opacity-10 animate-[spin_40s_linear_infinite]"></i>
+                <i class="fas fa-sun absolute top-3 right-24 text-yellow-300 text-5xl drop-shadow-[0_0_20px_rgba(253,224,71,0.8)] animate-[spin_20s_linear_infinite]"></i>
+                <i class="fas fa-cloud absolute top-8 right-44 text-white/50 text-5xl drop-shadow-sm"></i>
+                <i class="fas fa-cloud absolute top-2 right-64 text-white/40 text-3xl"></i>
+                <i class="fas fa-cloud absolute -bottom-2 right-28 text-white/30 text-7xl"></i>
+              </div>
+
+              <!-- Dark Mode Decor: Moon & Stars -->
+              <div :key="'dark-' + createForm.type" class="theme-dark-decor absolute inset-0 pointer-events-none transition-all duration-500">
+                <i class="fas fa-moon absolute -top-8 right-12 text-blue-100 text-[120px] opacity-[0.03] -rotate-12"></i>
+                <i class="fas fa-moon absolute top-3 right-24 text-yellow-200 text-4xl drop-shadow-[0_0_15px_rgba(254,240,138,0.5)] -rotate-12"></i>
+                <i class="fas fa-star absolute top-4 right-48 text-white/80 text-[8px] animate-pulse"></i>
+                <i class="fas fa-star absolute top-8 right-60 text-white/60 text-[10px] animate-pulse" style="animation-delay: 1s"></i>
+                <i class="fas fa-star absolute top-3 right-72 text-white/90 text-[6px] animate-pulse" style="animation-delay: 0.5s"></i>
+                <i class="fas fa-star absolute bottom-4 right-36 text-white/50 text-[12px] animate-pulse" style="animation-delay: 1.5s"></i>
+                <i class="fas fa-star absolute bottom-2 right-56 text-white/70 text-[8px] animate-pulse"></i>
+              </div>
+            </template>
+
+            <div class="relative z-10 text-white drop-shadow-md">
+              <div class="text-xs font-bold opacity-90 uppercase tracking-wider mb-1">
+                {{ createForm.type === 'EXPORT' ? 'Lập hóa đơn' : createForm.type === 'TRANSFER' ? 'Lập phiếu điều chuyển' : createForm.type === 'ADJUST_OUT' ? 'Lập phiếu tiêu hủy' : 'Lập phiếu kho' }}
+              </div>
+              <div class="font-bold text-xl">{{ createForm.type === 'TRANSFER' ? 'Tạo phiếu xin hàng (DRAFT)' : 'Tạo phiếu nháp (DRAFT)' }}</div>
+            </div>
+            <button @click="showCreateModal = false" class="relative z-10 w-9 h-9 flex items-center justify-center rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-sm transition-all shadow-sm border border-white/10">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="overflow-y-auto flex-1 p-6 bg-[#f8f9fa] custom-scrollbar">
+            <div class="space-y-6">
+              <!-- Type & Branches -->
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div v-if="!receiptType">
+                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Loại phiếu <span class="text-red-500">*</span></label>
+                  <select v-model="createForm.type" @change="onTypeChange"
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
+                    <option value="IMPORT">Nhập kho</option>
+                    <option value="EXPORT">Xuất bán</option>
+                    <option value="TRANSFER">Điều chuyển</option>
+                  </select>
+                </div>
+                <div v-if="createForm.type === 'IMPORT'">
+                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh nguồn</label>
+                  <select v-model="createForm.sourceBranchId" disabled
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-[#f1f5f9] disabled:text-[#8094ae] cursor-not-allowed">
+                    <option v-if="isHeadBranch" value="">-- Bên ngoài hệ thống --</option>
+                    <option v-if="!isHeadBranch && headBranch" :value="headBranch.id">{{ headBranch.name }}</option>
+                  </select>
+                </div>
+                <div v-if="createForm.type === 'TRANSFER'">
+                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh đích</label>
+                  <select v-model="createForm.destBranchId" disabled
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm bg-[#f1f5f9] text-[#8094ae] cursor-not-allowed">
+                    <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
+                  </select>
+                </div>
+                <div v-if="createForm.type === 'TRANSFER'">
+                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh nguồn <span class="text-red-500">*</span></label>
+                  <select v-model="createForm.sourceBranchId"
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
+                    <option value="">-- Chọn chi nhánh --</option>
+                    <option v-for="b in branches.filter(x => !x.isHead && x.id !== (user?.branchId || 0))" :key="b.id" :value="b.id">{{ b.name }}</option>
+                  </select>
+                </div>
+                <div v-if="createForm.type === 'IMPORT' || createForm.type === 'ADJUST_IN'">
+                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Chi nhánh đích</label>
+                  <select v-model="createForm.destBranchId" :disabled="createForm.type === 'IMPORT'"
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-[#f1f5f9] disabled:text-[#8094ae]">
+                    <option value="">-- Chọn chi nhánh --</option>
+                    <option v-for="b in branches.filter(x => x.id !== createForm.sourceBranchId)" :key="b.id" :value="b.id">{{ b.name }}</option>
+                  </select>
+                </div>
+                <div v-if="createForm.type === 'EXPORT'">
+                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Khách hàng <span class="text-red-500">*</span></label>
+                  <div class="relative">
+                    <input v-model="createForm.customerName" @focus="showCustomerDropdown = true" @blur="hideCustomerDropdown" @input="onCustomerInput" type="text" placeholder="Nhập tên khách hàng..."
+                      class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
+                    <div v-if="showCustomerDropdown && filteredCustomers.length > 0" class="absolute z-10 w-full mt-1 bg-white border border-[#e2e8f0] rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                       <div v-for="c in filteredCustomers" :key="c.id" @mousedown.prevent="selectCustomer(c)" class="px-3 py-2.5 hover:bg-[#f8f9fa] cursor-pointer text-sm border-b border-[#f1f5f9] last:border-0">
+                          <div class="font-bold text-[#364a63]">{{ c.name }}</div>
+                          <div class="text-[#8094ae] text-xs mt-0.5" v-if="c.contactInfo"><i class="fas fa-phone-alt mr-1"></i> {{ c.contactInfo }}</div>
+                       </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="createForm.type === 'EXPORT'">
+                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Số điện thoại <span class="text-red-500">*</span></label>
+                  <input v-model="createForm.customerPhone" @input="createForm.customerId = ''" type="text" placeholder="Nhập số điện thoại..."
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none" />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div v-if="createForm.type === 'EXPORT'" class="col-span-2 sm:col-span-1">
+                  <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Trạng thái thanh toán</label>
+                  <select v-model="createForm.paymentStatus"
+                    class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none">
+                    <option value="UNPAID">Chưa thanh toán</option>
+                    <option value="PAID">Đã thanh toán</option>
+                  </select>
+                </div>
+                <div class="col-span-2">
+                  <div class="flex justify-between items-center mb-1.5">
+                    <label class="block text-xs font-bold text-[#8094ae] uppercase">
+                      {{ createForm.type === 'ADJUST_OUT' ? 'Lý do tiêu hủy' : 'Ghi chú' }}
+                      <span v-if="createForm.type === 'ADJUST_OUT'" class="text-red-500">*</span>
+                    </label>
+                    <span class="text-[10px] text-[#8094ae]">{{ createForm.description?.length || 0 }}/500</span>
+                  </div>
+                  <textarea v-model="createForm.description" maxlength="500" :placeholder="createForm.type === 'ADJUST_OUT' ? 'Nhập lý do tiêu hủy (bắt buộc)...' : 'Ghi chú (tuỳ chọn)...'"
+                    class="w-full h-20 p-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none resize-y"></textarea>
+                </div>
+              </div>
+
+              <!-- Detail rows -->
+              <div>
+                <div class="flex items-center justify-between mb-3">
+                  <div class="text-xs font-bold text-[#8094ae] uppercase">Danh sách hàng hóa</div>
+                  <button @click="addDetailRow"
+                    class="h-8 px-3 bg-[#eef2ff] hover:bg-[#4361ee] hover:text-white text-[#4361ee] rounded-lg text-xs font-bold transition-all flex items-center gap-1">
+                    <i class="fas fa-plus"></i> Thêm dòng
+                  </button>
+                </div>
+                <div class="space-y-3">
+                  <div v-for="(d, idx) in createForm.details" :key="idx"
+                    class="border border-[#e2e8f0] rounded-xl p-4 bg-white space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-bold text-[#8094ae]">Dòng {{ idx + 1 }}</span>
+                      <button v-if="createForm.details.length > 1" @click="removeDetailRow(idx)"
+                        class="w-6 h-6 flex items-center justify-center rounded bg-red-50 text-red-400 hover:bg-red-500 hover:text-white transition-all">
+                        <i class="fas fa-times text-xs"></i>
+                      </button>
+                    </div>
+                    <div class="space-y-4">
+                      <!-- Sản phẩm & Lô sản xuất (Chiếm toàn bộ chiều ngang) -->
+                      <div class="grid grid-cols-12 gap-4">
+                        <div class="col-span-12 lg:col-span-4">
+                          <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Danh mục</label>
+                          <select v-model="d.categoryId" @change="d.productId = ''; onProductChange(d)"
+                            class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none bg-white">
+                            <option value="">-- Tất cả --</option>
+                            <option v-for="c in getAvailableCategoriesForRow(idx)" :key="c.id" :value="c.id">{{ c.name }}</option>
+                          </select>
+                        </div>
+                        <div class="col-span-12 lg:col-span-4">
+                          <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Sản phẩm <span class="text-red-500">*</span></label>
+                            <select v-if="getAvailableProductsForRow(idx).length > 0" v-model="d.productId" @change="onProductChange(d)"
+                              class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none bg-white">
+                              <option value="">-- Chọn sản phẩm --</option>
+                              <option v-for="p in getAvailableProductsForRow(idx)" :key="p.id" :value="p.id">{{ p.name }} ({{ p.sku }})</option>
+                            </select>
+                            <div v-else class="w-full h-10 px-3 border border-dashed border-[#cbd5e1] bg-[#f8fafc] rounded-xl text-sm text-[#94a3b8] flex items-center justify-center italic">
+                              Chưa có sản phẩm
+                            </div>
+                        </div>
+                        
+                        <div class="col-span-12 lg:col-span-4" v-if="d.productId">
+                          <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Lô sản xuất <span class="text-red-500">*</span></label>
+                          <div class="flex gap-2">
+                            <select v-if="!d.isNewBatch" v-model="d.batchCode" @change="onBatchChange(d)"
+                              class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none bg-white">
+                              <option value="">-- Chọn lô --</option>
+                              <option v-for="b in getBatchesForProduct(d.productId)" :key="b.batchCode" :value="b.batchCode">
+                                {{ b.batchCode }} (Tồn: {{ b.quantity }})
+                              </option>
+                            </select>
+                            <input v-else v-model="d.batchCode" type="text" placeholder="Nhập mã lô mới..."
+                              class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium outline-none focus:border-[#4361ee]" />
+                            
+                            <button v-if="createForm.type === 'IMPORT' && createForm.sourceBranchId === createForm.destBranchId && createForm.sourceBranchId" @click="d.isNewBatch = !d.isNewBatch; d.batchCode = ''" 
+                                    class="px-3 h-10 border border-[#e2e8f0] rounded-xl text-xs font-bold bg-white hover:bg-gray-50 whitespace-nowrap shadow-sm transition-all text-[#364a63]">
+                              <i :class="d.isNewBatch ? 'fas fa-list text-[#4361ee] mr-1' : 'fas fa-plus text-[#10b981] mr-1'"></i> {{ d.isNewBatch ? 'Chọn lô có sẵn' : 'Tạo lô mới' }}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Thông tin Số lượng, Tiền & NSX/HSD (Nhóm trong khung nền xám nhạt để dễ nhìn) -->
+                      <div v-if="d.productId" class="p-4 bg-[#f8f9fa] rounded-xl border border-[#e2e8f0] space-y-4">
+                        <!-- Row 1: Số lượng, Đơn giá, Thành tiền -->
+                        <div :class="(createForm.type === 'IMPORT' || createForm.type === 'TRANSFER') ? 'grid grid-cols-1' : 'grid grid-cols-3 gap-5'">
+                          <div>
+                            <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Số lượng <span class="text-red-500">*</span></label>
+                            <div class="flex items-center h-10 bg-white border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-[#4361ee]/20 transition-colors"
+                              :class="getMaxQuantity(d) !== null && d.quantity > getMaxQuantity(d)! ? 'border-red-400 focus-within:border-red-400' : 'border-[#e2e8f0] focus-within:border-[#4361ee]'">
+                              <input v-model.number="d.quantity" type="number" min="1"
+                                :max="getMaxQuantity(d) !== null ? getMaxQuantity(d)! : undefined"
+                                @input="constrainQuantity(d)" @blur="onQuantityBlur(d)"
+                                @keydown="(e) => { if(['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault() }"
+                                :disabled="!d.productId || (!d.isNewBatch && !d.batchCode)"
+                                class="w-full h-full px-3 text-sm font-bold outline-none disabled:bg-gray-100 disabled:text-gray-400 bg-transparent" />
+                              <div v-if="((createForm.type === 'IMPORT' && createForm.sourceBranchId === createForm.destBranchId) || createForm.type === 'ADJUST_IN') && getGlobalQuantity(d) !== null" 
+                                   class="px-3 h-full flex items-center bg-gray-50 border-l border-[#e2e8f0] text-xs font-bold text-[#8094ae] whitespace-nowrap">
+                                / {{ getGlobalQuantity(d) }}
+                              </div>
+                              <div v-else-if="getMaxQuantity(d) !== null" 
+                                   class="px-3 h-full flex items-center bg-gray-50 border-l border-[#e2e8f0] text-xs font-bold text-[#8094ae] whitespace-nowrap">
+                                / {{ getMaxQuantity(d) }}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
+                            <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Đơn giá</label>
+                            <input v-model.number="d.price" type="number" min="0" readonly
+                              class="w-full h-10 px-3 border border-[#e2e8f0] bg-gray-100 rounded-xl text-sm font-bold outline-none cursor-not-allowed text-[#8094ae]" />
+                          </div>
+                          
+                          <div v-if="createForm.type !== 'IMPORT' && createForm.type !== 'TRANSFER'">
+                            <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Thành tiền</label>
+                            <div class="w-full h-10 px-3 border border-transparent flex items-center text-sm font-bold text-[#4361ee] bg-[#eef2ff] rounded-xl overflow-x-auto whitespace-nowrap hide-scrollbar">
+                              {{ formatVND(d.quantity * (d.price || 0)) }}
+                            </div>
+                          </div>
+                        </div>
+
+                        <!-- Row 2: NSX, HSD -->
+                        <div v-if="(d.isNewBatch || d.batchCode)" class="grid grid-cols-2 gap-5 pt-4 border-t border-[#e2e8f0]">
+                          <div>
+                            <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Ngày sản xuất</label>
+                            <input v-model="d.manufacturingDate" type="date" :disabled="!d.isNewBatch"
+                              class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-gray-100 disabled:text-gray-500" />
+                          </div>
+                          <div>
+                            <label class="flex items-center gap-2 text-xs font-bold text-[#8094ae] uppercase mb-1.5" :class="d.isNewBatch ? 'cursor-pointer' : ''">
+                              <input type="checkbox" v-model="d.hasExpiryDate" class="w-3.5 h-3.5 rounded border-gray-300 text-[#4361ee] focus:ring-[#4361ee]" :disabled="!d.isNewBatch" />
+                              Hạn sử dụng
+                            </label>
+                            <input v-if="d.hasExpiryDate" v-model="d.expirationDate" type="date" :disabled="!d.isNewBatch"
+                              class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-gray-100 disabled:text-gray-500" />
+                            <div v-else class="w-full h-10 px-3 border border-dashed border-[#cbd5e1] bg-[#f8fafc] rounded-xl text-sm text-[#94a3b8] flex items-center italic" :class="{'opacity-50 cursor-not-allowed': !d.isNewBatch}">
+                              Không quản lý HSD
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer actions -->
+          <div class="px-6 py-4 border-t border-[#f1f5f9] flex justify-end gap-3 bg-white">
+            <button @click="showCreateModal = false"
+              class="px-5 py-2.5 border border-[#e2e8f0] bg-white rounded-xl font-semibold text-[#364a63] text-sm hover:bg-[#f1f5f9] transition-all">
+              Hủy
+            </button>
+            <button @click="submitCreateDraft" :disabled="submittingCreate"
+              class="px-6 py-2.5 bg-[#4361ee] hover:bg-[#3a0ca3] text-white rounded-xl font-bold text-sm transition-all disabled:opacity-60 flex items-center gap-2">
+              <i class="fas fa-spinner fa-spin" v-if="submittingCreate"></i>
+              <i class="fas fa-save" v-else></i>
+              Lưu nháp
+            </button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- STOCKTAKE MODAL (IMPORT) -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <Teleport to="body">
+      <div v-if="showStocktakeModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden">
+          <!-- Header -->
+          <div class="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-purple-500 to-fuchsia-400 text-white">
+            <div>
+              <div class="text-xs font-bold opacity-70 uppercase">Kiểm kê & Nhập kho</div>
+              <div class="font-bold text-lg">Phiếu: {{ stocktakeReceipt?.code }}</div>
+            </div>
+            <button @click="showStocktakeModal = false" class="w-9 h-9 flex items-center justify-center rounded-xl bg-white/20 hover:bg-white/30 transition-all">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+
+          <div class="p-6 space-y-4">
+            <div class="bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-purple-700">
+              <i class="fas fa-info-circle mr-2"></i>
+              Nhập <strong>số lượng thực đếm</strong> tại kho. Nếu có hao hụt, vui lòng ghi rõ lý do để đối soát. Hàng hóa sẽ được cộng vào kho tương ứng với số lượng thực đếm.
+            </div>
+
+            <div class="space-y-3 custom-scrollbar max-h-[50vh] overflow-y-auto">
+              <div v-for="item in stocktakeItems" :key="item.receiptDetailId"
+                class="border border-[#e2e8f0] rounded-xl p-4">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-semibold text-sm text-[#364a63]">{{ item.productName }}</span>
+                  <span class="text-xs text-[#8094ae]">Số trên phiếu: <strong>{{ item.sentQty }}</strong></span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <label class="text-xs text-[#8094ae] whitespace-nowrap">Thực đếm:</label>
+                  <input v-model.number="item.actualQuantity" type="number" :min="0" :max="item.sentQty" @keydown="(e) => { if(['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault() }"
+                    @input="item.actualQuantity = item.actualQuantity > item.sentQty ? item.sentQty : (item.actualQuantity < 0 ? 0 : item.actualQuantity)"
+                    class="flex-1 h-9 px-3 border rounded-lg text-sm focus:ring-2 focus:ring-purple-400/20 focus:border-purple-400 outline-none"
+                    :class="item.actualQuantity < item.sentQty ? 'border-amber-400 bg-amber-50' : 'border-[#e2e8f0]'" />
+                  <span v-if="item.actualQuantity < item.sentQty"
+                    class="text-xs font-bold text-amber-600 whitespace-nowrap">
+                    ⚠️ Hao hụt: {{ item.sentQty - item.actualQuantity }}
+                  </span>
+                  <span v-else class="text-xs font-bold text-green-600 whitespace-nowrap">✅ Đủ</span>
+                </div>
+                <div v-if="item.actualQuantity < item.sentQty" class="mt-3 bg-red-50 p-3 rounded-lg border border-red-100 flex items-start gap-3">
+                  <label class="text-xs font-bold text-red-600 whitespace-nowrap mt-2">Lý do <span class="text-red-500">*</span></label>
+                  <textarea v-model="item.shortfallReason" rows="2" placeholder="VD: Hư hỏng, thiếu hàng..."
+                    class="flex-1 px-3 py-2 border border-red-200 rounded-lg text-sm focus:ring-2 focus:ring-red-400/20 focus:border-red-400 outline-none bg-white resize-none"></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="px-6 py-4 border-t border-[#f1f5f9] flex justify-end gap-3 bg-[#f8f9fa]/50">
+            <button @click="showStocktakeModal = false"
+              class="px-5 py-2.5 border border-[#e2e8f0] bg-white rounded-xl font-semibold text-[#364a63] text-sm hover:bg-[#f1f5f9] transition-all">
+              Đóng
+            </button>
+            <button @click="submitConfirmStocktake" :disabled="submittingStocktake"
+              class="px-6 py-2.5 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-60 flex items-center gap-2">
+              <i class="fas fa-spinner fa-spin" v-if="submittingStocktake"></i>
+              <i class="fas fa-boxes" v-else></i>
+              Xác nhận Kiểm kê
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- CONFIRM TRANSFER MODAL -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <Teleport to="body">
+      <div v-if="showConfirmModal && confirmingReceipt"
+        class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden">
+          <!-- Header -->
+          <div class="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-sky-500 to-teal-400 text-white">
+            <div>
+              <div class="text-xs font-bold opacity-70 uppercase">Xác nhận nhận hàng</div>
+              <div class="font-bold text-lg">Phiếu: {{ confirmingReceipt.code }}</div>
+            </div>
+            <button @click="showConfirmModal = false" class="w-9 h-9 flex items-center justify-center rounded-xl bg-white/20 hover:bg-white/30 transition-all">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+
+          <div class="p-6 space-y-4">
+            <div class="bg-sky-50 border border-sky-200 rounded-xl p-4 text-sm text-sky-700">
+              <i class="fas fa-info-circle mr-2"></i>
+              Nhập <strong>số lượng thực tế nhận được</strong> cho từng sản phẩm. Hao hụt trong quá trình vận chuyển (nếu có) sẽ được ghi nhận trực tiếp vào chi tiết phiếu này để đối soát.
+            </div>
+
+            <div class="space-y-3">
+              <div v-for="item in confirmItems" :key="item.receiptDetailId"
+                class="border border-[#e2e8f0] rounded-xl p-4">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-semibold text-sm text-[#364a63]">{{ item.productName }}</span>
+                  <span class="text-xs text-[#8094ae]">Số đã xuất: <strong>{{ item.sentQty }}</strong></span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <label class="text-xs text-[#8094ae] whitespace-nowrap">Số lượng nhận:</label>
+                  <input v-model.number="item.actualQuantity" type="number" :min="0" :max="item.sentQty" @keydown="(e) => { if(['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault() }"
+                    @input="item.actualQuantity = item.actualQuantity > item.sentQty ? item.sentQty : (item.actualQuantity < 0 ? 0 : item.actualQuantity)"
+                    class="flex-1 h-9 px-3 border rounded-lg text-sm focus:ring-2 focus:ring-sky-400/20 focus:border-sky-400 outline-none"
+                    :class="item.actualQuantity < item.sentQty ? 'border-amber-400 bg-amber-50' : 'border-[#e2e8f0]'" />
+                  <span v-if="item.actualQuantity < item.sentQty"
+                    class="text-xs font-bold text-amber-600 whitespace-nowrap">
+                    ⚠️ Hao hụt: {{ item.sentQty - item.actualQuantity }}
+                  </span>
+                  <span v-else class="text-xs font-bold text-green-600 whitespace-nowrap">✅ Đủ</span>
+                </div>
+                <!-- Input for shortfall reason -->
+                <div v-if="item.actualQuantity < item.sentQty" class="mt-3 bg-red-50 p-3 rounded-lg border border-red-100 flex items-start gap-3">
+                  <label class="text-xs font-bold text-red-600 whitespace-nowrap mt-2">Lý do hao hụt <span class="text-red-500">*</span></label>
+                  <textarea v-model="item.shortfallReason" rows="2" placeholder="VD: Rơi vỡ, ẩm mốc, thiếu hàng..."
+                    class="flex-1 px-3 py-2 border border-red-200 rounded-lg text-sm focus:ring-2 focus:ring-red-400/20 focus:border-red-400 outline-none bg-white resize-none"></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="px-6 py-4 border-t border-[#f1f5f9] flex justify-end gap-3 bg-[#f8f9fa]/50">
+            <button @click="showConfirmModal = false"
+              class="px-5 py-2.5 border border-[#e2e8f0] bg-white rounded-xl font-semibold text-[#364a63] text-sm hover:bg-[#f1f5f9] transition-all">
+              Hủy
+            </button>
+            <button @click="submitConfirmTransfer" :disabled="submittingConfirm"
+              class="px-6 py-2.5 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-60 flex items-center gap-2">
+              <i class="fas fa-spinner fa-spin" v-if="submittingConfirm"></i>
+              <i class="fas fa-check-double" v-else></i>
+              Xác nhận nhận hàng
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- DIRECT IMPORT MODAL (THÊM SẢN PHẨM) -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <AppModal 
+      :show="showDirectImportModal" 
+      title="Thêm sản phẩm (Tạo Phiếu Nhập)" 
+      size="md" 
+      @close="showDirectImportModal = false"
+    >
+      <div class="p-6 space-y-4 text-sm">
+        <!-- Dòng 1: Danh mục -->
+        <div>
+          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Danh mục</label>
+          <select 
+            v-model="directImportForm.categoryId" 
+            @change="directImportForm.productId = ''; directImportForm.manufacturingDate = ''; directImportForm.expirationDate = ''"
+            class="w-full h-11 px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all shadow-sm"
+          >
+            <option value="">-- Chọn danh mục --</option>
+            <option v-for="c in categories" :key="c.id" :value="c.id">
+              {{ c.name }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Dòng 2: Sản phẩm -->
+        <div>
+          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Sản phẩm</label>
+          <select 
+            v-model="directImportForm.productId" 
+            :disabled="!directImportForm.categoryId"
+            class="w-full h-11 px-4 border border-[#e2e8f0] bg-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all shadow-sm disabled:bg-[#f1f5f9] disabled:text-slate-400"
+          >
+            <option value="">-- Chọn sản phẩm --</option>
+            <option v-for="p in filteredProductsForDirectImport" :key="p.id" :value="p.id">
+              [{{ p.sku }}] {{ p.name }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Dòng 3: Đơn vị tính, Giá nhập & Giá bán -->
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Đơn vị tính</label>
+            <input 
+              :value="selectedProductInDirectImport ? selectedProductInDirectImport.unit : '-'" 
+              type="text" 
+              disabled 
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#eef2ff] text-[#4361ee] rounded-xl text-sm outline-none font-extrabold transition-all" 
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Giá nhập</label>
+            <input 
+              v-model.number="directImportForm.price" 
+              type="number" 
+              min="0"
+              disabled
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none text-slate-500 font-semibold transition-all" 
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Giá bán</label>
+            <input 
+              :value="selectedProductInDirectImport ? formatVND(selectedProductInDirectImport.price) : '-'" 
+              type="text" 
+              disabled 
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none text-slate-500 font-semibold transition-all" 
+            />
+          </div>
+        </div>
+
+        <!-- Dòng 4: Mã lô sản xuất & Số lượng nhập -->
+        <div class="grid grid-cols-12 gap-4">
+          <div class="col-span-8">
+            <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Mã lô sản xuất</label>
+            <div class="flex gap-2">
+              <select v-if="!directImportForm.isNewBatch && directImportBatches.length > 0" 
+                v-model="directImportForm.batchCode" 
+                class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all">
+                <option value="">-- Chọn lô --</option>
+                <option v-for="b in directImportBatches" :key="b.batchCode" :value="b.batchCode">
+                  {{ b.batchCode }} (Tồn: {{ b.quantity }})
+                </option>
+              </select>
+              <input v-else 
+                v-model="directImportForm.batchCode" 
+                type="text" 
+                placeholder="Ví dụ: BATCH-01, MILK-2026..." 
+                class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
+              />
+              <button @click="directImportForm.isNewBatch = !directImportForm.isNewBatch; directImportForm.batchCode = ''" 
+                class="px-3 rounded-xl border border-[#e2e8f0] bg-[#f8f9fa] text-[#4361ee] hover:bg-[#eef2ff] transition-all flex items-center justify-center font-bold text-xs"
+                title="Chuyển đổi nhập lô mới/cũ">
+                <i class="fas fa-sync-alt"></i>
+              </button>
+            </div>
+          </div>
+          <div class="col-span-4">
+            <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số lượng nhập</label>
+            <input 
+              v-model.number="directImportForm.quantity" 
+              type="number" 
+              min="1" 
+              class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
+            />
+          </div>
+        </div>
+
+        <!-- Ngày sản xuất (NSX) - Bắt buộc -->
+        <div>
+          <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Ngày sản xuất (NSX)</label>
+          <input 
+            v-model="directImportForm.manufacturingDate" 
+            type="date" 
+            :disabled="isMfgDateLocked"
+            class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed" 
+          />
+        </div>
+        <!-- Checkbox quản lý theo hạn dùng -->
+        <div class="flex items-center gap-2 py-1">
+          <input 
+            id="directImportHasExpiry" 
+            v-model="directImportForm.hasExpiry" 
+            type="checkbox" 
+            :disabled="isExpDateLocked"
+            class="w-5 h-5 accent-[#4361ee] cursor-pointer rounded-md border-slate-300 disabled:opacity-60 disabled:cursor-not-allowed" 
+          />
+          <label for="directImportHasExpiry" class="cursor-pointer select-none font-bold text-xs text-[#8094ae] uppercase tracking-wider">
+            Sản phẩm quản lý theo hạn dùng
+          </label>
+        </div>
+
+        <!-- Các trường hạn dùng (chỉ hiện khi hasExpiry được tích chọn) -->
+        <Transition name="fade">
+          <div v-if="directImportForm.hasExpiry" class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Hạn sử dụng (HSD)</label>
+                <input 
+                  v-model="directImportForm.expirationDate" 
+                  type="date" 
+                  :disabled="isExpDateLocked"
+                  class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed" 
+                />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số ngày cảnh báo hạn dùng</label>
+                <input 
+                  v-model.number="directImportForm.expiryWarningDays" 
+                  type="number" 
+                  min="1"
+                  placeholder="Mặc định: 30" 
+                  class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] text-[#364a63] font-semibold transition-all" 
+                />
+              </div>
+            </div>
+          </div>
+        </Transition>
+
+        <div class="flex gap-3 pt-4 border-t border-[#f1f5f9]">
+          <button 
+            class="flex-1 h-11 bg-[#f8f9fa] hover:bg-[#e2e8f0] text-[#364a63] rounded-xl text-sm font-bold transition-colors" 
+            @click="showDirectImportModal = false"
+          >
+            Hủy bỏ
+          </button>
+          <button 
+            class="flex-1 h-11 bg-[#4361ee] hover:bg-[#3a0ca3] text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2" 
+            :disabled="submittingDirectImport"
+            @click="submitDirectImport"
+          >
+            <i v-if="submittingDirectImport" class="fas fa-spinner fa-spin"></i>
+            Xác nhận tạo Phiếu
+          </button>
+        </div>
+      </div>
+    </AppModal>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- EDIT RECEIPT MODAL -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <AppModal :show="showEditModal" @close="showEditModal = false" :title="editModalTitle">
+      <div class="space-y-6 p-4 sm:p-5">
+        <!-- Lý do chỉnh sửa -->
+        <div>
+          <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Lý do chỉnh sửa <span class="text-red-500">*</span></label>
+          <textarea v-model="editForm.editReason" rows="2"
+            placeholder="Nhập lý do chỉnh sửa (bắt buộc)..."
+            class="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl text-sm focus:ring-0 focus:border-[#4361ee] dark:focus:border-blue-500 outline-none resize-none transition-colors leading-relaxed"
+          ></textarea>
+        </div>
+
+        <!-- Ghi chú phiếu -->
+        <div>
+          <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Ghi chú phiếu</label>
+          <textarea v-model="editForm.description" rows="2"
+            placeholder="Ghi chú phiếu (tuỳ chọn)..."
+            class="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl text-sm focus:ring-0 focus:border-[#4361ee] dark:focus:border-blue-500 outline-none resize-none transition-colors leading-relaxed"
+          ></textarea>
+        </div>
+
+        <!-- Danh sách sản phẩm -->
+        <div>
+          <label class="block text-xs font-bold text-[#8094ae] uppercase mb-2">Cập nhật số lượng</label>
+          <div class="rounded-xl border-2 border-slate-200 dark:border-slate-700 overflow-hidden">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-50 dark:bg-slate-800/50">
+                <tr>
+                  <th class="px-5 py-3 text-left text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Sản phẩm</th>
+                  <th class="px-5 py-3 text-center text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-28">Số lượng cũ</th>
+                  <th class="px-5 py-3 text-center text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-36">Số lượng mới</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50">
+                <tr v-for="(d, idx) in editForm.details" :key="idx">
+                  <td class="px-5 py-3.5 text-sm text-slate-700 dark:text-slate-300 font-semibold">{{ d.productName }}</td>
+                  <td class="px-5 py-3.5 text-center font-medium text-slate-500 dark:text-slate-400">{{ d.originalQty }}</td>
+                  <td class="px-5 py-3.5">
+                    <div class="flex items-center h-10 bg-white dark:bg-slate-900 border-2 rounded-lg overflow-hidden focus-within:border-[#4361ee] dark:focus-within:border-blue-500 transition-colors"
+                      :class="d.maxQty !== null && d.quantity > d.maxQty ? 'border-red-400 focus-within:border-red-400' : (d.quantity !== d.originalQty ? 'border-amber-400 focus-within:border-amber-400 dark:border-amber-500 dark:bg-amber-900/20 bg-amber-50' : 'border-slate-200 dark:border-slate-700')">
+                      <input v-model.number="d.quantity" type="number" min="1"
+                        :max="d.maxQty !== null ? d.maxQty : undefined"
+                        @input="constrainEditQuantity(d)" @blur="onEditQuantityBlur(d)"
+                        @keydown="(e) => { if(['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault() }"
+                        class="w-full h-full px-3 text-center text-sm font-bold text-slate-900 dark:text-white outline-none bg-transparent" />
+                      <div v-if="d.maxQty !== null" 
+                           class="px-2 h-full flex items-center bg-slate-50 dark:bg-slate-800 border-l-2 border-inherit text-[10px] font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                        / {{ d.maxQty }}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Thông báo kự năng cho Manager -->
+        <div v-if="editMode === 'manager' && selectedReceipt?.status === 'DRAFT'"
+          class="p-3 bg-orange-50 border border-orange-200 rounded-xl text-xs text-orange-700 flex items-start gap-2">
+          <i class="fas fa-info-circle mt-0.5 flex-shrink-0"></i>
+          <span>Sau khi lưu, phiếu sḝ cđổi sang trạng thái <strong>Chờ Staff xác nhận</strong>. Staff sẽ nhận thông báo và phải xác nhận trước khi gửi lại lên bạn.</span>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex justify-end gap-3 pt-2">
+          <button @click="showEditModal = false"
+            class="h-10 px-5 border border-[#e2e8f0] rounded-xl text-sm font-semibold text-[#8094ae] hover:bg-[#f8f9fa] transition-all">
+            Hủy
+          </button>
+          <button @click="submitEditReceipt()" :disabled="submittingEdit"
+            class="h-10 px-6 bg-[#4361ee] hover:bg-[#3a0ca3] text-white rounded-xl text-sm font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-2 disabled:opacity-60">
+            <i class="fas fa-save" v-if="!submittingEdit"></i>
+            <i class="fas fa-spinner fa-spin" v-else></i>
+            {{ editMode === 'manager' && selectedReceipt?.status === 'DRAFT' ? 'Lưu & Gửi xuống Staff' : 'Lưu thay đổi' }}
+          </button>
+        </div>
+      </div>
+    </AppModal>
+
+    <!-- ── Modal Hủy Phiếu ─────────────────────────────── -->
+    <Transition name="fade">
+      <div v-if="showCancelModal" class="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4" @click.stop>
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-700" @click.stop>
+          <div class="bg-red-50 dark:bg-red-900/20 px-6 py-4 border-b border-red-100 dark:border-red-900/30 flex items-center justify-between">
+            <h3 class="text-base font-bold text-red-700 dark:text-red-400 flex items-center gap-2">
+              <i class="fas fa-exclamation-triangle"></i>
+              Hủy phiếu {{ receiptToCancel?.code }}
+            </h3>
+            <button @click="showCancelModal = false" class="text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="p-6">
+            <p class="text-sm text-slate-600 dark:text-slate-300 mb-4">Hành động này không thể hoàn tác. Vui lòng ghi rõ lý do hủy phiếu bên dưới để lưu vết hệ thống:</p>
+            <textarea v-model="cancelReason" rows="3"
+              class="w-full p-3 text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-all"
+              placeholder="Nhập lý do hủy phiếu..."></textarea>
+          </div>
+          <div class="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700 flex items-center justify-end gap-3">
+            <button @click="showCancelModal = false" class="px-5 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 bg-slate-100 dark:bg-slate-800/80 rounded-xl transition-colors">
+              Đóng
+            </button>
+            <button @click="executeCancelReceipt" class="px-5 py-2.5 text-sm font-bold text-white bg-red-500 hover:bg-red-600 rounded-xl shadow-sm shadow-red-500/20 transition-all flex items-center gap-2">
+              <i class="fas fa-trash"></i> Xác nhận hủy
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+  </div>
+</template>

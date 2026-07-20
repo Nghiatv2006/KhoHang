@@ -99,12 +99,11 @@ function confirmDeleteC(c: any) { deletingC.value = c; showDeleteC.value = true 
 async function saveCustomer() {
   if (!cForm.name?.trim()) { toast.error('Tên khách hàng là bắt buộc.'); return }
 
-  if (cForm.email && cForm.email.trim() !== '') {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(cForm.email.trim())) {
-      toast.error('Email không hợp lệ.');
-      return;
-    }
+  if (!cForm.email?.trim()) { toast.error('Email khách hàng là bắt buộc.'); return }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(cForm.email.trim())) {
+    toast.error('Email không hợp lệ.');
+    return;
   }
 
   if (cForm.phone && cForm.phone.trim() !== '') {
@@ -256,7 +255,7 @@ function exportExcel() {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="c in paginatedCustomers" :key="c.id" class="border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer group hover:-translate-y-[1px]" @dblclick="isManager ? openEditC(c) : null">
+            <tr v-for="c in paginatedCustomers" :key="c.id" class="border-b border-[#f1f5f9] hover:border-transparent hover:bg-gradient-to-r hover:from-[#4361ee]/15 hover:to-[#4cc9f0]/15 hover:shadow-sm transition-all duration-300 cursor-pointer group hover:-translate-y-[1px]" @dblclick="openEditC(c)">
               <td class="p-4 first:rounded-l-xl last:rounded-r-xl">
                 <div class="font-bold text-[#364a63]">{{ c.name }}</div>
                 <div class="text-xs text-[#8094ae] font-mono mt-0.5">MST: {{ c.taxCode || '—' }}</div>
@@ -351,11 +350,11 @@ function exportExcel() {
           <div class="p-6 flex-1 overflow-y-auto custom-scrollbar">
             <div v-if="cTab === 'info'" class="space-y-5">
               <div class="grid grid-cols-2 gap-5">
-                <div class="col-span-2"><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Tên khách hàng <span class="text-[#ea4f52]">*</span></label><input v-model="cForm.name" type="text" placeholder="Nguyễn Văn A..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all text-[#364a63]" /></div>
-                <div><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Email</label><input v-model="cForm.email" type="email" placeholder="email@..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all text-[#364a63]" /></div>
-                <div><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số điện thoại</label><input v-model="cForm.phone" type="text" placeholder="0900..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all text-[#364a63]" /></div>
-                <div><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Mã số thuế</label><input v-model="cForm.taxCode" type="text" placeholder="MST..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all font-mono text-[#364a63]" /></div>
-                <div class="col-span-2"><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Địa chỉ</label><input v-model="cForm.address" type="text" placeholder="Địa chỉ..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all text-[#364a63]" /></div>
+                <div class="col-span-2"><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Tên khách hàng <span class="text-[#ea4f52]">*</span></label><input v-model="cForm.name" :disabled="!isManager" type="text" placeholder="Nguyễn Văn A..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all text-[#364a63] disabled:opacity-70 disabled:cursor-not-allowed" /></div>
+                <div><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Email <span class="text-[#ea4f52]">*</span></label><input v-model="cForm.email" :disabled="!isManager" type="email" placeholder="email@..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all text-[#364a63] disabled:opacity-70 disabled:cursor-not-allowed" /></div>
+                <div><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Số điện thoại</label><input v-model="cForm.phone" @input="cForm.phone = cForm.phone.replace(/\D/g, '')" maxlength="10" :disabled="!isManager" type="text" placeholder="0900..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all text-[#364a63] disabled:opacity-70 disabled:cursor-not-allowed" /></div>
+                <div><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Mã số thuế</label><input v-model="cForm.taxCode" :disabled="!isManager" type="text" placeholder="MST..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all font-mono text-[#364a63] disabled:opacity-70 disabled:cursor-not-allowed" /></div>
+                <div class="col-span-2"><label class="block text-xs font-bold text-[#8094ae] uppercase tracking-wider mb-2">Địa chỉ</label><input v-model="cForm.address" :disabled="!isManager" type="text" placeholder="Địa chỉ..." class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#f4bd0e]/20 focus:border-[#f4bd0e] outline-none transition-all text-[#364a63] disabled:opacity-70 disabled:cursor-not-allowed" /></div>
               </div>
             </div>
             <div v-else class="space-y-4">
@@ -439,7 +438,7 @@ function exportExcel() {
           <!-- Footer -->
           <div v-if="cTab === 'info'" class="p-6 border-t border-[#f1f5f9] bg-[#f8fafc] flex gap-3">
             <button class="flex-1 h-11 bg-white border border-[#e2e8f0] hover:bg-[#f8f9fa] text-[#364a63] rounded-xl text-sm font-bold transition-colors shadow-sm" @click="showCModal = false">Hủy bỏ</button>
-            <button class="flex-1 h-11 bg-[#f4bd0e] hover:bg-[#d9a80c] text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2" :disabled="cSaving" @click="saveCustomer">
+            <button v-if="isManager" class="flex-1 h-11 bg-[#f4bd0e] hover:bg-[#d9a80c] text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2" :disabled="cSaving" @click="saveCustomer">
               <i v-if="cSaving" class="fas fa-spinner fa-spin"></i>
               {{ cSaving ? 'Đang lưu...' : 'Lưu thông tin' }}
             </button>
