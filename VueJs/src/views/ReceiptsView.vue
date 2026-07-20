@@ -315,7 +315,9 @@ const filteredReceipts = computed(() => {
   // Nếu có prop receiptType, không cần lọc thêm theo filterType
   if (!props.receiptType && filterType.value) result = result.filter(r => r.type === filterType.value)
   if (filterStatus.value) {
-    if (filterStatus.value === 'UNPAID') {
+    if (filterStatus.value === 'ACTIONABLE') {
+      result = result.filter(r => isActionable(r))
+    } else if (filterStatus.value === 'UNPAID') {
       result = result.filter(r => r.type === 'EXPORT' && r.status === 'COMPLETED' && (r.paymentStatus === 'UNPAID' || r.paymentStatus === 'Chưa thanh toán'))
     } else if (filterStatus.value === 'COMPENSATION') {
       result = result.filter(r => r.code && r.code.startsWith('COMP-'))
@@ -349,8 +351,8 @@ const filteredReceipts = computed(() => {
     const da = a.createdAt ? new Date(a.createdAt).getTime() : 0
     const db = b.createdAt ? new Date(b.createdAt).getTime() : 0
     
-    // Khi xem các tab chờ xử lý (Chờ duyệt, Chờ Admin, Chưa thanh toán...), hiển thị phiếu lâu nhất lên trước
-    if (['DRAFT', 'PENDING_ADMIN', 'PENDING_STOCKTAKE', 'UNPAID', 'COMPENSATION'].includes(filterStatus.value)) {
+    // Khi xem các tab chờ xử lý (Cần xử lý, Chờ duyệt, Chờ Admin, Chưa thanh toán...), hiển thị phiếu lâu nhất lên trước
+    if (['ACTIONABLE', 'DRAFT', 'PENDING_ADMIN', 'PENDING_STOCKTAKE', 'UNPAID', 'COMPENSATION'].includes(filterStatus.value)) {
       return da - db
     }
     
@@ -454,7 +456,47 @@ const isHeadBranch = computed(() => user.value?.branchId === headBranch.value?.i
 // ──────────────────────────────────────────────────────────────
 // STATS
 // ──────────────────────────────────────────────────────────────
-const statDraft = computed(() => typeFilteredReceipts.value.filter(r => r.status === 'DRAFT').length)
+const isActionable = (r: any) => {
+  const isManagerVal = isManager.value;
+  const isAdminVal = isAdmin.value;
+  const isStaffVal = user.value?.role === 'STAFF';
+  const myBranchId = user.value?.branchId;
+  const isSource = Number(r.sourceBranchId) === Number(myBranchId);
+  const isDest = Number(r.destBranchId) === Number(myBranchId);
+
+  if (r.type === 'IMPORT') {
+    if (r.status === 'DRAFT') return (isManagerVal || isAdminVal) && isDest;
+    if (r.status === 'PENDING_ADMIN') return isAdminVal;
+    if (r.status === 'PENDING_STOCKTAKE') return isStaffVal && isDest;
+    if (r.status === 'PENDING_SHORTFALL_MANAGER') return isManagerVal && !isAdminVal && isDest;
+    if (r.status === 'PENDING_SHORTFALL_ADMIN') return isAdminVal;
+    if (r.status === 'PENDING_COMPENSATION') return (isManagerVal && isSource) || isAdminVal;
+  }
+  if (r.type === 'EXPORT') {
+    if (r.status === 'DRAFT') {
+       if (isAdminVal && Number(r.sourceBranchId) === 1) return true;
+       if (isManagerVal && isSource && r.createdById === user.value?.id) return true;
+       if (isStaffVal && isSource) return true;
+       return false;
+    }
+  }
+  if (r.type === 'TRANSFER') {
+    if (r.status === 'DRAFT') return (isManagerVal || isAdminVal) && isSource;
+    if (r.status === 'PENDING_ADMIN') return (isManagerVal || isAdminVal) && isDest;
+    if (r.status === 'PENDING_STOCKTAKE') return isStaffVal && isDest;
+    if (r.status === 'PENDING_SHORTFALL_MANAGER') return isManagerVal && !isAdminVal && isDest;
+    if (r.status === 'PENDING_SHORTFALL_ADMIN') return (isManagerVal && isSource) || isAdminVal;
+    if (r.status === 'PENDING_COMPENSATION') return isManagerVal && isSource;
+  }
+  if (r.type === 'DISPOSAL') {
+    if (r.status === 'DRAFT') return (isManagerVal || isAdminVal) && isSource;
+    if (r.status === 'PENDING_ADMIN') return (isManagerVal || isAdminVal) && isSource;
+    if (r.status === 'PENDING_STOCKTAKE') return isAdminVal;
+  }
+  return false;
+}
+
+const statActionable = computed(() => typeFilteredReceipts.value.filter(r => isActionable(r)).length)
 const statCompleted = computed(() => typeFilteredReceipts.value.filter(r => r.status === 'COMPLETED').length)
 const statCancelled = computed(() => typeFilteredReceipts.value.filter(r => r.status === 'CANCELLED').length)
 
@@ -1658,7 +1700,7 @@ function statusLabel(r: any) {
     if (r?.type === 'TRANSFER') {
       if (r.sourceBranchId === user.value?.branchId) return 'Đã duyệt';
       if (r.destBranchId === user.value?.branchId) {
-        if (isManager.value) return 'Chờ duyệt';
+        if (isManager.value || isAdmin.value) return 'Chờ duyệt';
         return 'Chờ Manager';
       }
       return 'Chờ Manager';
@@ -2148,14 +2190,14 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
 
     <!-- STAT CARDS -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div @click="filterStatus = filterStatus === 'DRAFT' ? '' : 'DRAFT'; filterTimeRange = filterStatus ? 'all' : 'today';"
-        :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'DRAFT' ? 'border-yellow-400 ring-2 ring-yellow-200' : 'border-[#f1f5f9] hover:border-yellow-300']">
+      <div @click="filterStatus = filterStatus === 'ACTIONABLE' ? '' : 'ACTIONABLE'; filterTimeRange = filterStatus ? 'all' : 'today';"
+        :class="['bg-white rounded-2xl p-5 border transition-all cursor-pointer flex items-center gap-4', filterStatus === 'ACTIONABLE' || filterStatus === 'DRAFT' ? 'border-yellow-400 ring-2 ring-yellow-200' : 'border-[#f1f5f9] hover:border-yellow-300']">
         <div class="w-12 h-12 rounded-xl bg-yellow-50 flex items-center justify-center text-yellow-500 text-xl">
           <i class="fas fa-pencil-alt"></i>
         </div>
         <div>
           <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wide">Chờ duyệt</div>
-          <div class="text-2xl font-extrabold text-yellow-500">{{ statDraft }}</div>
+          <div class="text-2xl font-extrabold text-yellow-500">{{ statActionable }}</div>
         </div>
       </div>
       <div @click="filterStatus = filterStatus === 'COMPLETED' ? '' : 'COMPLETED'; filterTimeRange = filterStatus ? 'all' : 'today';"
@@ -2231,7 +2273,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
             <select v-model="filterStatus"
               class="w-full h-11 px-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none transition-all text-[#364a63]">
               <option value="">-- Tất cả trạng thái --</option>
-              <option value="DRAFT">Chờ duyệt</option>
+              <option value="ACTIONABLE">Chờ duyệt</option>
               <option value="COMPLETED">Đã duyệt</option>
               <option value="CANCELLED">Đã hủy</option>
               <option value="RECEIVED">Đã nhận hàng</option>
@@ -3107,16 +3149,10 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
                             <input v-model="d.manufacturingDate" type="date" :disabled="!d.isNewBatch"
                               class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-gray-100 disabled:text-gray-500" />
                           </div>
-                          <div>
-                            <label class="flex items-center gap-2 text-xs font-bold text-[#8094ae] uppercase mb-1.5" :class="d.isNewBatch ? 'cursor-pointer' : ''">
-                              <input type="checkbox" v-model="d.hasExpiryDate" class="w-3.5 h-3.5 rounded border-gray-300 text-[#4361ee] focus:ring-[#4361ee]" :disabled="!d.isNewBatch" />
-                              Hạn sử dụng
-                            </label>
-                            <input v-if="d.hasExpiryDate" v-model="d.expirationDate" type="date" :disabled="!d.isNewBatch"
+                          <div v-if="d.hasExpiryDate">
+                            <label class="block text-xs font-bold text-[#8094ae] uppercase mb-1.5">Hạn sử dụng</label>
+                            <input v-model="d.expirationDate" type="date" :disabled="!d.isNewBatch"
                               class="w-full h-10 px-3 border border-[#e2e8f0] rounded-xl text-sm font-medium focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none disabled:bg-gray-100 disabled:text-gray-500" />
-                            <div v-else class="w-full h-10 px-3 border border-dashed border-[#cbd5e1] bg-[#f8fafc] rounded-xl text-sm text-[#94a3b8] flex items-center italic" :class="{'opacity-50 cursor-not-allowed': !d.isNewBatch}">
-                              Không quản lý HSD
-                            </div>
                           </div>
                         </div>
                       </div>
