@@ -60,56 +60,49 @@ const isManager = computed(() => user.value?.role === 'MANAGER')
 function canApproveReceipt(r: any) {
   if (r.status === 'DRAFT') {
       if (r.type === 'DISPOSAL') {
-            if (isManager.value && r.sourceBranchId === user.value?.branchId) return true;
-            if (isAdmin.value) return true;
-        }
-        if (r.type === 'ADJUST_OUT') {
-          // Everyone can click the button, backend will handle routing to PENDING_ADMIN or COMPLETED
+          if ((isManager.value || isAdmin.value) && r.sourceBranchId === user.value?.branchId) return true;
+      }
+      if (r.type === 'ADJUST_OUT') {
           if (r.sourceBranchId === user.value?.branchId || isAdmin.value) return true;
       }
-      if (r.type === 'EXPORT' && isAdmin.value && r.sourceBranchId !== 1) return false;
-      if (isAdmin.value) return true;
-      if (isManager.value) {
+      if (r.type === 'EXPORT') {
+          if (isAdmin.value && r.sourceBranchId === 1) return true;
+          if (isManager.value && r.sourceBranchId === user.value?.branchId && r.createdById === user.value?.id) return true;
+          if (user.value?.role === 'STAFF' && r.sourceBranchId === user.value?.branchId) return true;
+          return false;
+      }
+      
+      if (isManager.value || isAdmin.value) {
           if (r.type === 'IMPORT' || r.type === 'ADJUST_IN') {
               if (r.destBranchId === user.value?.branchId) return true;
           } else if (r.type === 'TRANSFER') {
-              // Manager chi nhánh NGUỒN duyệt phiếu DRAFT điều chuyển
               if (r.sourceBranchId === user.value?.branchId) return true;
           } else {
-              if (r.type === 'EXPORT' && r.createdById !== user.value?.id) return false;
               if (r.sourceBranchId === user.value?.branchId) return true;
           }
-      }
-      if (user.value?.role === 'STAFF') {
-          if (r.type === 'EXPORT' && r.sourceBranchId === user.value?.branchId) return true;
       }
       return false;
   }
   if (r.status === 'PENDING_ADMIN') {
       if (r.type === 'DISPOSAL') {
-            if (isManager.value && r.sourceBranchId === user.value?.branchId) return true;
-            if (isAdmin.value) return true;
-        }
-        if (r.type === 'ADJUST_OUT') {
-          if (isAdmin.value || isManager.value) {
-              if (isAdmin.value || r.sourceBranchId === user.value?.branchId) return true;
-          }
-          return false;
+          if ((isManager.value || isAdmin.value) && r.sourceBranchId === user.value?.branchId) return true;
+      }
+      if (r.type === 'ADJUST_OUT') {
+          if (isAdmin.value || r.sourceBranchId === user.value?.branchId) return true;
       }
       if (r.type === 'IMPORT') {
           if (isAdmin.value) return true;
           return false;
       }
       if (r.type === 'TRANSFER') {
-          // PENDING_ADMIN của TRANSFER là chờ Manager chi nhánh ĐÍCH duyệt
-          if (isManager.value && r.destBranchId === user.value?.branchId) return true;
-          return false;
+          if ((isManager.value || isAdmin.value) && r.destBranchId === user.value?.branchId) return true;
       }
+      return false;
   }
-      if (r.status === 'PENDING_STOCKTAKE') {
-        if (r.type === 'DISPOSAL' && isAdmin.value) return true;
-    }
-    return false;
+  if (r.status === 'PENDING_STOCKTAKE') {
+      if (r.type === 'DISPOSAL' && isAdmin.value) return true;
+  }
+  return false;
 }
 
 function approveReceiptText(r: any) {
@@ -128,17 +121,19 @@ function approveReceiptText(r: any) {
     if (r.type === 'DISPOSAL' && r.status === 'PENDING_STOCKTAKE') {
         return "Xác nhận & Hoàn tất tiêu hủy";
     }
-    if (r.type === 'IMPORT' && r.status === 'DRAFT' && isManager.value && !isAdmin.value) {
+    if (r.type === 'IMPORT' && r.status === 'DRAFT' && (isManager.value || isAdmin.value)) {
         return "Duyệt (Gửi Admin)";
     }
     if (r.type === 'IMPORT' && r.status === 'PENDING_ADMIN' && isAdmin.value) {
         return "Chấp nhận nhập kho";
     }
     if (r.type === 'TRANSFER' && r.status === 'DRAFT') {
-        return "Duyệt (Gửi Manager chi nhánh đích)";
+        const isHeadSource = r.sourceBranchId === headBranch.value?.id
+        return isHeadSource ? "Duyệt & Gửi Manager chi nhánh đích" : "Duyệt (Gửi Admin tổng duyệt)"
     }
     if (r.type === 'TRANSFER' && r.status === 'PENDING_ADMIN') {
-        return "Duyệt điều chuyển";
+        const isHeadSource = r.sourceBranchId === headBranch.value?.id
+        return isHeadSource ? "Duyệt nhận hàng" : "Duyệt & Cho xuất kho"
     }
     return "Phê duyệt";
 }
@@ -147,16 +142,15 @@ function canCancelReceipt(r: any) {
   if (r.status !== 'DRAFT' && r.status !== 'PENDING_ADMIN') return false;
   if (r.type === 'EXPORT' && isAdmin.value && r.sourceBranchId !== 1) return false;
   if (r.type === 'EXPORT' && isManager.value && r.createdById !== user.value?.id) return false;
-  if (isAdmin.value) return true;
+  
   if (user.value?.role === 'STAFF') {
       return r.status === 'DRAFT' && r.createdById === user.value?.id;
   }
-  if (!isManager.value) return false;
   
-  // Manager can only cancel receipts if they are the "requesting branch" (the one who initiated it).
-  // The responding branch manager cannot cancel it when it's DRAFT or PENDING_ADMIN.
+  if (!isManager.value && !isAdmin.value) return false;
+  
   let requestingBranchId = null;
-  if (r.type === 'IMPORT') {
+  if (r.type === 'IMPORT' || r.type === 'ADJUST_IN') {
       requestingBranchId = r.destBranchId;
   } else {
       requestingBranchId = r.sourceBranchId;
@@ -164,11 +158,13 @@ function canCancelReceipt(r: any) {
   
   if (requestingBranchId === user.value?.branchId) return true;
   
-  // Manager đích có quyền hủy (từ chối) phiếu điều chuyển khi nó được gửi đến họ (PENDING_ADMIN)
   if (r.type === 'TRANSFER' && r.status === 'PENDING_ADMIN') {
       if (r.destBranchId === user.value?.branchId) return true;
   }
   
+  if (r.type === 'IMPORT' && r.status === 'PENDING_ADMIN' && isAdmin.value) return true;
+  if (r.type === 'DISPOSAL' && r.status === 'PENDING_ADMIN' && isAdmin.value) return true;
+
   return false;
 }
 
@@ -2141,7 +2137,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
         </button>
 
         <button
-          v-if="user?.role === 'STAFF' && !(receiptType === 'TRANSFER' && isHeadBranch)"
+          v-if="user?.role === 'STAFF'"
           @click="openCreateModal"
           class="h-[42px] bg-[#4361ee] hover:bg-[#3a0ca3] text-white px-5 rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition-all flex items-center gap-2"
         >
