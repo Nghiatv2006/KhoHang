@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, nextTick, reactive } from 'vue'
+import { ref, onMounted, computed, watch, nextTick, reactive, onUnmounted } from 'vue'
 
 function toLocalISODate(d: Date): string {
   const year = d.getFullYear()
@@ -98,6 +98,27 @@ let topSoldChartInst: echarts.ECharts | null = null
 
 const headBranchImportChartRef = ref<HTMLElement | null>(null)
 let headBranchImportChartInst: echarts.ECharts | null = null
+
+const dashboardContainerRef = ref<HTMLElement | null>(null)
+let resizeObserver: ResizeObserver | null = null
+
+function handleResize() {
+  trendChartInst?.resize()
+  branchChartInst?.resize()
+  catRevenueChartInst?.resize()
+  topSoldChartInst?.resize()
+  headBranchImportChartInst?.resize()
+}
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+  if (resizeObserver) resizeObserver.disconnect()
+  trendChartInst?.dispose()
+  branchChartInst?.dispose()
+  catRevenueChartInst?.dispose()
+  topSoldChartInst?.dispose()
+  headBranchImportChartInst?.dispose()
+})
 
 const isHeadBranchUser = computed(() => {
   const bId = user.value?.branchId || user.value?.branch?.id
@@ -351,20 +372,17 @@ function initCharts() {
   updateCharts()
   
   nextTick(() => {
-    trendChartInst?.resize()
-    branchChartInst?.resize()
-    catRevenueChartInst?.resize()
-    topSoldChartInst?.resize()
-    headBranchImportChartInst?.resize()
+    handleResize()
   })
 
-  window.addEventListener('resize', () => {
-    trendChartInst?.resize()
-    branchChartInst?.resize()
-    catRevenueChartInst?.resize()
-    topSoldChartInst?.resize()
-    headBranchImportChartInst?.resize()
-  })
+  window.addEventListener('resize', handleResize)
+
+  if (dashboardContainerRef.value) {
+    resizeObserver = new ResizeObserver(() => {
+      handleResize()
+    })
+    resizeObserver.observe(dashboardContainerRef.value)
+  }
 }
 
 function updateCharts() {
@@ -882,7 +900,7 @@ function formatVND(val: number) {
     <p>Đang tải dữ liệu...</p>
   </div>
   
-  <div v-else class="max-w-[1400px]">
+  <div v-else class="max-w-[1400px]" ref="dashboardContainerRef">
 
     <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
       <h2 class="text-2xl font-bold text-slate-800">Tổng quan</h2>
