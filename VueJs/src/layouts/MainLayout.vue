@@ -409,7 +409,7 @@ onUnmounted(() => {
 
     <!-- MAIN CONTENT -->
     <main 
-      class="flex-1 flex flex-col transition-all duration-300 ease-in-out p-8"
+      class="flex-1 min-w-0 flex flex-col transition-all duration-300 ease-in-out p-8"
       :class="isCollapsed ? 'ml-0' : 'ml-[280px]'"
     >
       <!-- Topbar -->

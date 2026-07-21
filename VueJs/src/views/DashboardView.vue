@@ -102,12 +102,16 @@ let headBranchImportChartInst: echarts.ECharts | null = null
 const dashboardContainerRef = ref<HTMLElement | null>(null)
 let resizeObserver: ResizeObserver | null = null
 
+let resizeTimeout: ReturnType<typeof setTimeout> | null = null
 function handleResize() {
-  trendChartInst?.resize()
-  branchChartInst?.resize()
-  catRevenueChartInst?.resize()
-  topSoldChartInst?.resize()
-  headBranchImportChartInst?.resize()
+  if (resizeTimeout) clearTimeout(resizeTimeout)
+  resizeTimeout = setTimeout(() => {
+    trendChartInst?.resize()
+    branchChartInst?.resize()
+    catRevenueChartInst?.resize()
+    topSoldChartInst?.resize()
+    headBranchImportChartInst?.resize()
+  }, 100)
 }
 
 onUnmounted(() => {
@@ -900,7 +904,7 @@ function formatVND(val: number) {
     <p>Đang tải dữ liệu...</p>
   </div>
   
-  <div v-else class="max-w-[1400px]" ref="dashboardContainerRef">
+  <div v-else class="w-full min-w-0 max-w-[1400px]" ref="dashboardContainerRef">
 
     <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
       <h2 class="text-2xl font-bold text-slate-800">Tổng quan</h2>
