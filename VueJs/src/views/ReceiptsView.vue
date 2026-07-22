@@ -22,31 +22,31 @@ const pageConfig = computed(() => {
       title: 'Quản lý Nhập Kho',
       desc: 'Theo dõi, lập và phê duyệt các phiếu nhập kho',
       icon: 'fas fa-download',
-      btnLabel: 'Lưu phiếu nhập'
+      btnLabel: 'Tạo phiếu nhập'
     },
     EXPORT: {
       title: 'Quản lý Xuất Kho',
       desc: 'Theo dõi, lập và quản lý các phiếu xuất kho',
       icon: 'fas fa-file-export',
-      btnLabel: 'Lưu phiếu xuất'
+      btnLabel: 'Tạo phiếu xuất'
     },
     TRANSFER: {
       title: 'Quản lý Điều Chuyển',
       desc: 'Theo dõi, lập và phê duyệt các phiếu điều chuyển kho',
       icon: 'fas fa-exchange-alt',
-      btnLabel: 'Lưu phiếu điều chuyển'
+      btnLabel: 'Tạo phiếu điều chuyển'
     },
     ADJUST_OUT: {
       title: 'Quản lý Tiêu Hủy',
       desc: 'Theo dõi, lập và quản lý các phiếu tiêu hủy hàng hóa',
       icon: 'fas fa-trash-alt',
-      btnLabel: 'Lưu phiếu tiêu hủy'
+      btnLabel: 'Tạo phiếu tiêu hủy'
     },
     DISPOSAL: {
       title: 'Quản lý Tiêu Hủy',
       desc: 'Theo dõi, lập và phê duyệt các phiếu tiêu hủy hàng hóa',
       icon: 'fas fa-trash-alt',
-      btnLabel: 'Lưu phiếu tiêu hủy'
+      btnLabel: 'Tạo phiếu tiêu hủy'
     }
   }
   return configs[props.receiptType || 'IMPORT'] || configs.IMPORT
@@ -2910,7 +2910,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
               <div class="text-xs font-bold opacity-90 uppercase tracking-wider mb-1">
                 {{ createForm.type === 'EXPORT' ? 'Lưu phiếu xuất' : createForm.type === 'TRANSFER' ? 'Lưu phiếu điều chuyển' : createForm.type === 'DISPOSAL' ? 'Lưu phiếu tiêu hủy' : 'Lưu phiếu kho' }}
               </div>
-              <div class="font-bold text-xl">{{ createForm.type === 'EXPORT' ? 'Tạo phiếu xuất' : createForm.type === 'TRANSFER' ? 'Tạo lệnh xuất hàng' : createForm.type === 'DISPOSAL' ? 'Tạo phiếu tiêu hủy' : 'Tạo phiếu nhập' }}</div>
+              <div class="font-bold text-xl">{{ createForm.type === 'EXPORT' ? 'Tạo phiếu xuất' : createForm.type === 'TRANSFER' ? 'Tạo phiếu điều chuyển' : createForm.type === 'DISPOSAL' ? 'Tạo phiếu tiêu hủy' : 'Tạo phiếu nhập' }}</div>
             </div>
             <button @click="showCreateModal = false" class="relative z-10 w-9 h-9 flex items-center justify-center rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-sm transition-all shadow-sm border border-white/10">
               <i class="fas fa-times"></i>
@@ -3173,7 +3173,7 @@ html.dark-mode .sky-status-badge:hover .moon-icon {
               class="px-6 py-2.5 bg-[#4361ee] hover:bg-[#3a0ca3] text-white rounded-xl font-bold text-sm transition-all disabled:opacity-60 flex items-center gap-2">
               <i class="fas fa-spinner fa-spin" v-if="submittingCreate"></i>
               <i class="fas fa-save" v-else></i>
-              {{ createForm.type === 'EXPORT' ? 'Lưu phiếu xuất' : createForm.type === 'TRANSFER' ? 'Lưu lệnh điều chuyển' : createForm.type === 'DISPOSAL' ? 'Lưu phiếu tiêu hủy' : 'Lưu phiếu nhập' }}
+              {{ createForm.type === 'EXPORT' ? 'Lưu phiếu xuất' : createForm.type === 'TRANSFER' ? 'Lưu phiếu điều chuyển' : createForm.type === 'DISPOSAL' ? 'Lưu phiếu tiêu hủy' : 'Lưu phiếu nhập' }}
             </button>
           </div>
         </div>
