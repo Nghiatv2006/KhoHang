@@ -1,136 +1,188 @@
 # WareHub — Hệ thống Quản lý Kho hàng Đa Chi nhánh
 
-WareHub là giải pháp quản lý kho hàng tập trung và phân phối hàng hóa dành cho doanh nghiệp vận hành theo mô hình **Chi nhánh Tổng (Kho trung tâm) và nhiều Chi nhánh Con (Kho vệ tinh)**. Hệ thống giúp doanh nghiệp kiểm soát chặt chẽ tồn kho theo lô sản xuất, hạn sử dụng, tự động hóa quy trình kiểm kê, quản lý công nợ khách hàng và truy vết lịch sử hoạt động thông qua nhật ký hệ thống (Audit Log).
+WareHub là hệ thống quản lý kho hàng tập trung và hỗ trợ điều chuyển phân phối hàng hóa dành cho doanh nghiệp vận hành theo mô hình **Chi nhánh Tổng (Kho trung tâm)** và nhiều **Chi nhánh Con (Kho vệ tinh)**.
 
 ---
 
-## 🌟 Tính Năng Cốt Lõi (Core Features)
-
-### 1. Mô hình Phân phối Đa Chi nhánh (Multi-Branch Architecture)
-- **Chi nhánh Tổng (Head Branch):** Nhận hàng đầu vào (`IMPORT`) từ nhà cung cấp và phân phối xuống các chi nhánh con thông qua phiếu điều chuyển (`TRANSFER`).
-- **Chi nhánh Con (Sub-Branch):** Nhận hàng từ kho tổng và thực hiện xuất bán trực tiếp cho khách hàng (`EXPORT`).
-
-### 2. Quản lý Tồn kho theo Lô & Hạn sử dụng (Batch-level & Expiry Tracking)
-- Quản lý tồn kho chi tiết đến từng **Mã lô (Batch Code), Ngày sản xuất (NSX) và Hạn sử dụng (HSD)**.
-- Áp dụng nguyên tắc **FEFO (First Expired, First Out - Hàng cận hạn xuất trước)** để tối ưu hóa hạn sử dụng, tránh lãng phí vốn do hàng hết hạn.
-
-### 3. Quy trình Phê duyệt Nghiêm ngặt (Manager Approval Flow)
-- Nhân viên kho (`STAFF`) chỉ được phép tạo phiếu ở trạng thái nháp (`DRAFT`).
-- Quản lý (`MANAGER`) kiểm tra và duyệt phiếu chuyển sang trạng thái hoàn thành (`COMPLETED`) để hệ thống tự động cộng/trừ số lượng tồn kho thực tế, hoặc hủy phiếu (`CANCELLED`).
-- Mọi phiếu đã duyệt `COMPLETED` hoặc `CANCELLED` đều **không thể sửa hay xóa** để bảo vệ tính toàn vẹn dữ liệu kế toán kho.
-
-### 4. Kiểm kê & Tự động cân bằng Kho (Stocktake & Auto Adjustment)
-- Cho phép tạo phiên kiểm kê định kỳ tại từng chi nhánh.
-- So sánh số lượng thực tế kiểm đếm (`actual_quantity`) với số lượng sổ sách hệ thống (`expected_quantity`).
-- Khi hoàn tất kiểm kê, hệ thống tự động sinh các phiếu cân bằng tăng (`ADJUST_IN`) hoặc cân bằng giảm (`ADJUST_OUT`) tương ứng với lượng chênh lệch thực tế.
-
-### 5. Quản lý Công nợ Khách hàng (Accounts Receivable - AR)
-- Theo dõi lịch sử công nợ chi tiết của từng khách hàng.
-- Khi duyệt phiếu xuất bán hàng chưa thanh toán (`UNPAID`), công nợ khách hàng tự động tăng tương ứng. Khi khách hàng thanh toán (`PAID`), công nợ tự động giảm trừ.
-
-### 6. Nhật ký Hoạt động Bảo mật (Audit Logging)
-- Tự động ghi lại mọi thao tác nghiệp vụ nhạy cảm (Đăng nhập, thêm/sửa/xóa sản phẩm, phê duyệt phiếu kho, kiểm kê, cảnh báo spam).
-- Nhật ký hoạt động chỉ được đọc và không thể chỉnh sửa hay xóa bởi bất kỳ ai (kể cả ADMIN), bảo đảm tính minh bạch khi cần đối soát.
-
-### 7. Dashboard Phân tích Kinh doanh Hiện đại (Modern ECharts Analytics)
-- **Xu hướng Nhập - Xuất kho (30 ngày):** Biểu đồ đường (Line Chart) so sánh lượng tiền nhập hàng và xuất bán mỗi ngày.
-- **Doanh thu xuất bán theo Chi nhánh (30 ngày):** Biểu đồ cột đứng so sánh doanh số thực tế giữa các kho con.
-- **Tỷ trọng doanh thu theo Danh mục (30 ngày):** Biểu đồ Donut phân tích cơ cấu đóng góp doanh thu của từng nhóm sản phẩm.
-- **Top 10 sản phẩm bán chạy nhất:** Biểu đồ cột ngang hiển thị danh sách mặt hàng đắt khách nhất.
-- **Dự báo số ngày bán hàng còn lại (Inventory Runway):** Biểu đồ cột ngang thông minh tự động đổi màu cột dựa theo mức độ khẩn cấp (Đỏ `< 7` ngày, Vàng `7-15` ngày, Xanh `> 15` ngày) để cảnh báo thủ kho chủ động nhập thêm hàng.
+## 📋 Mục lục
+- [Giới thiệu Dự án](#-giới-thiệu-dự-án)
+- [Yêu cầu Môi trường (Prerequisites)](#-yêu-cầu-môi-trường-prerequisites)
+- [Công nghệ & Thư viện sử dụng](#-công-nghệ--thư-viện-sử-dụng)
+- [Cấu trúc Thư mục Dự án](#-cấu-trúc-thư-mục-dự-án)
+- [Cấu hình Biến môi trường (.env)](#-cấu-hình-biến-môi-trường-env)
+- [Hướng dẫn Cài đặt & Khởi chạy](#-hướng-dẫn-cài-đặt--khởi-chạy)
+- [Dịch vụ bên thứ ba (Third-party Services)](#-dịch-vụ-bên-thứ-ba-third-party-services)
 
 ---
 
-## 🛠️ Công Nghệ Sử Dụng (Tech Stack)
+## 🌟 Giới thiệu Dự án
 
-### Backend (Spring Boot API)
-- **Framework:** Spring Boot (Java 17)
-- **Database:** PostgreSQL (Cơ sở dữ liệu quan hệ)
-- **ORM:** Spring Data JPA
-- **Security:** Spring Security (Xác thực phân quyền RBAC: ADMIN, MANAGER, STAFF)
-
-### Frontend (VueJS Web App)
-- **Framework:** Vue 3 Composition API
-- **Build Tool:** Vite + TypeScript
-- **Styling:** Tailwind CSS (Vanilla CSS & Glassmorphism design)
-- **Charts:** Apache ECharts (Trực quan hóa dữ liệu hiệu năng cao)
+**WareHub** giải quyết bài toán quản lý kho đa chi nhánh cho doanh nghiệp với các đặc điểm cốt lõi:
+- **Phân phối Đa chi nhánh:** Quản lý kho tổng (nhập từ nhà cung cấp, chuyển hàng xuống chi nhánh con) và các kho con (nhận hàng, xuất bán lẻ).
+- **Kiểm soát Tồn kho chi tiết:** Quản lý và kiểm soát chính xác số lượng tồn kho của từng mặt hàng (thiết bị điện tử, iPhone, phụ kiện...) tại từng chi nhánh tổng và chi nhánh con.
+- **Quy trình Phê duyệt Phân quyền:** Phân quyền minh bạch giữa Quản lý (Manager) và Nhân viên (Staff).
+- **Kiểm kê & Tự động cân bằng:** So sánh thực tế kiểm đếm với sổ sách và tự động sinh phiếu cân bằng kho (`ADJUST_IN` / `ADJUST_OUT`).
+- **Quản lý Công nợ & Báo cáo:** Theo dõi công nợ khách hàng (AR) và hệ thống biểu đồ trực quan hóa dữ liệu kinh doanh.
 
 ---
 
-## 💾 Cấu trúc Cơ sở Dữ liệu chính
+## 💻 Yêu cầu Môi trường (Prerequisites)
 
-```
-                                      [categories]
-                                           │ (1)
-                                           ▼ (N)
- [branches] ──(1)──► (N) [inventories] ◄──(N)── [products]
-     │                       ▲                      ▲
-     │ (1)                   │ (1)                  │ (1)
-     ▼ (N)                   │                      │
- [receipts] ◄──(1)──────(N) [receipt_details] ──────┘
-     │
-     ▼ (N)
- [customers]
-```
+Trước khi tiến hành cài đặt và khởi chạy dự án, máy tính của bạn cần được cài đặt sẵn các môi trường sau:
+
+| Công cụ / Môi trường | Phiên bản khuyến nghị | Mục đích sử dụng |
+| :--- | :--- | :--- |
+| **Node.js** | `>= 18.0.0` | Môi trường thực thi JavaScript cho Frontend |
+| **npm** | `>= 9.0.0` | Trình quản lý gói thư viện Node.js |
+| **Java Development Kit (JDK)** | `17` (OpenJDK / Eclipse Temurin) | Môi trường biên dịch và chạy Spring Boot Backend |
+| **PostgreSQL** | `>= 14.0` | Hệ quản trị cơ sở dữ liệu quan hệ chính |
+| **Git** | Bản mới nhất | Quản lý mã nguồn dự án |
 
 ---
 
-## 🔌 Hướng dẫn Khởi động nhanh bằng File Script (`.bat`)
+## 🛠️ Công nghệ & Thư viện sử dụng
 
-Để tiết kiệm tài nguyên hệ thống (RAM/CPU) khi phát triển và không phải mở các IDE nặng như IntelliJ IDEA, dự án cung cấp bộ script chạy nhanh bằng file batch (`.bat`) trên Windows.
+### 1. Backend (Spring Boot API)
+- **Java Version:** 17
+- **Framework:** Spring Boot `3.5.14`
+- **Spring Starters & Modules:**
+  - `spring-boot-starter-web`: Xây dựng RESTful Web API.
+  - `spring-boot-starter-data-jpa`: Tương tác cơ sở dữ liệu qua ORM Hibernate / JPA.
+  - `spring-boot-starter-security`: Xác thực và phân quyền người dùng (RBAC: ADMIN, MANAGER, STAFF).
+  - `spring-boot-starter-mail`: Dịch vụ gửi email thông báo tự động.
+- **Database Driver:** PostgreSQL JDBC Driver (`org.postgresql:postgresql`)
+- **Bảo mật JWT:** JJWT `0.11.5` (`jjwt-api`, `jjwt-impl`, `jjwt-jackson`)
+- **Xử lý Tài liệu & Báo cáo:**
+  - **Apache POI** (`5.2.3` - `poi`, `poi-ooxml`): Đọc/ghi dữ liệu và xuất báo cáo file Excel (`.xlsx`).
+  - **OpenHTMLtoPDF** (`1.0.10` - `openhtmltopdf-core`, `openhtmltopdf-pdfbox`): Render template HTML thành tệp PDF.
 
-Bộ script điều khiển dự án bao gồm:
-1. **`init_db.bat`** (ở thư mục gốc): Tự động xin quyền Admin, kiểm tra và bật dịch vụ PostgreSQL, tạo cơ sở dữ liệu `warehouse_db` và nạp toàn bộ cấu trúc bảng cùng dữ liệu mẫu.
-2. **`run_warehub.bat`** (ở thư mục gốc): Script chính khởi chạy, tự động mở song song Backend và Frontend trong 2 cửa sổ CMD riêng biệt.
-3. **`run_backend.bat`**: Script khởi chạy Spring Boot (tự động nạp cấu hình từ `.env` thông qua PowerShell và gán JDK 17).
-4. **`run_frontend.bat`**: Script tích hợp menu lựa chọn tải tài nguyên (`npm install`) hoặc chạy Vite dev server cho Frontend VueJS.
-
-### Quy trình khởi chạy dự án từng bước:
-
-#### Bước 1: Cấu hình biến môi trường (`.env`)
-* Sao chép file `.env.example` thành `.env` (nếu chưa có) và cập nhật thông số kết nối Database của máy bạn (nếu khác với cấu hình mặc định là `postgres` / mật khẩu `123456`).
-
-#### Bước 2: Khởi tạo Cơ sở dữ liệu
-* Click đúp chuột vào file **`init_db.bat`** ở thư mục gốc.
-* Hệ thống sẽ hiện hộp thoại xin quyền Admin để tự động kiểm tra trạng thái dịch vụ PostgreSQL:
-  * Nếu PostgreSQL đang tắt, script sẽ tự động khởi chạy dịch vụ này lên.
-  * Tự động tạo cơ sở dữ liệu `warehouse_db` (nếu chưa có).
-  * Tự động chuyển bảng mã sang UTF-8 và chạy các tệp `full_schema.sql` và `seed_data.sql` để tạo cấu trúc và dữ liệu mẫu.
-
-#### Bước 3: Tải tài nguyên Frontend (Chỉ cần chạy ở lần đầu tiên)
-* Click đúp chuột vào file **`run_frontend.bat`** ở thư mục gốc.
-* Nhập phím **`1`** và ấn Enter để thực hiện tải tài nguyên (`npm install`).
-* Sau khi quá trình tải tài nguyên hoàn tất, ấn phím bất kỳ để quay lại menu chính và nhập **`3`** để thoát cửa sổ này.
-
-#### Bước 4: Khởi động ứng dụng
-* Click đúp vào file **`run_warehub.bat`** ở thư mục gốc để khởi động đồng thời cả Backend và Frontend.
-* **Mẹo (Tùy chọn)**: Để tiện dụng, bạn có thể click chuột phải vào file **`run_warehub.bat`** -> chọn **Send to** -> **Desktop (create shortcut)** để bật nhanh từ màn hình chính.
-* Truy cập `http://localhost:3000` (hoặc `http://localhost:3001` tùy theo log hiển thị ở Frontend) trên trình duyệt để sử dụng hệ thống.
+### 2. Frontend (VueJS Single Page Application)
+- **Framework & Core:** Vue 3 (`3.5.34` - Composition API), TypeScript (`6.0.2`)
+- **Build Tool:** Vite (`8.0.12`), `vue-tsc`
+- **Routing:** Vue Router (`4.6.4`)
+- **Styling & Design:** Tailwind CSS (`4.3.1`), PostCSS (`8.5.15`), Autoprefixer
+- **HTTP Client:** Axios (`1.17.0`)
+- **Biểu đồ & Trực quan hóa (Charts):** Apache ECharts (`6.1.0`), `vue-echarts` (`8.0.1`)
+- **Hiệu ứng & 3D:** Anime.js (`4.5.0`), Three.js (`0.184.0`)
+- **Xuất PDF & Hình ảnh ở Client:** `jspdf` (`4.2.1`), `html2canvas` (`1.4.1`)
 
 ---
 
----
+## 📁 Cấu trúc Thư mục Dự án
 
-## ☕ Cơ chế tự động dò tìm JDK 17 (Auto-detect)
-
-File script `run_backend.bat` đã được cấu hình thông minh:
-* **Tự động kiểm tra**: Nếu biến môi trường `JAVA_HOME` hiện tại của bạn không trỏ tới JDK 17 hoặc bị lỗi, script sẽ tự động tìm kiếm JDK 17 hợp lệ (chứa tệp thực thi `bin\java.exe`) trong các thư mục cài đặt tiêu chuẩn:
-  * `D:\jdk17`
-  * `C:\Program Files\Java`
-  * `C:\Program Files\Eclipse Adoptium`
-  * `D:\Java`
-  * `C:\Java`
-* **Gán tự động**: Khi tìm thấy JDK 17 hợp lệ, hệ thống sẽ tự động gán biến `JAVA_HOME` tạm thời cho phiên làm việc để chạy dự án. Bạn **không cần phải chỉnh sửa cấu hình thủ công**.
-
----
-
-## 🐙 Quản lý mã nguồn trên Git cho các file `.bat`
-
-Các file `.bat` này đã được cấu hình ignore thay đổi cục bộ sẵn trong Git. Bạn có thể thay đổi cấu hình trên máy mình thoải mái mà không sợ bị Git báo thay đổi hoặc đẩy đè cấu hình lên người khác.
-
-Nếu bạn clone dự án về máy mới và muốn áp dụng quy tắc bỏ qua thay đổi cục bộ này cho các file `.bat`, hãy mở PowerShell tại thư mục dự án và chạy lệnh:
-```bash
-git update-index --skip-worktree run_backend.bat run_frontend.bat run_warehub.bat
+```text
+WareHub/
+├── build.gradle              # Cấu hình Gradle & Dependencies Backend
+├── settings.gradle           # Cấu hình tên project Gradle
+├── Dockerfile / docker-compose.yml # Thẻ đóng gói Docker container
+├── full_schema.sql           # Schema SQL khởi tạo bảng CSDL PostgreSQL
+├── seed_data.sql             # Dữ liệu khởi tạo mẫu
+├── init_db.bat / init_db.ps1 # Script tự động tạo database & nạp SQL
+├── run_warehub.bat           # Script khởi chạy đồng thời Backend + Frontend
+├── run_backend.bat           # Script khởi chạy Spring Boot (Auto-detect JDK 17)
+├── run_frontend.bat          # Script quản lý & chạy Vite Frontend
+│
+├── src/                      # MÃ NGUỒN BACKEND (Spring Boot)
+│   └── main/java/com/example/Hehe/
+│       ├── config/           # Cấu hình Security, CORS, Mail, WebMvc...
+│       ├── controller/       # REST API Controllers (Auth, Product, Receipt...)
+│       ├── dto/              # Data Transfer Objects (Request/Response)
+│       ├── exception/        # Xử lý ngoại lệ toàn cục (Global Exception Handler)
+│       ├── model/            # JPA Entities (Branch, Product, Inventory, Receipt...)
+│       ├── repository/       # JPA Repositories truy vấn CSDL
+│       ├── security/         # JWT Token Provider, Auth Filters, Security Config
+│       ├── service/          # Logic nghiệp vụ hệ thống
+│       └── util/             # Utility classes (PDF/Excel Generator...)
+│
+├── VueJs/                    # MÃ NGUỒN FRONTEND (Vue 3 SPA)
+│   ├── package.json          # Danh sách thư viện & Scripts NPM
+│   ├── vite.config.ts        # Cấu hình Vite Build Tool
+│   ├── tailwind.config.js    # Cấu hình giao diện Tailwind CSS
+│   └── src/
+│       ├── api.ts            # Cấu hình Axios & Endpoints
+│       ├── assets/           # CSS, logo, hình ảnh tĩnh
+│       ├── components/       # Các component UI tái sử dụng
+│       ├── layouts/          # Giao diện khung (MainLayout, AuthLayout)
+│       ├── router/           # Định tuyến ứng dụng (Vue Router)
+│       ├── views/            # Các trang giao diện chính
+│       └── utils/            # Helper functions
+│
+├── docs/ / UseCase/          # Tài liệu mô tả Use Case & Nghiệp vụ
+└── diagrams/                 # Sơ đồ ERD & Thiết kế hệ thống
 ```
 
-*(Nếu muốn khôi phục lại trạng thái theo dõi bình thường của Git, sử dụng cờ `--no-skip-worktree`).*
+---
+
+## ⚙️ Cấu hình Biến môi trường (`.env`)
+
+Trước khi khởi chạy dự án, sao chép tệp `.env.example` thành `.env` (hoặc tạo tệp `.env` mới tại thư mục gốc) và khai báo các biến môi trường sau:
+
+```env
+# 1. Spring Boot Server Port
+SERVER_PORT=8080
+
+# 2. Cấu hình Cơ sở dữ liệu PostgreSQL
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=warehouse_db
+DB_USERNAME=postgres
+DB_PASSWORD=123456
+
+# 3. Cấu hình Bảo mật JWT
+JWT_SECRET=<chuỗi-bí-mật-ngẫu-nhiên-tối-thiểu-32-ký-tự>
+JWT_EXPIRATION=86400000
+
+# 4. Tài khoản Admin mặc định (dùng để tham chiếu khi chạy seed_data)
+DEFAULT_ADMIN_USERNAME=admin
+DEFAULT_ADMIN_PASSWORD=123456
+
+# 5. Cấu hình Gửi Email (SMTP Gmail)
+MAIL_USERNAME=your_email@gmail.com
+MAIL_PASSWORD=your_app_password
+
+# 6. Backup HMAC Secret
+BACKUP_SECRET=<chuỗi-bí-mật-ngẫu-nhiên-tối-thiểu-32-ký-tự>
+
+# 7. AbstractAPI Email Verification Key
+ABSTRACT_API_KEY=your_abstract_api_key_here
+```
+
+---
+
+## 🚀 Hướng dẫn Cài đặt & Khởi chạy
+
+### Cách 1: Khởi chạy bằng IntelliJ IDEA & Terminal (Khuyên dùng cho Developer)
+
+1. **Khởi tạo Cơ sở dữ liệu:**
+   * Click đúp chuột vào tệp `init_db.bat` ở thư mục gốc. Script sẽ tự động kích hoạt dịch vụ PostgreSQL (nếu bị tắt), tạo database `warehouse_db` và nạp toàn bộ cấu trúc bảng cùng dữ liệu mẫu từ `full_schema.sql` và `seed_data.sql`.
+
+2. **Khởi chạy Backend (Spring Boot):**
+   * Mở thư mục dự án WareHub trong **IntelliJ IDEA**.
+   * IntelliJ sẽ tự động nhận diện dự án Gradle và tải toàn bộ các phụ thuộc (dependencies).
+   * Để ứng dụng nạp biến môi trường từ `.env`: cài đặt plugin **EnvFile** trong IntelliJ (hoặc cấu hình đường dẫn tệp `.env` trong phần *Environment Variables* của **Run/Debug Configurations**).
+   * Mở tệp `src/main/java/com/example/Hehe/HeheApplication.java` và nhấn nút **Run** (hoặc tổ hợp phím `Shift + F10`).
+   * Backend API sẽ lắng nghe tại cổng `http://localhost:8080`.
+
+3. **Khởi chạy Frontend (Vue 3):**
+   * Mở cửa sổ **Terminal** tích hợp trong IntelliJ IDEA (hoặc CMD/PowerShell), di chuyển vào thư mục `VueJs`:
+     ```powershell
+     cd VueJs
+     npm install     # Tải phụ thuộc (Chỉ thực hiện ở lần chạy đầu tiên)
+     npm run dev     # Khởi chạy Vite Dev Server
+     ```
+   * Mở trình duyệt và truy cập `http://localhost:3000`.
+
+---
+
+### Cách 2: Khởi chạy nhanh bằng Bộ Script `.bat` (Windows)
+
+1. **Khởi tạo Cơ sở dữ liệu:** Click đúp file `init_db.bat`.
+2. **Tải tài nguyên Frontend (Chỉ lần đầu):** Click đúp file `run_frontend.bat` -> Nhập phím `1` (`npm install`).
+3. **Khởi chạy đồng thời cả hệ thống:** Click đúp file `run_warehub.bat` để tự động bật Backend và Frontend trong 2 cửa sổ console riêng biệt.
+
+---
+
+## 🌐 Dịch vụ bên thứ ba (Third-party Services)
+
+- **[Abstract API - Email Reputation API](https://www.abstractapi.com/api/email-verification-validation-api):** Được tích hợp tại [UserController.java](file:///d:/IT/Hehe/src/main/java/com/example/Hehe/controller/UserController.java) để kiểm tra khả năng gửi/nhận thư (`email_deliverability`) của email người dùng.
+- **Gmail SMTP Server:** Dịch vụ gửi email tự động thông qua Spring Mail.
