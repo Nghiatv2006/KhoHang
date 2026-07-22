@@ -125,26 +125,26 @@ SERVER_PORT=8080
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=warehouse_db
-DB_USERNAME=postgres
-DB_PASSWORD=123456
+DB_USERNAME=your_db_username
+DB_PASSWORD=your_db_password
 
 # 3. Cấu hình Bảo mật JWT
-JWT_SECRET=<chuỗi-bí-mật-ngẫu-nhiên-tối-thiểu-32-ký-tự>
+JWT_SECRET=your_jwt_secret_key_min_32_chars
 JWT_EXPIRATION=86400000
 
 # 4. Tài khoản Admin mặc định (dùng để tham chiếu khi chạy seed_data)
-DEFAULT_ADMIN_USERNAME=admin
-DEFAULT_ADMIN_PASSWORD=123456
+DEFAULT_ADMIN_USERNAME=your_admin_username
+DEFAULT_ADMIN_PASSWORD=your_admin_password
 
 # 5. Cấu hình Gửi Email (SMTP Gmail)
 MAIL_USERNAME=your_email@gmail.com
-MAIL_PASSWORD=your_app_password
+MAIL_PASSWORD=your_email_app_password
 
 # 6. Backup HMAC Secret
-BACKUP_SECRET=<chuỗi-bí-mật-ngẫu-nhiên-tối-thiểu-32-ký-tự>
+BACKUP_SECRET=your_backup_hmac_secret_key
 
 # 7. AbstractAPI Email Verification Key
-ABSTRACT_API_KEY=your_abstract_api_key_here
+ABSTRACT_API_KEY=your_abstract_api_key
 ```
 
 ---
