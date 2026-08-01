@@ -215,7 +215,7 @@ const mainNavItems = computed(() => {
   }
   items.push({ label: 'Điều chuyển', to: '/transfers', icon: 'fas fa-exchange-alt', badge: badgeTransfer.value })
   
-  items.push({ label: 'Tiêu hủy', to: '/disposals', icon: 'fas fa-trash-alt', badge: badgeDisposal.value })
+  // items.push({ label: 'Tiêu hủy', to: '/disposals', icon: 'fas fa-trash-alt', badge: badgeDisposal.value })
   if (hasCrudPermission.value) {
     items.push({ label: 'Sản phẩm', to: '/products', icon: 'fas fa-box-open' })
   }
