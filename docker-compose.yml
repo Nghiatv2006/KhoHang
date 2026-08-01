@@ -41,6 +41,7 @@ services:
       MAIL_USERNAME: "${MAIL_USERNAME}"
       MAIL_PASSWORD: "${MAIL_PASSWORD}"
       BACKUP_SECRET: "${BACKUP_SECRET}"
+      ABSTRACT_API_KEY: "${ABSTRACT_API_KEY}"
     volumes:
       - ./uploads:/app/uploads
     depends_on:
