@@ -1,4 +1,5 @@
 
+
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { api } from '../api'
@@ -9,7 +10,7 @@ const toast = useToast()
 // ─── State ────────────────────────────────────────────────────────────────────
 const history = ref<any[]>([])
 const loading = ref(true)
-const exporting = ref(false)
+const exporting = ref(false)   
 const restoring = ref(false)
 const triggeringAuto = ref(false)
 
