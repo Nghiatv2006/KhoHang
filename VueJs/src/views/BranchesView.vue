@@ -17,7 +17,6 @@ const filteredBranches = computed(() => {
   if (!bSearch.value.trim()) return branches.value
   const kw = bSearch.value.toLowerCase()
   return branches.value.filter(b => 
-    b.isHead || 
     b.name?.toLowerCase().includes(kw) || 
     b.address?.toLowerCase().includes(kw) ||
     b.taxCode?.toLowerCase().includes(kw) ||
@@ -74,19 +73,7 @@ async function doDelete() {
 
 async function loadBranches() {
   bLoading.value = true
-  try { 
-    const res = await api.get('/api/branches'); 
-    if (res.ok) {
-      const data = await res.json();
-      // Đảm bảo nhánh tổng luôn ở trên cùng, các nhánh khác sort theo ID
-      data.sort((a: any, b: any) => {
-        if (a.isHead && !b.isHead) return -1;
-        if (!a.isHead && b.isHead) return 1;
-        return a.id - b.id;
-      });
-      branches.value = data;
-    }
-  }
+  try { const res = await api.get('/api/branches'); if (res.ok) branches.value = await res.json() }
   catch {} finally { bLoading.value = false }
 }
 
@@ -98,7 +85,7 @@ const branchThemes = [
     cardBg: 'bg-gradient-to-br from-[#f0fdf4] to-[#dcfce7] border-[#86efac] hover:shadow-[0_15px_30px_rgba(22,163,74,0.18)] hover:border-[#16a34a] hover:-translate-y-1.5',
     iconBg: 'bg-white border border-[#86efac] text-[#16a34a]',
     titleColor: 'text-[#15803d]',
-    descBg: 'bg-white/80 border border-[#bbf7d0]',
+    descBg: 'bg-white border border-[#dcfce7]',
     topBar: 'from-[#16a34a] to-[#4ade80]',
     warnBg: 'bg-[#dcfce7] border border-[#86efac] text-[#15803d]',
     icon: 'fas fa-leaf',
@@ -109,7 +96,7 @@ const branchThemes = [
     cardBg: 'bg-gradient-to-br from-[#fffaf5] to-[#f7ebe1] border-[#e3cbb8] hover:shadow-[0_15px_30px_rgba(133,77,14,0.15)] hover:border-[#854d0e] hover:-translate-y-1.5',
     iconBg: 'bg-white border border-[#e3cbb8] text-[#854d0e]',
     titleColor: 'text-[#713f12]',
-    descBg: 'bg-white/80 border border-[#fed7aa]',
+    descBg: 'bg-white border border-[#f7ebe1]',
     topBar: 'from-[#854d0e] to-[#b45309]',
     warnBg: 'bg-[#f7ebe1] border border-[#e3cbb8] text-[#713f12]',
     icon: 'fas fa-seedling',
@@ -120,7 +107,7 @@ const branchThemes = [
     cardBg: 'bg-gradient-to-br from-[#f0f9ff] to-[#e0f2fe] border-[#7dd3fc] hover:shadow-[0_15px_30px_rgba(3,105,161,0.18)] hover:border-[#0284c7] hover:-translate-y-1.5',
     iconBg: 'bg-white border border-[#7dd3fc] text-[#0284c7]',
     titleColor: 'text-[#075985]',
-    descBg: 'bg-white/80 border border-[#bae6fd]',
+    descBg: 'bg-white border border-[#e0f2fe]',
     topBar: 'from-[#0284c7] to-[#0ea5e9]',
     warnBg: 'bg-[#e0f2fe] border border-[#7dd3fc] text-[#075985]',
     icon: 'fas fa-tint',
@@ -131,7 +118,7 @@ const branchThemes = [
     cardBg: 'bg-gradient-to-br from-[#fff5f6] to-[#ffdce0] border-[#fda4af] hover:shadow-[0_15px_30px_rgba(225,29,72,0.18)] hover:border-[#e11d48] hover:-translate-y-1.5',
     iconBg: 'bg-white border border-[#fda4af] text-[#e11d48]',
     titleColor: 'text-[#be123c]',
-    descBg: 'bg-white/80 border border-[#fecdd3]',
+    descBg: 'bg-white border border-[#ffdce0]',
     topBar: 'from-[#e11d48] to-[#fb7185]',
     warnBg: 'bg-[#ffdce0] border border-[#fda4af] text-[#be123c]',
     icon: 'fas fa-sun',
@@ -139,26 +126,8 @@ const branchThemes = [
   }
 ]
 
-function getBranchTheme(b: any, idx: number) {
-  if (b.isHead) {
-    return {
-      themeClass: 'is-head-card',
-      cardBg: 'bg-white border-[#c8aa6e] shadow-[0_8px_30px_rgba(10,200,185,0.08)] hover:shadow-[0_15px_30px_rgba(10,200,185,0.2)] hover:border-[#0ac8b9] hover:-translate-y-1.5',
-      iconBg: 'bg-gradient-to-br from-[#f0fdfa] to-white border border-[#c8aa6e] text-[#0ac8b9] shadow-[0_4px_15px_rgba(10,200,185,0.15)]',
-      titleColor: 'text-[#0f766e]',
-      descBg: 'bg-[#f8f9fa] border border-[#c8aa6e]/40',
-      topBar: 'from-[#0ac8b9] via-[#c8aa6e] to-[#0ac8b9]',
-      warnBg: 'bg-[#f0fdfa] border border-[#0ac8b9]/40 text-[#0d9488]',
-      icon: 'fas fa-crown',
-      watermark: 'fas fa-crown text-[#c8aa6e]/10 group-hover:scale-110 group-hover:-rotate-6 group-hover:text-[#0ac8b9]/10'
-    }
-  }
-
-  const theme = branchThemes[idx % branchThemes.length]
-  return {
-    ...theme,
-    themeClass: `theme-${idx % 4}`
-  }
+function getBranchTheme(idx: number) {
+  return branchThemes[idx % branchThemes.length]
 }
 </script>
 
@@ -196,24 +165,24 @@ function getBranchTheme(b: any, idx: number) {
       <div
         v-for="(b, index) in filteredBranches"
         :key="b.id"
-        :class="['rounded-[16px] p-6 transition-all duration-300 group relative overflow-hidden flex flex-col cursor-pointer select-none branch-card branch-card-enter shadow-[0_8px_30px_rgba(0,0,0,0.06)] border-2', getBranchTheme(b, index).cardBg, getBranchTheme(b, index).themeClass]"
+        :class="['rounded-[16px] p-6 transition-all duration-300 group relative overflow-hidden flex flex-col cursor-pointer select-none branch-card branch-card-enter shadow-[0_8px_30px_rgba(0,0,0,0.06)] border-2', getBranchTheme(index).cardBg, `theme-${index % 4}`]"
         :style="{ animationDelay: `${index * 50}ms` }"
         @dblclick="isAdmin ? openEdit(b) : null"
       >
         <!-- Decorative top bar -->
-        <div :class="['absolute top-0 left-0 w-full h-1 bg-gradient-to-r transition-opacity', getBranchTheme(b, index).topBar, b.isHead ? 'opacity-100' : 'opacity-0 group-hover:opacity-100']"></div>
+        <div :class="['absolute top-0 left-0 w-full h-1 bg-gradient-to-r transition-opacity', getBranchTheme(index).topBar, b.isHead ? 'opacity-100' : 'opacity-0 group-hover:opacity-100']"></div>
         
         <!-- Header -->
         <div class="flex items-start justify-between mb-5 relative z-10">
           <div class="flex items-center gap-3">
-            <div :class="['w-12 h-12 rounded-xl flex items-center justify-center border shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:rotate-6 relative z-10 store-icon-circle', getBranchTheme(b, index).iconBg]">
-              <i :class="[getBranchTheme(b, index).icon, 'text-xl']"></i>
+            <div :class="['w-12 h-12 rounded-xl flex items-center justify-center border shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:rotate-6 relative z-10 store-icon-circle', getBranchTheme(index).iconBg]">
+              <i :class="[getBranchTheme(index).icon, 'text-xl']"></i>
             </div>
             <div>
-              <div :class="['font-bold text-lg leading-tight transition-colors card-title', getBranchTheme(b, index).titleColor]">{{ b.name }}</div>
+              <div :class="['font-bold text-lg leading-tight transition-colors card-title', getBranchTheme(index).titleColor]">{{ b.name }}</div>
               <div class="text-xs font-mono text-[#8094ae] mt-1">ID: #{{ b.id }}</div>
               <div v-if="b.isHead" class="mt-1.5 inline-flex items-center gap-1 bg-white/80 text-[#f59e0b] text-[10px] font-bold px-2 py-0.5 rounded-md border border-[#ffecb3] shadow-sm is-head-badge">
-                <i class="fas fa-star text-[9px] text-[#f59e0b]"></i> CHI NHÁNH TỔNG
+                <i class="fas fa-crown text-[9px] text-[#f59e0b]"></i> CHI NHÁNH TỔNG
               </div>
             </div>
           </div>
@@ -231,12 +200,12 @@ function getBranchTheme(b: any, idx: number) {
         <!-- Info -->
         <div class="space-y-3 flex-1 flex flex-col justify-between relative z-10">
           <div class="space-y-2">
-            <div :class="['flex items-start gap-3 p-2.5 rounded-xl border info-capsule', getBranchTheme(b, index).descBg]">
+            <div :class="['flex items-start gap-3 p-2.5 rounded-xl border info-capsule', getBranchTheme(index).descBg]">
               <i class="fas fa-map-marker-alt text-[#8094ae] mt-1 flex-shrink-0"></i>
               <span class="text-sm text-[#526484] leading-relaxed line-clamp-2 w-full" :title="b.address">{{ b.address || 'Chưa cập nhật địa chỉ' }}</span>
             </div>
 
-            <div :class="['flex items-start gap-3 p-2.5 rounded-xl border info-capsule', getBranchTheme(b, index).descBg]">
+            <div :class="['flex items-start gap-3 p-2.5 rounded-xl border info-capsule', getBranchTheme(index).descBg]">
               <i class="fas fa-file-invoice-dollar text-[#8094ae] mt-1 flex-shrink-0"></i>
               <div>
                 <div class="text-[10px] text-[#8094ae] font-bold uppercase tracking-wider">Mã số thuế</div>
@@ -244,7 +213,7 @@ function getBranchTheme(b: any, idx: number) {
               </div>
             </div>
 
-            <div :class="['flex items-start gap-3 p-2.5 rounded-xl border info-capsule', getBranchTheme(b, index).descBg]">
+            <div :class="['flex items-start gap-3 p-2.5 rounded-xl border info-capsule', getBranchTheme(index).descBg]">
               <i class="fas fa-user-shield text-[#8094ae] mt-1 flex-shrink-0"></i>
               <div>
                 <div class="text-[10px] text-[#8094ae] font-bold uppercase tracking-wider">Người phụ trách</div>
@@ -255,7 +224,7 @@ function getBranchTheme(b: any, idx: number) {
           
           <div class="flex items-center justify-between border-t border-black/5 pt-3 mt-auto">
             <div class="text-xs font-bold text-[#8094ae] uppercase tracking-wider">Ngưỡng cảnh báo</div>
-            <div :class="['flex items-center gap-1.5 px-2.5 py-1 rounded-md border warning-badge', getBranchTheme(b, index).warnBg]">
+            <div :class="['flex items-center gap-1.5 px-2.5 py-1 rounded-md border warning-badge', getBranchTheme(index).warnBg]">
               <i class="fas fa-exclamation-triangle text-[10px]"></i>
               <span class="font-bold text-sm">{{ b.lowStockThreshold }}</span>
             </div>
@@ -263,7 +232,7 @@ function getBranchTheme(b: any, idx: number) {
         </div>
 
         <!-- Watermark Nature Background Icon -->
-        <i :class="['absolute -bottom-6 -right-6 text-9xl transition-all duration-1000 pointer-events-none z-0 nature-watermark', getBranchTheme(b, index).watermark]"></i>
+        <i :class="['absolute -bottom-6 -right-6 text-9xl transition-all duration-1000 pointer-events-none z-0 nature-watermark', getBranchTheme(index).watermark]"></i>
       </div>
     </div>
 
@@ -459,24 +428,7 @@ html.dark-mode .info-capsule div {
   color: #94a3b8 !important;
 }
 html.dark-mode .is-head-badge {
-  background-color: #091428 !important;
-  border-color: #c8aa6e !important;
-}
-
-/* ── Challenger Theme Overrides (isHead) ── */
-.is-head-card .info-capsule i {
-  color: #c8aa6e !important; /* Gold icons */
-}
-html:not(.dark-mode) .is-head-card .is-head-badge {
-  background-color: #fffbeb !important;
-  border-color: #c8aa6e !important;
-  color: #b45309 !important;
-}
-html.dark-mode .is-head-card .is-head-badge {
-  border-color: #c8aa6e !important;
-  color: #c8aa6e !important;
-}
-.is-head-card .is-head-badge i {
-  color: #0ac8b9 !important; /* Cyan icon in badge */
+  background-color: rgba(30, 41, 59, 0.8) !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
 }
 </style>
