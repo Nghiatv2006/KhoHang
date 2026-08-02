@@ -208,6 +208,7 @@ async function saveUser() {
   if (!userForm.email?.trim()) { toast.error('Email là bắt buộc.'); return }
   if (!editingUser.value && !userForm.password) { toast.error('Mật khẩu là bắt buộc khi tạo mới.'); return }
   
+
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userForm.email.trim())) {
     toast.error('Định dạng email không hợp lệ.')
     return

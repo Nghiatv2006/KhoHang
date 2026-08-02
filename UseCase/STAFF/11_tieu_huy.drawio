@@ -1,44 +1,61 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <mxfile host="Electron" type="device">
-  <diagram id="23_tieu_huy-id" name="Use Case: Tiêu hủy (Staff)">
+  <diagram id="11_tieu_huy_staff-id" name="Use Case: Tiêu hủy (Staff)">
     <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" connect="1" arrows="1">
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
-        <mxCell id="system_boundary" value="Use Case: Tiêu hủy (Staff)" style="swimlane;whiteSpace=wrap;html=1;startSize=30;fillColor=#f8f9fa;strokeColor=#cccccc;fontStyle=1;align=center;" vertex="1" parent="1">
-          <mxGeometry x="220" y="50" width="650" height="380" as="geometry"/>
+        <mxCell id="system_boundary" value="Hệ thống Quản lý Kho - Tiêu hủy (Staff)" style="swimlane;whiteSpace=wrap;html=1;startSize=30;fillColor=#f8f9fa;strokeColor=#cccccc;fontStyle=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="220" y="40" width="680" height="400" as="geometry"/>
         </mxCell>
+        <!-- Actor -->
         <mxCell id="act_staff" value="Staff" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontColor=#1a1a1a;fontStyle=1;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="80" y="100" width="50" height="90" as="geometry"/>
+          <mxGeometry x="70" y="160" width="50" height="90" as="geometry"/>
         </mxCell>
+        <!-- UC1: Xem phiếu Tiêu hủy -->
         <mxCell id="uc_view" value="Xem phiếu Tiêu hủy" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;" vertex="1" parent="1">
-          <mxGeometry x="260" y="100" width="185" height="60" as="geometry"/>
+          <mxGeometry x="270" y="90" width="190" height="60" as="geometry"/>
         </mxCell>
-        <mxCell id="uc_de_xuat" value="Đề xuất Tiêu hủy" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;" vertex="1" parent="1">
-          <mxGeometry x="260" y="200" width="185" height="60" as="geometry"/>
+        <!-- UC2: Tạo đề xuất Tiêu hủy -->
+        <mxCell id="uc_de_xuat" value="Tạo đề xuất Tiêu hủy&#xa;(Lưu thẳng thành PENDING_ADMIN)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="270" y="210" width="220" height="70" as="geometry"/>
         </mxCell>
-        <mxCell id="uc_chon_sp" value="Chọn sản phẩm hỏng/cận date" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;" vertex="1" parent="1">
-          <mxGeometry x="560" y="200" width="185" height="60" as="geometry"/>
+        <!-- UC3: Chọn sản phẩm hỏng/cận date -->
+        <mxCell id="uc_chon_sp" value="Chọn sản phẩm hỏng / cận date" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="580" y="80" width="200" height="60" as="geometry"/>
         </mxCell>
-        <mxCell id="uc_ghi_ly_do" value="Đính kèm hình ảnh và Lý do" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;" vertex="1" parent="1">
-          <mxGeometry x="560" y="300" width="185" height="60" as="geometry"/>
+        <!-- UC4: Nhập lý do tiêu hủy (bắt buộc) -->
+        <mxCell id="uc_ly_do" value="Nhập lý do tiêu hủy&#xa;(Bắt buộc)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="580" y="170" width="200" height="60" as="geometry"/>
         </mxCell>
-        <mxCell id="uc_huy_nhap" value="Xóa Đề xuất Nháp" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;" vertex="1" parent="1">
-          <mxGeometry x="260" y="300" width="185" height="60" as="geometry"/>
+        <!-- UC5: Chọn phương pháp tiêu hủy -->
+        <mxCell id="uc_phuong_phap" value="Chọn phương pháp tiêu hủy&#xa;(Tùy chọn)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="580" y="260" width="200" height="60" as="geometry"/>
         </mxCell>
+        <!-- UC6: Đính kèm hình ảnh minh chứng -->
+        <mxCell id="uc_dinh_kem" value="Đính kèm hình ảnh minh chứng&#xa;(Tùy chọn)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fb8c00;strokeWidth=2;fontStyle=1;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="580" y="350" width="200" height="60" as="geometry"/>
+        </mxCell>
+        <!-- Ghi chú: Staff KHÔNG THỂ SỬA hay HỦY phiếu DISPOSAL vì nó được tạo ra ở trạng thái PENDING_ADMIN luôn (không qua DRAFT) -->
+        <!-- Edges: Actor -> Use Cases -->
         <mxCell id="edge_0" value="" style="endArrow=none;html=1;rounded=0;strokeColor=#4a90d9;strokeWidth=1.5;" edge="1" parent="1" source="act_staff" target="uc_view">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="edge_1" value="" style="endArrow=none;html=1;rounded=0;strokeColor=#4a90d9;strokeWidth=1.5;" edge="1" parent="1" source="act_staff" target="uc_de_xuat">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
+        <!-- Edges: Include relationships -->
         <mxCell id="edge_2" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;strokeColor=#555555;strokeWidth=1.5;labelBackgroundColor=#ffffff;fontColor=#333333;fontSize=10;align=center;" edge="1" parent="1" source="uc_de_xuat" target="uc_chon_sp">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="edge_3" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;strokeColor=#555555;strokeWidth=1.5;labelBackgroundColor=#ffffff;fontColor=#333333;fontSize=10;align=center;" edge="1" parent="1" source="uc_de_xuat" target="uc_ghi_ly_do">
+        <mxCell id="edge_3" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;strokeColor=#555555;strokeWidth=1.5;labelBackgroundColor=#ffffff;fontColor=#333333;fontSize=10;align=center;" edge="1" parent="1" source="uc_de_xuat" target="uc_ly_do">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="edge_4" value="" style="endArrow=none;html=1;rounded=0;strokeColor=#4a90d9;strokeWidth=1.5;" edge="1" parent="1" source="act_staff" target="uc_huy_nhap">
+        <!-- Edges: Extend relationships -->
+        <mxCell id="edge_4" value="&amp;lt;&amp;lt;extend&amp;gt;&amp;gt;" style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;strokeColor=#888888;strokeWidth=1.5;labelBackgroundColor=#ffffff;fontColor=#333333;fontSize=10;align=center;" edge="1" parent="1" source="uc_phuong_phap" target="uc_de_xuat">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_5" value="&amp;lt;&amp;lt;extend&amp;gt;&amp;gt;" style="endArrow=open;endSize=12;dashed=1;html=1;rounded=0;strokeColor=#888888;strokeWidth=1.5;labelBackgroundColor=#ffffff;fontColor=#333333;fontSize=10;align=center;" edge="1" parent="1" source="uc_dinh_kem" target="uc_de_xuat">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
       </root>

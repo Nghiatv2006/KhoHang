@@ -150,7 +150,8 @@ public class ProductServiceImpl implements ProductService {
                 throw new RuntimeException("Ngày sản xuất không thể lớn hơn hạn sử dụng.");
             }
         }
-        String normalizedName = request.getName().replaceAll("[\u200B-\u200D\uFEFF]", "").replaceAll("\\s+", " ").trim();
+        // Áp dụng thuật toán chuẩn hóa tên máy, bóc tách dung lượng và kiểm tra chéo theo danh mục
+        String normalizedName = com.example.Hehe.util.ProductFormatUtil.validateAndFormatProductName(request.getName(), category.getName());
 
         // Kiểm tra xem trong danh mục đã có sản phẩm này chưa
         if (productRepository.existsByNameIgnoreCaseAndCategoryIdAndIsDeletedFalse(normalizedName, categoryId)) {
@@ -205,7 +206,8 @@ public class ProductServiceImpl implements ProductService {
         Category category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new RuntimeException("Danh mục không tồn tại trong hệ thống."));
 
-        String normalizedName = request.getName().replaceAll("[\u200B-\u200D\uFEFF]", "").replaceAll("\\s+", " ").trim();
+        // Áp dụng thuật toán chuẩn hóa tên máy, bóc tách dung lượng và kiểm tra chéo theo danh mục
+        String normalizedName = com.example.Hehe.util.ProductFormatUtil.validateAndFormatProductName(request.getName(), category.getName());
 
         // Kiểm tra trùng tên trong cùng danh mục (loại trừ chính nó)
         if (productRepository.existsByNameIgnoreCaseAndCategoryIdAndIdNotAndIsDeletedFalse(normalizedName, categoryId, id)) {
@@ -391,6 +393,11 @@ public class ProductServiceImpl implements ProductService {
     public Map<String, Object> importProductsFromExcel(MultipartFile file, boolean preview, User currentUser) {
         checkPermission(currentUser);
 
+        String filename = file.getOriginalFilename();
+        if (filename == null || !(filename.toLowerCase().endsWith(".xlsx") || filename.toLowerCase().endsWith(".xls"))) {
+            throw new RuntimeException("Tải lên thất bại: Hệ thống chỉ chấp nhận file Excel. Vui lòng kiểm tra lại định dạng file của bạn!");
+        }
+
         int newCount = 0;
         int updateCount = 0;
         int skippedCount = 0;
@@ -439,12 +446,14 @@ public class ProductServiceImpl implements ProductService {
                 if (isRowEmpty) continue;
 
                 try {
-                    String name = getCellValueAsString(row.getCell(headerMap.get("Tên sản phẩm")));
-                    if (name.isEmpty()) throw new RuntimeException("Tên sản phẩm không được để trống.");
-                    name = name.replaceAll("[\u200B-\u200D\uFEFF]", "").replaceAll("\\s+", " ").trim();
+                    String rawName = getCellValueAsString(row.getCell(headerMap.get("Tên sản phẩm")));
+                    if (rawName.isEmpty()) throw new RuntimeException("Tên sản phẩm không được để trống.");
 
                     String categoryName = getCellValueAsString(row.getCell(headerMap.get(catColName)));
                     if (categoryName.isEmpty()) throw new RuntimeException("Tên Danh mục không được để trống.");
+
+                    // Validate & Format name based on category
+                    String name = com.example.Hehe.util.ProductFormatUtil.validateAndFormatProductName(rawName, categoryName);
 
                     String normalizedSearchName = normalizeString(categoryName);
                     Category category = null;
@@ -592,6 +601,10 @@ public class ProductServiceImpl implements ProductService {
             }
             
         } catch (Exception e) {
+            String exName = e.getClass().getName();
+            if (exName.contains("NotOfficeXmlFileException") || exName.contains("OfficeXmlFileException") || exName.contains("ZipException")) {
+                throw new RuntimeException("Tải lên thất bại: Định dạng file không hợp lệ! Có vẻ file này đã bị đổi đuôi mạo danh Excel. Vui lòng sử dụng file Excel (.xlsx) chuẩn.");
+            }
             throw new RuntimeException("Lỗi khi đọc file Excel: " + e.getMessage());
         }
 

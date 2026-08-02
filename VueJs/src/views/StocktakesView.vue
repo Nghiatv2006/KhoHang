@@ -293,7 +293,7 @@ async function approveStocktakeDeviation() {
         }
       } else {
         if (!approveForm.value.responsiblePersonName.trim()) {
-          toast.error('Vui lòng nhập tên đối tượng bên ngoài (Khách hàng, Kẻ gian...).')
+          toast.error('Vui lòng nhập tên người chịu trách nhiệm (Thủ kho, Khách hàng...).')
           actionLoading.value = false
           return
         }
@@ -1076,7 +1076,7 @@ onUnmounted(() => {
             <textarea
               v-model="selectedStocktake.notes"
               @input="triggerAutoSave"
-              :disabled="selectedStocktake.status !== 'DRAFT' && !(selectedStocktake.status === 'PENDING_APPROVAL' && isManager)"
+              :disabled="selectedStocktake.status !== 'DRAFT'"
               rows="2"
               placeholder="Nhập ghi chú hoặc lý do kiểm kê đợt này..."
               class="w-full p-4 border border-[#e2e8f0] bg-[#f8f9fa] rounded-xl text-sm focus:ring-2 focus:ring-[var(--accent-500)]/20 focus:border-[var(--accent-500)] outline-none transition-all text-[#364a63] disabled:opacity-75 disabled:cursor-not-allowed"
@@ -1122,7 +1122,7 @@ onUnmounted(() => {
                     <td class="p-3 text-right font-mono font-bold">{{ d.expectedQuantity }}</td>
                     <td class="p-3 text-center">
                       <input
-                        v-if="canEditDraft || (selectedStocktake.status === 'PENDING_APPROVAL' && isManager)"
+                        v-if="canEditDraft"
                         v-model.number="d.actualQuantity"
                         @input="triggerAutoSave"
                         type="number"
@@ -1659,11 +1659,11 @@ onUnmounted(() => {
           <div class="flex gap-4 mb-3">
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="radio" v-model="approveForm.responsibleType" value="internal" class="text-[#4361ee] focus:ring-[#4361ee]" />
-              <span class="text-sm text-slate-700 font-medium">Nhân viên nội bộ</span>
+              <span class="text-sm text-slate-700 font-medium">Chọn từ danh sách nhân viên hệ thống</span>
             </label>
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="radio" v-model="approveForm.responsibleType" value="external" class="text-[#4361ee] focus:ring-[#4361ee]" />
-              <span class="text-sm text-slate-700 font-medium">Đối tượng bên ngoài (Khách hàng, Kẻ gian...)</span>
+              <span class="text-sm text-slate-700 font-medium">Tự nhập tên (Thủ kho, Khách hàng, Người ngoài...)</span>
             </label>
           </div>
           
@@ -1680,7 +1680,7 @@ onUnmounted(() => {
             <input
               v-model="approveForm.responsiblePersonName"
               type="text"
-              placeholder="VD: Đối tác giao hàng bên ngoài, Nhà cung cấp X..."
+              placeholder="VD: Ông Bảo (Thủ kho), Khách hàng, Nhà cung cấp X..."
               class="w-full p-3 border border-[#e2e8f0] bg-white rounded-xl text-sm focus:ring-2 focus:ring-[#4361ee]/20 focus:border-[#4361ee] outline-none"
             />
           </template>

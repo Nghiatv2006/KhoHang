@@ -1,336 +1,3 @@
-<script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
-import { api } from '../api'
-import { useToast } from '../utils/toast'
-import AppModal from '../components/AppModal.vue'
-import ConfirmDialog from '../components/ConfirmDialog.vue'
-
-const toast = useToast()
-const user = ref<any>(JSON.parse(localStorage.getItem('wh_user') || '{}'))
-const isManager = computed(() => ['ADMIN', 'MANAGER'].includes(user.value?.role))
-
-// ─── View Mode ──────────────────────────────────────────────────────────────
-
-// ─── Tabs ───────────────────────────────────────────────────────────────────
-const activeTab = ref<'products' | 'categories'>('products')
-
-// ─── Products ───────────────────────────────────────────────────────────────
-const products = ref<any[]>([])
-const categories = ref<any[]>([])
-const pLoading = ref(true)
-const pSearch = ref('')
-const pCategoryId = ref<number | ''>('')
-
-const currentPage = ref(0)
-const totalPages = ref(1)
-const totalElements = ref(0)
-
-const filteredProducts = computed(() => products.value)
-
-// Product Modal
-const showProductModal = ref(false)
-const isSpaceEasterEgg = ref(false)
-const editingProduct = ref<any>(null)
-const productForm = reactive({
-  name: '', categoryId: '' as number | '',
-  importPrice: '' as any, price: '' as any, unit: 'Chiếc', imageUrl: ''
-})
-const pSaving = ref(false)
-const uploadingImage = ref(false)
-
-// Conflict Dialog removed
-
-async function handleImageUpload(event: Event) {
-  const target = event.target as HTMLInputElement
-  if (!target.files || target.files.length === 0) return
-  
-  const file = target.files[0]
-  
-  if (!file.type.startsWith('image/')) {
-    toast.error('Chỉ chấp nhận file hình ảnh!')
-    target.value = ''
-    return
-  }
-
-  const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg']
-  const extension = file.name.split('.').pop()?.toLowerCase() || ''
-  if (!allowedExtensions.includes(extension)) {
-    toast.error('Chỉ chấp nhận định dạng ảnh (jpg, jpeg, png, gif, webp, svg)!')
-    target.value = ''
-    return
-  }
-
-  const formData = new FormData()
-  formData.append('file', file)
-  
-  uploadingImage.value = true
-  try {
-    const res = await api.upload('/api/upload', formData)
-    const data = await res.json()
-    if (res.ok) {
-      productForm.imageUrl = data.url
-      toast.success('Tải ảnh lên thành công!')
-    } else {
-      toast.error(data.error || 'Lỗi tải ảnh')
-    }
-  } catch (error) {
-    toast.error('Không thể kết nối máy chủ khi tải ảnh.')
-  } finally {
-    uploadingImage.value = false
-    // Reset file input so user can select the same file again if needed
-    target.value = ''
-  }
-}
-
-function openAddProduct() {
-  isSpaceEasterEgg.value = Math.random() < 0.004;
-  editingProduct.value = null
-  Object.assign(productForm, { name: '', categoryId: '', importPrice: '', price: '', unit: 'Chiếc', imageUrl: '' })
-  showProductModal.value = true
-}
-function openEditProduct(p: any) {
-  isSpaceEasterEgg.value = Math.random() < 0.004;
-  editingProduct.value = p
-  Object.assign(productForm, {
-    name: p.name, categoryId: p.categoryId || '',
-    importPrice: p.importPrice, price: p.price, unit: p.unit || 'Chiếc', imageUrl: p.imageUrl || ''
-  })
-  showProductModal.value = true
-}
-async function saveProduct() {
-  if (!productForm.name?.trim()) {
-    toast.error('Tên sản phẩm là bắt buộc.')
-    return
-  }
-  if (!productForm.categoryId) {
-    toast.error('Vui lòng chọn danh mục cho sản phẩm.')
-    return
-  }
-  pSaving.value = true
-  try {
-    const payload = {
-      name: productForm.name.trim(),
-      categoryId: productForm.categoryId || null,
-      importPrice: productForm.importPrice || 0,
-      price: productForm.price || 0,
-      unit: productForm.unit || 'Chiếc',
-      imageUrl: productForm.imageUrl
-    }
-    const res = editingProduct.value
-      ? await api.put(`/api/products/${editingProduct.value.id}`, payload)
-      : await api.post('/api/products', payload)
-    
-    let data = {}
-    try { data = await res.json() } catch {}
-
-    if (res.ok) {
-      const productName = (data as any).name || payload.name;
-      toast.success(editingProduct.value ? `Cập nhật sản phẩm ${productName} thành công!` : `Thêm sản phẩm ${productName} thành công!`)
-      showProductModal.value = false
-      await loadProducts(editingProduct.value ? currentPage.value : 0)
-    } else {
-      toast.error((data as any).message || 'Có lỗi xảy ra.')
-    }
-  } catch { toast.error('Không thể kết nối máy chủ.') }
-  finally { pSaving.value = false }
-}
-
-// Delete product
-const showDeleteProduct = ref(false)
-const deletingProduct = ref<any>(null)
-function confirmDeleteProduct(p: any) { deletingProduct.value = p; showDeleteProduct.value = true }
-async function doDeleteProduct() {
-  if (!deletingProduct.value) return
-  try {
-    const res = await api.delete(`/api/products/${deletingProduct.value.id}`)
-    let data = {}
-    try { data = await res.json() } catch {}
-    if (res.ok) { toast.success('Xóa sản phẩm thành công!'); await loadProducts(currentPage.value) }
-    else toast.error((data as any).message || 'Không thể xóa sản phẩm.')
-  } catch { toast.error('Có lỗi xảy ra.') }
-  finally { showDeleteProduct.value = false }
-}
-
-// Import Excel
-const importingExcel = ref(false)
-const pendingImportFile = ref<File | null>(null)
-const importPreviewResult = ref<any>(null)
-const importResult = ref<{ newCount?: number; updateCount?: number; skippedCount?: number; successCount: number; errors: string[]; updateDetails?: string[] } | null>(null)
-
-function downloadTemplate() {
-  window.open('/api/products/template', '_blank')
-}
-
-async function handleExcelImport(event: Event) {
-  const target = event.target as HTMLInputElement
-  if (!target.files || target.files.length === 0) return
-  
-  const file = target.files[0]
-  
-  const extension = file.name.split('.').pop()?.toLowerCase() || ''
-  if (!['xlsx', 'xls'].includes(extension)) {
-    toast.error('Tải lên thất bại: Hệ thống chỉ chấp nhận file Excel. Vui lòng kiểm tra lại định dạng file của bạn!')
-    target.value = ''
-    return
-  }
-
-  pendingImportFile.value = file
-  
-  const formData = new FormData()
-  formData.append('file', file)
-  
-  importingExcel.value = true
-  try {
-    const res = await api.upload('/api/products/import?preview=true', formData)
-    const data = await res.json()
-    if (res.ok) {
-      importPreviewResult.value = {
-        ...data,
-        showNew: true,
-        showUpdate: true
-      }
-    } else {
-      toast.error(data.message || 'Lỗi phân tích file Excel')
-      pendingImportFile.value = null
-    }
-  } catch (error) {
-    toast.error('Không thể kết nối máy chủ.')
-    pendingImportFile.value = null
-  } finally {
-    importingExcel.value = false
-    target.value = ''
-  }
-}
-
-async function confirmExcelImport() {
-  if (!pendingImportFile.value) return
-  
-  const formData = new FormData()
-  formData.append('file', pendingImportFile.value)
-  
-  importingExcel.value = true
-  try {
-    const res = await api.upload('/api/products/import?preview=false', formData)
-    const data = await res.json()
-    if (res.ok) {
-      importResult.value = data
-      toast.success('Nhập và cập nhật sản phẩm thành công!')
-      await loadProducts(0)
-    } else {
-      toast.error(data.message || 'Lỗi khi lưu dữ liệu Excel')
-    }
-  } catch (error) {
-    toast.error('Không thể kết nối máy chủ.')
-  } finally {
-    importingExcel.value = false
-    importPreviewResult.value = null
-    pendingImportFile.value = null
-  }
-}
-
-function cancelExcelImport() {
-  importPreviewResult.value = null
-  pendingImportFile.value = null
-}
-
-// ─── Categories ─────────────────────────────────────────────────────────────
-const cLoading = ref(false)
-const cSearch = ref('')
-
-const cCurrentPage = ref(0)
-const cTotalPages = ref(1)
-const cTotalElements = ref(0)
-
-const filteredCategories = computed(() => categories.value)
-
-const showCatModal = ref(false)
-const editingCat = ref<any>(null)
-const catForm = reactive({ name: '', description: '' })
-const catSaving = ref(false)
-const showDeleteCat = ref(false)
-const deletingCat = ref<any>(null)
-
-function openAddCat() { isSpaceEasterEgg.value = Math.random() < 0.004; editingCat.value = null; Object.assign(catForm, { name: '', description: '' }); showCatModal.value = true }
-function openEditCat(c: any) { isSpaceEasterEgg.value = Math.random() < 0.004; editingCat.value = c; Object.assign(catForm, { name: c.name, description: c.description || '' }); showCatModal.value = true }
-function confirmDeleteCat(c: any) { deletingCat.value = c; showDeleteCat.value = true }
-
-async function saveCat() {
-  if (!catForm.name?.trim()) { toast.error('Tên danh mục không được để trống.'); return }
-  catSaving.value = true
-  try {
-    const payload = { name: catForm.name.trim(), description: catForm.description }
-    const res = editingCat.value
-      ? await api.put(`/api/categories/${editingCat.value.id}`, payload)
-      : await api.post('/api/categories', payload)
-    let data = {}
-    try { data = await res.json() } catch {}
-    if (res.ok) {
-      toast.success(editingCat.value ? 'Cập nhật danh mục thành công!' : 'Thêm danh mục thành công!')
-      showCatModal.value = false
-      await loadCategories(editingCat.value ? cCurrentPage.value : 0)
-    } else toast.error((data as any).message || 'Có lỗi xảy ra.')
-  } catch { toast.error('Không thể kết nối máy chủ.') }
-  finally { catSaving.value = false }
-}
-async function doDeleteCat() {
-  if (!deletingCat.value) return
-  try {
-    const res = await api.delete(`/api/categories/${deletingCat.value.id}`)
-    let data = {}
-    try { data = await res.json() } catch {}
-    if (res.ok) { toast.success('Xóa danh mục thành công!'); await loadCategories(cCurrentPage.value) }
-    else toast.error((data as any).message || 'Không thể xóa danh mục.')
-  } catch { toast.error('Có lỗi xảy ra.') }
-  finally { showDeleteCat.value = false }
-}
-
-// ─── Load data ───────────────────────────────────────────────────────────────
-async function loadProducts(page = 0) {
-  pLoading.value = true
-  currentPage.value = page
-  try {
-    const res = await api.get(`/api/products?page=${page}&size=50&keyword=${pSearch.value.trim()}&categoryId=${pCategoryId.value}`)
-    if (res.ok) {
-      const data = await res.json()
-      products.value = data.content || data
-      totalPages.value = data.totalPages || 1
-      totalElements.value = data.totalElements || products.value.length
-    }
-  } catch {} finally { pLoading.value = false }
-}
-async function loadCategories(page = 0) {
-  cLoading.value = true
-  cCurrentPage.value = page
-  try {
-    const res = await api.get(`/api/categories?page=${page}&size=50&keyword=${cSearch.value.trim()}`)
-    if (res.ok) {
-      const data = await res.json()
-      categories.value = data.content || data
-      cTotalPages.value = data.totalPages || 1
-      cTotalElements.value = data.totalElements || categories.value.length
-    }
-  } catch {} finally { cLoading.value = false }
-}
-
-onMounted(async () => {
-  await Promise.all([loadProducts(), loadCategories()])
-})
-
-watch([pSearch, pCategoryId], () => {
-  loadProducts(0)
-})
-
-watch(cSearch, () => {
-  loadCategories(0)
-})
-
-function formatCurrency(val: any) {
-  if (!val) return '—'
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(val)
-}
-
-</script>
-
 <template>
   <div class="products-view-container space-y-6 max-w-[1400px] mx-auto relative">
     
@@ -365,7 +32,7 @@ function formatCurrency(val: any) {
 
     <!-- ── PRODUCTS TAB ── -->
     <Transition name="fade" mode="out-in">
-      <div v-if="activeTab === 'products'" class="bg-white dark:bg-slate-800/40 rounded-[10px] border border-slate-100 dark:border-slate-700/50 border-t-4 border-t-indigo-500 shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden transition-colors">
+      <div v-if="activeTab === 'products'" class="bg-indigo-50/50 dark:bg-slate-800/40 rounded-[16px] border border-slate-100 dark:border-slate-700/50 border-t-4 border-t-indigo-500 shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden transition-colors">
         <!-- Toolbar -->
         <div class="p-5 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between flex-wrap gap-4 bg-slate-50 dark:bg-slate-800/80 transition-colors">
           <div class="flex items-center gap-3 flex-1 min-w-[300px]">
@@ -493,7 +160,7 @@ function formatCurrency(val: any) {
             <div>
               Hiển thị {{ filteredProducts.length }} / {{ totalElements }} sản phẩm
             </div>
-            <div v-if="totalPages >= 1" class="flex items-center gap-2">
+            <div v-if="totalPages > 1" class="flex items-center gap-2">
               <button 
                 :disabled="currentPage === 0"
                 @click="loadProducts(currentPage - 1)"
@@ -519,7 +186,7 @@ function formatCurrency(val: any) {
 
     <!-- ── CATEGORIES TAB ── -->
     <Transition name="fade" mode="out-in">
-      <div v-if="activeTab === 'categories'" class="bg-white dark:bg-slate-800/40 rounded-[10px] border border-slate-100 dark:border-slate-700/50 border-t-4 border-t-sky-500 shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden transition-colors">
+      <div v-if="activeTab === 'categories'" class="bg-sky-50/50 dark:bg-slate-800/40 rounded-[16px] border border-slate-100 dark:border-slate-700/50 border-t-4 border-t-sky-500 shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden transition-colors">
         <!-- Toolbar -->
         <div class="p-5 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between flex-wrap gap-4 bg-slate-50 dark:bg-slate-800/80 transition-colors">
           <div class="flex items-center gap-3 flex-1 min-w-[300px]">
@@ -600,7 +267,7 @@ function formatCurrency(val: any) {
             <div>
               Hiển thị {{ filteredCategories.length }} / {{ cTotalElements }} danh mục
             </div>
-            <div v-if="cTotalPages >= 1" class="flex items-center gap-2">
+            <div v-if="cTotalPages > 1" class="flex items-center gap-2">
               <button 
                 :disabled="cCurrentPage === 0"
                 @click="loadCategories(cCurrentPage - 1)"
@@ -836,56 +503,30 @@ function formatCurrency(val: any) {
     <ConfirmDialog :show="showDeleteCat" title="Xóa danh mục" :message="`Bạn có chắc muốn xóa danh mục '${deletingCat?.name}'?`" confirm-text="Xóa" :danger="true" @confirm="doDeleteCat" @cancel="showDeleteCat = false" />
 
     <!-- Import Preview Modal -->
-    <AppModal :show="!!importPreviewResult" title="Xác nhận dữ liệu nhập" size="md" @close="cancelExcelImport">
+    <AppModal :show="!!importPreviewResult" title="Phân tích File Excel" size="md" @close="cancelExcelImport">
       <div class="p-6">
         <div class="text-slate-700 dark:text-slate-300 font-medium mb-4">Hệ thống đã đọc xong file Excel, thống kê trước khi thực hiện:</div>
         
         <div class="space-y-3 mb-6">
-          <div v-if="importPreviewResult?.newCount > 0" class="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-xl border border-blue-100 dark:border-blue-800/50">
-            <div class="flex items-center gap-3 mb-2 cursor-pointer hover:opacity-80 transition-opacity select-none" @click="importPreviewResult.showNew = !importPreviewResult.showNew">
-              <i class="fas fa-plus-circle text-lg"></i>
-              <div class="flex-1">Sẽ <strong>thêm mới</strong>: {{ importPreviewResult.newCount }} sản phẩm.</div>
-              <i :class="['fas text-sm transition-transform', importPreviewResult.showNew ? 'fa-chevron-up' : 'fa-chevron-down']"></i>
-            </div>
-            <div class="grid transition-[grid-template-rows,opacity] duration-300 ease-in-out" :class="importPreviewResult.showNew ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'">
-              <div class="overflow-hidden">
-                <div class="pl-7 pt-1" v-if="importPreviewResult.newDetails?.length > 0">
-                  <ul class="space-y-2 text-sm max-h-[150px] overflow-y-auto custom-scrollbar pr-2">
-                    <li v-for="(detail, idx) in importPreviewResult.newDetails" :key="idx" class="border-b border-blue-200/50 dark:border-blue-700/50 last:border-0 pb-1.5 last:pb-0">
-                      <div class="font-bold text-blue-900 dark:text-blue-300 mb-0.5">{{ detail.name }}</div>
-                      <div class="text-blue-700/90 dark:text-blue-400/90 pl-3 border-l-2 border-blue-300 dark:border-blue-600 ml-1 text-[13px] leading-relaxed">
-                        <div>• Danh mục: {{ detail.category }}</div>
-                        <div class="flex gap-4">
-                          <span>• Giá nhập: {{ detail.importPrice }}</span>
-                          <span>• Giá bán: {{ detail.price }}</span>
-                        </div>
-                      </div>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
+          <div v-if="importPreviewResult?.newCount > 0" class="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-xl border border-blue-100 dark:border-blue-800/50">
+            <i class="fas fa-plus-circle text-lg"></i>
+            <div>Sẽ <strong>thêm mới</strong>: {{ importPreviewResult.newCount }} sản phẩm.</div>
           </div>
           
           <div v-if="importPreviewResult?.updateCount > 0" class="p-3 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded-xl border border-amber-100 dark:border-amber-800/50">
-            <div class="flex items-center gap-3 mb-2 cursor-pointer hover:opacity-80 transition-opacity select-none" @click="importPreviewResult.showUpdate = !importPreviewResult.showUpdate">
+            <div class="flex items-center gap-3 mb-2">
               <i class="fas fa-edit text-lg"></i>
-              <div class="flex-1">Sẽ <strong>cập nhật</strong>: {{ importPreviewResult.updateCount }} sản phẩm.</div>
-              <i :class="['fas text-sm transition-transform', importPreviewResult.showUpdate ? 'fa-chevron-up' : 'fa-chevron-down']"></i>
+              <div>Sẽ <strong>cập nhật</strong>: {{ importPreviewResult.updateCount }} sản phẩm.</div>
             </div>
-            <div class="grid transition-[grid-template-rows,opacity] duration-300 ease-in-out" :class="importPreviewResult.showUpdate ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'">
-              <div class="overflow-hidden">
-                <div class="pl-7 pt-1">
-                  <ul class="space-y-2 text-sm max-h-[150px] overflow-y-auto custom-scrollbar pr-2">
-                    <li v-for="(detail, idx) in importPreviewResult.updateDetails" :key="idx" class="border-b border-amber-200/50 dark:border-amber-700/50 last:border-0 pb-1.5 last:pb-0">
-                      <div class="font-bold text-amber-900 dark:text-amber-300 mb-0.5">{{ detail.name }}</div>
-                      <div class="text-amber-700/90 dark:text-amber-400/90 pl-3 border-l-2 border-amber-300 dark:border-amber-600 ml-1 text-[13px] leading-relaxed">
-                        <div v-for="(change, cIdx) in detail.changes" :key="cIdx">• Cập nhật: {{ change }}</div>
-                      </div>
-                    </li>
-                  </ul>
-                </div>
-              </div>
+            <div class="pl-7">
+              <ul class="space-y-2 text-sm max-h-[150px] overflow-y-auto custom-scrollbar pr-2">
+                <li v-for="(detail, idx) in importPreviewResult.updateDetails" :key="idx" class="border-b border-amber-200/50 dark:border-amber-700/50 last:border-0 pb-1.5 last:pb-0">
+                  <div class="font-bold text-amber-900 dark:text-amber-300 mb-0.5">{{ detail.name }}</div>
+                  <div class="text-amber-700/90 dark:text-amber-400/90 pl-3 border-l-2 border-amber-300 dark:border-amber-600 ml-1 text-[13px] leading-relaxed">
+                    <div v-for="(change, cIdx) in detail.changes" :key="cIdx">• Cập nhật: {{ change }}</div>
+                  </div>
+                </li>
+              </ul>
             </div>
           </div>
 
@@ -956,74 +597,3 @@ function formatCurrency(val: any) {
     </div>
   </div>
 </template>
-
-<style scoped>
-/* Scoped overrides here if any */
-</style>
-
-<style>
-</style>
-<style scoped>
-@keyframes spin { to { transform: rotate(360deg); } }
-.animate-spin { animation: spin 0.8s linear infinite; }
-
-.slide-panel-enter-active, .slide-panel-leave-active {
-  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.slide-panel-enter-from, .slide-panel-leave-to {
-  transform: translateX(100%);
-}
-.fade-enter-active, .fade-leave-active {
-  transition: opacity 0.4s ease;
-}
-.fade-enter-from, .fade-leave-to {
-  opacity: 0;
-}
-.custom-scrollbar::-webkit-scrollbar { width: 6px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-
-@keyframes spin-very-slow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-@keyframes moon-rock {
-  0%, 100% { transform: rotate(-15deg); }
-  50% { transform: rotate(5deg); }
-}
-.animate-spin-very-slow { animation: spin-very-slow 60s linear infinite; }
-.animate-moon-rock { animation: moon-rock 8s ease-in-out infinite; }
-</style>
-
-<style>
-/* Dynamic Modal Header Styles */
-.theme-modal-header {
-  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
-}
-.theme-light-decor {
-  opacity: 1;
-  transform: translateY(0);
-}
-.theme-dark-decor {
-  opacity: 0;
-  transform: translateY(20px);
-}
-html.dark-mode .theme-modal-header {
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-}
-html.dark-mode .theme-modal-header.easter-egg-space {
-  background: linear-gradient(135deg, #090a0f 0%, #1b1130 50%, #0c0817 100%) !important;
-}
-html.dark-mode .theme-light-decor {
-  opacity: 0;
-  transform: translateY(-20px);
-}
-html.dark-mode .theme-dark-decor {
-  opacity: 1;
-  transform: translateY(0);
-}
-.theme-modal-header.easter-egg-space {
-  background: linear-gradient(135deg, #090a0f 0%, #1b1130 50%, #0c0817 100%) !important;
-}
-</style>

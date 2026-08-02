@@ -36,6 +36,8 @@ const ACTION_LABELS: Record<string, string> = {
   'LOGIN':         'Đăng nhập',
   'LOGOUT':        'Đăng xuất',
   'CREATE':        'Thêm mới',
+  'CREATE_RECEIPT':'Tạo phiếu',
+  'CREATE_DISPOSAL_RECEIPT':'Tạo phiếu tiêu hủy',
   'UPDATE':        'Cập nhật',
   'DELETE':        'Xóa',
   'RESTORE':       'Khôi phục',
@@ -211,6 +213,8 @@ function actionColor(action: string, isWarning: boolean) {
     'LOGIN':  'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800/50',
     'LOGOUT': 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
     'CREATE': 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800/50',
+    'CREATE_RECEIPT': 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/50',
+    'CREATE_DISPOSAL_RECEIPT': 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200 dark:bg-fuchsia-900/30 dark:text-fuchsia-400 dark:border-fuchsia-800/50',
     'UPDATE': 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800/50',
     'DELETE': 'bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800/50',
     'RESTORE': 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-900/30 dark:text-sky-400 dark:border-sky-800/50',
@@ -288,6 +292,7 @@ watch([filterKeyword, filterUserId, filterAction, filterFrom, filterTo, filterTi
 
 watch(currentPage, () => {
   triggerSearch()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 })
 </script>
 
@@ -444,6 +449,9 @@ watch(currentPage, () => {
                           <span v-else-if="log.action === 'IMPORT_EXCEL'">
                             Xem chi tiết (+{{ log.details.split('\n').length - 1 }} sản phẩm)
                           </span>
+                          <span v-else-if="log.action === 'APPROVE' && log.details.includes('Tiêu hủy')">
+                            Xem chi tiết (+{{ log.details.split('\n').length - 1 }} sản phẩm tiêu hủy)
+                          </span>
                           <span v-else>
                             Xem chi tiết (+{{ log.details.split('\n').length - 1 }} thay đổi)
                           </span>
@@ -495,16 +503,23 @@ watch(currentPage, () => {
                 </button>
                 
                 <div v-else-if="typeof item === 'string' && item.startsWith('...')" class="relative flex items-center justify-center w-8 h-8">
-                  <div v-if="showJumpInput === item.replace('...', '')" class="absolute z-10 flex items-center bottom-10">
-                    <input v-model="jumpPageNumber" @keyup.enter="handleJump" @blur="handleJump" v-focus
-                           type="number" min="1" :max="totalPages"
-                           class="w-16 h-9 px-2 text-center text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 border-2 border-indigo-500 rounded-lg outline-none shadow-xl"
-                           placeholder="Trang" />
-                  </div>
-                  <button v-else @click="openJumpInput(item.replace('...', '') as 'left' | 'right')"
+                  <button @click="openJumpInput(item.replace('...', '') as 'left' | 'right')"
                           class="w-8 h-8 flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer" title="Nhảy đến trang">
                     <i class="fas fa-ellipsis-h text-[10px]"></i>
                   </button>
+                  <div v-if="showJumpInput === item.replace('...', '')" class="absolute z-50 bottom-full mb-2 bg-white dark:bg-slate-900 shadow-[0_4px_15px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-600 transform -translate-x-1/2 left-1/2 w-[140px] flex flex-col">
+                    <div class="bg-slate-700 dark:bg-slate-800 text-white font-bold text-[13px] px-2.5 py-1.5 text-left">
+                      Chuyển trang...
+                    </div>
+                    <div class="p-2 flex items-center gap-2">
+                      <input v-model="jumpPageNumber" @keyup.enter="handleJump" @blur="handleJump" v-focus
+                             type="number" min="1" :max="totalPages"
+                             class="flex-1 w-0 h-[28px] px-1 text-center text-[13px] font-semibold text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-[3px] outline-none focus:border-indigo-500" />
+                      <button @mousedown.prevent="handleJump" class="w-[36px] h-[28px] bg-slate-700 dark:bg-slate-800 hover:bg-slate-800 text-white font-bold text-[13px] rounded-[3px] transition-colors cursor-pointer">
+                        Đi
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </template>
 
