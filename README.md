@@ -186,3 +186,5 @@ ABSTRACT_API_KEY=your_abstract_api_key
 
 - **[Abstract API - Email Reputation API](https://www.abstractapi.com/api/email-verification-validation-api):** Được tích hợp tại [UserController.java](file:///d:/IT/Hehe/src/main/java/com/example/Hehe/controller/UserController.java) để kiểm tra khả năng gửi/nhận thư (`email_deliverability`) của email người dùng.
 - **Gmail SMTP Server:** Dịch vụ gửi email tự động thông qua Spring Mail.
+
+Mọi thắc mắc có thể liên hệ đến email : trannghia2006nd@gmail.com
